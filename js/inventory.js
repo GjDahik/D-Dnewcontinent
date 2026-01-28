@@ -361,6 +361,42 @@ function deleteAllItems() {
         .catch(e => showToast('Error: ' + e.message, true));
 }
 
+// ==================== HELPER: Leer archivos CSV o Excel ====================
+function readFileAsTextForInventory(file, callback) {
+    const fileName = file.name.toLowerCase();
+    const isExcel = fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
+    
+    if (isExcel) {
+        // Leer archivo Excel usando SheetJS
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                
+                // Obtener la primera hoja
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                
+                // Convertir a CSV
+                const csv = XLSX.utils.sheet_to_csv(worksheet);
+                callback(csv);
+            } catch (error) {
+                showToast('Error al leer archivo Excel: ' + error.message, true);
+                console.error('Error leyendo Excel:', error);
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    } else {
+        // Leer archivo CSV normalmente
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            callback(e.target.result);
+        };
+        reader.readAsText(file);
+    }
+}
+
 // ==================== CSV IMPORT FOR INVENTORY ====================
 // Plantillas CSV para descargar (mismo contenido que csv-plantillas/)
 const CSV_TEMPLATES = {
@@ -541,7 +577,7 @@ function processCSVUpload() {
     const file = fileInput.files[0];
     
     if (!file) {
-        showToast('Por favor selecciona un archivo CSV', true);
+        showToast('Por favor selecciona un archivo CSV o Excel', true);
         return;
     }
 
@@ -563,14 +599,12 @@ function processCSVUpload() {
     const isBiblioteca = tipo === 'biblioteca';
     const isEmporio = tipo === 'emporio';
 
-    const reader = new FileReader();
-    reader.onload = function(e) {
+    readFileAsTextForInventory(file, function(text) {
         try {
-            const text = e.target.result;
             const lines = text.split('\n').filter(function(line) { return line.trim(); });
             
             if (lines.length < 2) {
-                showToast('El archivo CSV está vacío o solo tiene encabezados', true);
+                showToast('El archivo está vacío o solo tiene encabezados', true);
                 return;
             }
 
@@ -710,7 +744,7 @@ function processCSVUpload() {
             }
 
             if (count === 0) {
-                showToast('No se encontraron items válidos en el CSV', true);
+                showToast('No se encontraron items válidos en el archivo', true);
                 if (errors.length > 0) {
                     console.error('Errores:', errors);
                 }
@@ -740,14 +774,8 @@ function processCSVUpload() {
                 });
 
         } catch (error) {
-            showToast('Error al procesar el CSV: ' + error.message, true);
+            showToast('Error al procesar el archivo: ' + error.message, true);
             console.error(error);
         }
-    };
-
-    reader.onerror = function() {
-        showToast('Error al leer el archivo', true);
-    };
-
-    reader.readAsText(file);
+    });
 }

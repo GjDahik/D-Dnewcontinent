@@ -86,11 +86,11 @@ async function loadLoginPlayers() {
     try {
         const snap = await db.collection('players').get();
         const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
-        sel.innerHTML = '<option value="">— Selecciona tu personaje —</option>';
+        sel.innerHTML = '<option value="">— Selecciona tu aventurero —</option>';
         list.forEach(p => {
             const opt = document.createElement('option');
             opt.value = p.nombre || '';
-            opt.textContent = (p.nombre || 'Sin nombre') + (p.clase ? ' • ' + p.clase : '');
+            opt.textContent = p.nombre || 'Sin nombre';
             opt.dataset.id = p.id;
             sel.appendChild(opt);
         });
@@ -184,30 +184,64 @@ function showLoginModal() {
 }
 
 const DEFAULT_MAP_IMAGE_URL = 'https://i.imgur.com/ppAIykX.png';
+const DEFAULT_CONTINENT_NAME = 'Nueva Valdoria';
 
 async function loadMapImage() {
     try {
         const snap = await db.collection('settings').doc('map').get();
-        const url = (snap.exists && snap.data().imageUrl) ? snap.data().imageUrl.trim() : DEFAULT_MAP_IMAGE_URL;
+        const data = snap.exists ? snap.data() : {};
+        const url = (data.imageUrl) ? data.imageUrl.trim() : DEFAULT_MAP_IMAGE_URL;
+        const continentName = (data.continentName) ? data.continentName.trim() : DEFAULT_CONTINENT_NAME;
+        
         const mapImg = document.getElementById('map-img');
         const playerMapImg = document.getElementById('player-map-img');
         const inputEl = document.getElementById('map-image-url');
+        const continentInputEl = document.getElementById('map-continent-name');
+        const mapTitleDM = document.getElementById('map-title-dm');
+        const mapTitlePlayer = document.getElementById('map-title-player');
+        
         if (mapImg) mapImg.src = url;
         if (playerMapImg) playerMapImg.src = url;
         if (inputEl && isDM()) inputEl.value = url;
+        if (continentInputEl && isDM()) continentInputEl.value = continentName;
+        
+        // Actualizar títulos del mapa
+        if (mapTitleDM) mapTitleDM.textContent = '🗺️ Mapa de ' + continentName;
+        if (mapTitlePlayer) mapTitlePlayer.textContent = '🗺️ Mapa de ' + continentName;
+        
+        // Actualizar atributos alt de las imágenes
+        if (mapImg) mapImg.alt = 'Mapa de ' + continentName;
+        if (playerMapImg) playerMapImg.alt = 'Mapa de ' + continentName;
+        
+        // Actualizar texto de jugadores
+        const playersContinentText = document.getElementById('players-continent-text');
+        if (playersContinentText) playersContinentText.textContent = 'Los héroes de ' + continentName;
     } catch (e) {
         const mapImg = document.getElementById('map-img');
         const playerMapImg = document.getElementById('player-map-img');
+        const mapTitleDM = document.getElementById('map-title-dm');
+        const mapTitlePlayer = document.getElementById('map-title-player');
+        
         if (mapImg) mapImg.src = DEFAULT_MAP_IMAGE_URL;
         if (playerMapImg) playerMapImg.src = DEFAULT_MAP_IMAGE_URL;
+        if (mapTitleDM) mapTitleDM.textContent = '🗺️ Mapa de ' + DEFAULT_CONTINENT_NAME;
+        if (mapTitlePlayer) mapTitlePlayer.textContent = '🗺️ Mapa de ' + DEFAULT_CONTINENT_NAME;
+        
+        // Actualizar texto de jugadores
+        const playersContinentText = document.getElementById('players-continent-text');
+        if (playersContinentText) playersContinentText.textContent = 'Los héroes de ' + DEFAULT_CONTINENT_NAME;
     }
 }
 
 async function saveMapImage() {
     if (!isDM()) return;
     const inputEl = document.getElementById('map-image-url');
+    const continentInputEl = document.getElementById('map-continent-name');
     if (!inputEl) return;
+    
     const url = (inputEl.value || '').trim();
+    const continentName = (continentInputEl && continentInputEl.value) ? continentInputEl.value.trim() : DEFAULT_CONTINENT_NAME;
+    
     if (!url) {
         showToast('Escribe la URL de la imagen (ej: https://i.imgur.com/xxxxx.png)', true);
         return;
@@ -217,11 +251,31 @@ async function saveMapImage() {
         return;
     }
     try {
-        await db.collection('settings').doc('map').set({ imageUrl: url }, { merge: true });
+        await db.collection('settings').doc('map').set({ 
+            imageUrl: url,
+            continentName: continentName || DEFAULT_CONTINENT_NAME
+        }, { merge: true });
+        
         const mapImg = document.getElementById('map-img');
         const playerMapImg = document.getElementById('player-map-img');
-        if (mapImg) mapImg.src = url;
-        if (playerMapImg) playerMapImg.src = url;
+        const mapTitleDM = document.getElementById('map-title-dm');
+        const mapTitlePlayer = document.getElementById('map-title-player');
+        
+        if (mapImg) {
+            mapImg.src = url;
+            mapImg.alt = 'Mapa de ' + continentName;
+        }
+        if (playerMapImg) {
+            playerMapImg.src = url;
+            playerMapImg.alt = 'Mapa de ' + continentName;
+        }
+        if (mapTitleDM) mapTitleDM.textContent = '🗺️ Mapa de ' + continentName;
+        if (mapTitlePlayer) mapTitlePlayer.textContent = '🗺️ Mapa de ' + continentName;
+        
+        // Actualizar texto de jugadores
+        const playersContinentText = document.getElementById('players-continent-text');
+        if (playersContinentText) playersContinentText.textContent = 'Los héroes de ' + continentName;
+        
         showToast('Mapa actualizado correctamente');
     } catch (e) {
         showToast('Error al guardar: ' + e.message, true);
@@ -550,28 +604,141 @@ function playerDirectorioVolver() {
     document.getElementById('player-cities-list-wrap').style.display = 'block';
 }
 
-function openPlayerHabitantesModal(cityId, cityNombre) {
+// Colores para las cards de NPCs (estilo medieval/fantástico oscuro)
+const NPC_CARD_COLORS = [
+    { bg: 'linear-gradient(135deg, rgba(42,35,28,0.95), rgba(30,25,20,0.98))', border: '#4a3c31' },
+    { bg: 'linear-gradient(135deg, rgba(52,42,32,0.95), rgba(40,32,24,0.98))', border: '#5a4a3a' },
+    { bg: 'linear-gradient(135deg, rgba(45,38,30,0.95), rgba(35,28,22,0.98))', border: '#4a3c31' },
+    { bg: 'linear-gradient(135deg, rgba(38,32,26,0.95), rgba(28,24,18,0.98))', border: '#3a2e24' },
+    { bg: 'linear-gradient(135deg, rgba(50,40,30,0.95), rgba(38,30,22,0.98))', border: '#5a4634' },
+    { bg: 'linear-gradient(135deg, rgba(42,36,28,0.95), rgba(32,28,20,0.98))', border: '#4a3e30' },
+    { bg: 'linear-gradient(135deg, rgba(46,38,30,0.95), rgba(36,30,22,0.98))', border: '#4a3c2e' },
+    { bg: 'linear-gradient(135deg, rgba(40,34,28,0.95), rgba(30,26,20,0.98))', border: '#3a3028' }
+];
+
+function getNpcCardColor(index) {
+    return NPC_CARD_COLORS[index % NPC_CARD_COLORS.length];
+}
+
+async function openPlayerHabitantesModal(cityId, cityNombre) {
+    const user = getCurrentUser();
+    if (!user || !user.id) return;
+    
     const npcs = playerNpcsData.filter(n => n.ciudadId === cityId);
-    const actitudEmoji = { amigable: '😊', neutral: '😐', hostil: '😠' };
     document.getElementById('player-habitantes-modal-title').textContent = '🎭 Habitantes' + (cityNombre ? ' — ' + cityNombre : '');
     const list = document.getElementById('player-habitantes-modal-list');
+    
+    // Cargar notas del jugador
+    let playerNpcNotes = {};
+    try {
+        const playerDoc = await db.collection('players').doc(user.id).get();
+        if (playerDoc.exists) {
+            playerNpcNotes = playerDoc.data().npcNotes || {};
+        }
+    } catch (e) {
+        console.error('Error cargando notas:', e);
+    }
+    
     if (!npcs.length) {
         list.innerHTML = '<p style="color:#8b7355; text-align:center; padding:40px;">No hay habitantes registrados en esta ciudad.</p>';
     } else {
-        list.innerHTML = npcs.map(n => {
-            const act = (n.actitud || 'neutral').toLowerCase();
-            const emoji = actitudEmoji[act] || '😐';
+        list.innerHTML = npcs.map((n, idx) => {
+            const color = getNpcCardColor(idx);
+            const notes = playerNpcNotes[n.id] || '';
             return `
-            <div class="player-mistfall-npc-card">
-                <span class="player-mistfall-npc-icon">🎭</span>
+            <div class="player-mistfall-npc-card-colored" style="background: ${color.bg}; border-color: ${color.border};">
                 <div class="player-mistfall-npc-info">
                     <h3 class="player-mistfall-npc-name">${n.nombre || 'NPC'}</h3>
-                    <p class="player-mistfall-npc-rol">${n.rol || ''} ${emoji} ${act}</p>
+                    <p class="player-mistfall-npc-rol">${n.rol || ''}</p>
+                    <div class="player-mistfall-npc-notes-section" style="margin-top: 12px;">
+                        <label style="color: #a89878; font-size: 0.85em; display: block; margin-bottom: 6px;">Mis notas:</label>
+                        <textarea class="player-mistfall-npc-notes-input" data-npc-id="${n.id}" placeholder="Escribe tus notas sobre este NPC..." style="width: 100%; min-height: 60px; padding: 8px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: #d4c4a8; font-family: inherit; font-size: 0.9em; resize: vertical;">${notes}</textarea>
+                    </div>
                 </div>
             </div>`;
         }).join('');
+        
+        // Agregar listeners para guardar notas automáticamente
+        list.querySelectorAll('.player-mistfall-npc-notes-input').forEach(textarea => {
+            let timeout;
+            textarea.addEventListener('input', () => {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => {
+                    savePlayerNpcNote(textarea.dataset.npcId, textarea.value);
+                }, 1000);
+            });
+        });
     }
     openModal('player-habitantes-modal');
+}
+
+async function savePlayerNpcNote(npcId, notes) {
+    const user = getCurrentUser();
+    if (!user || !user.id || !isPlayer()) return;
+    
+    try {
+        const playerRef = db.collection('players').doc(user.id);
+        const playerDoc = await playerRef.get();
+        const currentData = playerDoc.exists ? playerDoc.data() : {};
+        const npcNotes = currentData.npcNotes || {};
+        npcNotes[npcId] = notes.trim();
+        
+        await playerRef.update({ npcNotes });
+    } catch (e) {
+        console.error('Error guardando nota:', e);
+        showToast('Error al guardar nota', true);
+    }
+}
+
+async function renderPlayerDirectorioHabitantes(cityId, cityNombre) {
+    const user = getCurrentUser();
+    if (!user || !user.id) return;
+    
+    const npcs = playerNpcsData.filter(n => n.ciudadId === cityId);
+    document.getElementById('player-directorio-habitantes-city-name').textContent = (cityNombre || 'Ciudad').toUpperCase();
+    const grid = document.getElementById('player-directorio-habitantes-npcs-grid');
+    
+    // Cargar notas del jugador
+    let playerNpcNotes = {};
+    try {
+        const playerDoc = await db.collection('players').doc(user.id).get();
+        if (playerDoc.exists) {
+            playerNpcNotes = playerDoc.data().npcNotes || {};
+        }
+    } catch (e) {
+        console.error('Error cargando notas:', e);
+    }
+    
+    if (!npcs.length) {
+        grid.innerHTML = '<p style="color:#8b7355; text-align:center; padding:40px; grid-column: 1 / -1;">No hay habitantes registrados en esta ciudad.</p>';
+    } else {
+        grid.innerHTML = npcs.map((n, idx) => {
+            const color = getNpcCardColor(idx);
+            const notes = playerNpcNotes[n.id] || '';
+            return `
+            <div class="player-mistfall-npc-card-colored" style="background: ${color.bg}; border-color: ${color.border};">
+                <div class="player-mistfall-npc-info">
+                    <h3 class="player-mistfall-npc-name">${n.nombre || 'NPC'}</h3>
+                    <p class="player-mistfall-npc-rol">${n.rol || ''}</p>
+                    <div class="player-mistfall-npc-notes-section">
+                        <label style="color: #a89878; font-size: 0.85em; display: block; margin-bottom: 6px;">Mis notas:</label>
+                        <textarea class="player-mistfall-npc-notes-input" data-npc-id="${n.id}" placeholder="Escribe tus notas sobre este NPC..." style="width: 100%; min-height: 60px; padding: 8px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: #d4c4a8; font-family: inherit; font-size: 0.9em; resize: vertical;">${notes}</textarea>
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+        
+        // Agregar listeners para guardar notas automáticamente
+        grid.querySelectorAll('.player-mistfall-npc-notes-input').forEach(textarea => {
+            let timeout;
+            textarea.addEventListener('input', () => {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => {
+                    savePlayerNpcNote(textarea.dataset.npcId, textarea.value);
+                }, 1000);
+            });
+        });
+    }
 }
 
 function playerDirectorioHabitantesVolver() {
@@ -2081,7 +2248,7 @@ async function playerTavernCheckout() {
     const shopTipo = (shop && shop.tipo ? shop.tipo : 'taberna').toString().toLowerCase();
     for (const row of playerTavernCart) {
         if (row.type === 'entry') {
-            inventario.push({ name: row.name, price: row.price, effect: 'Entrada taberna', rarity: 'común', shopTipo });
+            // Las entradas no se agregan al inventario
             continue;
         }
         const it = items.find(i => i.id === row.id);

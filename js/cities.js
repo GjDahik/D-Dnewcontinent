@@ -1,3 +1,39 @@
+// ==================== HELPER: Leer archivos CSV o Excel ====================
+function readFileAsText(file, callback) {
+    const fileName = file.name.toLowerCase();
+    const isExcel = fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
+    
+    if (isExcel) {
+        // Leer archivo Excel usando SheetJS
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                
+                // Obtener la primera hoja
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                
+                // Convertir a CSV
+                const csv = XLSX.utils.sheet_to_csv(worksheet);
+                callback(csv);
+            } catch (error) {
+                showToast('Error al leer archivo Excel: ' + error.message, true);
+                console.error('Error leyendo Excel:', error);
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    } else {
+        // Leer archivo CSV normalmente
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            callback(e.target.result);
+        };
+        reader.readAsText(file);
+    }
+}
+
 // ==================== CITIES + NPCs + SHOPS ====================
 /** Ciudad fija "Old Mistfall": no se puede borrar desde el dashboard, solo desde la base de datos. */
 const OLD_MISTFALL_CITY_NAME = 'Old Mistfall';
@@ -154,9 +190,7 @@ function importShopsCSV(event) {
 
     var cityId = document.getElementById('import-shops-city-id').value;
 
-    var reader = new FileReader();
-    reader.onload = function(e) {
-        var text = e.target.result;
+    readFileAsText(file, function(text) {
         var lines = text.split('\n').filter(function(line) { return line.trim(); });
         
         if (lines.length < 2) {
@@ -212,9 +246,7 @@ function importShopsCSV(event) {
             showToast(count + ' tiendas importadas');
             closeModal('import-shops-modal');
         }).catch(function(e) { showToast('Error: ' + e.message, true); });
-    };
-
-    reader.readAsText(file);
+    });
     event.target.value = '';
 }
 
@@ -295,9 +327,7 @@ function importNpcsCSV(event) {
             showToast(count + ' NPCs importados');
             closeModal('import-npcs-modal');
         }).catch(function(err) { showToast('Error: ' + err.message, true); });
-    };
-
-    reader.readAsText(file);
+    });
     event.target.value = '';
 }
 

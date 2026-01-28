@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>⚔️ Dashboard DM - Nueva Valdoria</title>
+    <title>D&D Companion</title>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/styles.css">
 </head>
@@ -12,7 +12,7 @@
         <header class="header">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div>
-                    <h1>🏰 Nueva Valdoria</h1>
+                    <h1>D&D Companion</h1>
                     <p>Panel de Control del Dungeon Master</p>
                 </div>
                 <div>
@@ -34,15 +34,21 @@
         <!-- MAPA -->
         <section id="map" class="tab-content active">
             <div class="section-header">
-                <h2>🗺️ Mapa de Nueva Valdoria</h2>
+                <h2 id="map-title-dm">🗺️ Mapa</h2>
             </div>
-            <div id="map-url-row" class="map-url-row" style="margin-bottom:16px; display:flex; flex-wrap:wrap; align-items:center; gap:10px;">
-                <label for="map-image-url" style="color:#a89878; font-size:0.9em;">URL de la imagen (Imgur):</label>
-                <input type="url" id="map-image-url" placeholder="https://i.imgur.com/xxxxx.png" class="map-url-input" style="flex:1; min-width:200px; padding:8px 12px; background:rgba(0,0,0,0.4); border:1px solid #4a3c31; border-radius:6px; color:#d4c4a8;">
-                <button type="button" class="btn btn-small" onclick="saveMapImage()">Guardar</button>
+            <div id="map-config-row" style="margin-bottom:16px; display:flex; flex-direction:column; gap:12px;">
+                <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px;">
+                    <label for="map-continent-name" style="color:#a89878; font-size:0.9em;">Nombre del continente:</label>
+                    <input type="text" id="map-continent-name" placeholder="Ej: Nueva Valdoria" class="map-url-input" style="flex:1; min-width:200px; padding:8px 12px; background:rgba(0,0,0,0.4); border:1px solid #4a3c31; border-radius:6px; color:#d4c4a8;">
+                </div>
+                <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px;">
+                    <label for="map-image-url" style="color:#a89878; font-size:0.9em;">URL de la imagen (Imgur):</label>
+                    <input type="url" id="map-image-url" placeholder="https://i.imgur.com/xxxxx.png" class="map-url-input" style="flex:1; min-width:200px; padding:8px 12px; background:rgba(0,0,0,0.4); border:1px solid #4a3c31; border-radius:6px; color:#d4c4a8;">
+                    <button type="button" class="btn btn-small" onclick="saveMapImage()">Guardar</button>
+                </div>
             </div>
             <div style="text-align:center; background: linear-gradient(180deg, rgba(42, 42, 62, 0.9) 0%, rgba(26, 26, 46, 0.95) 100%); border: 2px solid #c9a227; border-radius: 12px; padding: 20px;">
-                <img id="map-img" src="https://i.imgur.com/ppAIykX.png" alt="Mapa de Nueva Valdoria" style="max-width:100%; border-radius:10px;">
+                <img id="map-img" src="https://i.imgur.com/ppAIykX.png" alt="Mapa" style="max-width:100%; border-radius:10px;">
             </div>
         </section>
 
@@ -57,7 +63,7 @@
                 <div class="city-header" onclick="togglePlayersCard()">
                     <div class="city-info">
                         <h3>⚔️ Grupo de Aventureros</h3>
-                        <p>Los héroes de Nueva Valdoria</p>
+                        <p id="players-continent-text">Los héroes</p>
                     </div>
                     <div class="city-meta">
                         <span id="players-count">0 jugadores</span>
@@ -117,10 +123,10 @@
         </nav>
         <section id="player-map" class="tab-content active">
             <div class="section-header">
-                <h2>🗺️ Mapa de Nueva Valdoria</h2>
+                <h2 id="map-title-player">🗺️ Mapa</h2>
             </div>
             <div class="player-map-wrap">
-                <img id="player-map-img" src="https://i.imgur.com/ppAIykX.png" alt="Mapa de Nueva Valdoria" class="player-map-img">
+                <img id="player-map-img" src="https://i.imgur.com/ppAIykX.png" alt="Mapa" class="player-map-img">
             </div>
         </section>
         <section id="player-ciudades" class="tab-content">
@@ -929,7 +935,7 @@
                 
                 <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #4a3c31;">
                     <h4 style="color: #d4af37; margin-bottom: 10px;">📋 Formato para Excel/Sheets</h4>
-                    <p style="color: #8b7355; margin-bottom: 10px; font-size: 0.9em;">Copia esta tabla en Excel, llena tus tiendas, guarda como CSV</p>
+                    <p style="color: #8b7355; margin-bottom: 10px; font-size: 0.9em;">Copia esta tabla en Excel, llena tus tiendas, guarda como CSV o Excel (.xlsx)</p>
                     <div style="overflow-x: auto;">
                         <table style="width: 100%; border-collapse: collapse; font-size: 0.85em; background: #0d0d0d; border-radius: 4px;">
                             <thead>
@@ -960,10 +966,10 @@
                 </div>
 
                 <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px;">
-                    <h4 style="color: #d4af37; margin-bottom: 10px;">📤 Subir archivo CSV</h4>
+                    <h4 style="color: #d4af37; margin-bottom: 10px;">📤 Subir archivo CSV o Excel</h4>
                     <label class="btn" style="display: block; text-align: center; cursor: pointer;">
-                        📁 Seleccionar archivo CSV
-                        <input type="file" id="shops-csv-input" accept=".csv" style="display: none;" onchange="importShopsCSV(event)">
+                        📁 Seleccionar archivo CSV o Excel
+                        <input type="file" id="shops-csv-input" accept=".csv,.xlsx,.xls" style="display: none;" onchange="importShopsCSV(event)">
                     </label>
                 </div>
             </div>
@@ -1014,10 +1020,10 @@
                     </div>
                 </div>
                 <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px;">
-                    <h4 style="color: #d4af37; margin-bottom: 10px;">📤 Subir archivo CSV</h4>
+                    <h4 style="color: #d4af37; margin-bottom: 10px;">📤 Subir archivo CSV o Excel</h4>
                     <label class="btn" style="display: block; text-align: center; cursor: pointer;">
-                        📁 Seleccionar archivo CSV
-                        <input type="file" id="npcs-csv-input" accept=".csv" style="display: none;" onchange="importNpcsCSV(event)">
+                        📁 Seleccionar archivo CSV o Excel
+                        <input type="file" id="npcs-csv-input" accept=".csv,.xlsx,.xls" style="display: none;" onchange="importNpcsCSV(event)">
                     </label>
                 </div>
             </div>
@@ -1049,7 +1055,7 @@
                 <!-- Plantilla CSV (oculta por defecto) -->
                 <div id="csv-template-section" style="display: none; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #4a3c31;">
                     <h4 style="color: #d4af37; margin-bottom: 10px;">📋 Formato para Excel/Sheets</h4>
-                    <p style="color: #8b7355; margin-bottom: 10px; font-size: 0.9em;">Copia esto en Excel, llena tus items, guarda como CSV y usa "Importar CSV"</p>
+                    <p style="color: #8b7355; margin-bottom: 10px; font-size: 0.9em;">Copia esto en Excel, llena tus items, guarda como CSV o Excel (.xlsx) y usa "Importar"</p>
                     <button type="button" class="btn btn-small" onclick="downloadCSVTemplate('pociones')" style="margin-bottom: 10px;">📥 Descargar plantilla CSV</button>
                     <div style="overflow-x: auto;">
                         <table style="width: 100%; border-collapse: collapse; font-size: 0.85em; background: #0d0d0d; border-radius: 4px;">
@@ -1095,7 +1101,7 @@
                 <!-- Plantilla CSV Taberna (name, price, effect, type, categoria) -->
                 <div id="csv-template-section-taberna" style="display: none; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #4a3c31;">
                     <h4 style="color: #d4af37; margin-bottom: 10px;">🍺 Formato CSV para <strong>Taberna</strong></h4>
-                    <p style="color: #8b7355; margin-bottom: 10px; font-size: 0.9em;">Copia esta tabla en Excel, rellena tus bebidas/comidas, guarda como CSV y usa "Importar".</p>
+                    <p style="color: #8b7355; margin-bottom: 10px; font-size: 0.9em;">Copia esta tabla en Excel, rellena tus bebidas/comidas, guarda como CSV o Excel (.xlsx) y usa "Importar".</p>
                     <button type="button" class="btn btn-small" onclick="downloadCSVTemplate('taberna')" style="margin-bottom: 10px;">📥 Descargar plantilla CSV</button>
                     <div style="overflow-x: auto;">
                         <table style="width: 100%; border-collapse: collapse; font-size: 0.85em; background: #0d0d0d; border-radius: 4px;">
@@ -1148,7 +1154,7 @@
                 <!-- Plantilla CSV Forja / Herrería (name, price, tier, tipo, damage, damageType, ac, desc) -->
                 <div id="csv-template-section-forja" style="display: none; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #4a3c31;">
                     <h4 style="color: #d4af37; margin-bottom: 10px;">⚔️ Formato CSV para <strong>Forja / Herrería</strong></h4>
-                    <p style="color: #8b7355; margin-bottom: 10px; font-size: 0.9em;">Copia esta tabla en Excel, rellena armas/armaduras/servicios por nivel, guarda como CSV y usa "Importar".</p>
+                    <p style="color: #8b7355; margin-bottom: 10px; font-size: 0.9em;">Copia esta tabla en Excel, rellena armas/armaduras/servicios por nivel, guarda como CSV o Excel (.xlsx) y usa "Importar".</p>
                     <button type="button" class="btn btn-small" onclick="downloadCSVTemplate('forja')" style="margin-bottom: 10px;">📥 Descargar plantilla CSV</button>
                     <div style="overflow-x: auto;">
                         <table style="width: 100%; border-collapse: collapse; font-size: 0.85em; background: #0d0d0d; border-radius: 4px;">
@@ -1209,7 +1215,7 @@
                 <!-- Plantilla CSV Artesanías / Arquería (name, price, type, tab, effect, desc) -->
                 <div id="csv-template-section-artesanias" style="display: none; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #4a3c31;">
                     <h4 style="color: #d4af37; margin-bottom: 10px;">🏹 Formato CSV para <strong>Artesanías / Arquería</strong></h4>
-                    <p style="color: #8b7355; margin-bottom: 10px; font-size: 0.9em;">Copia esta tabla en Excel, rellena flechas/ropa/servicios, guarda como CSV y usa "Importar".</p>
+                    <p style="color: #8b7355; margin-bottom: 10px; font-size: 0.9em;">Copia esta tabla en Excel, rellena flechas/ropa/servicios, guarda como CSV o Excel (.xlsx) y usa "Importar".</p>
                     <button type="button" class="btn btn-small" onclick="downloadCSVTemplate('artesanias')" style="margin-bottom: 10px;">📥 Descargar plantilla CSV</button>
                     <div style="overflow-x: auto;">
                         <table style="width: 100%; border-collapse: collapse; font-size: 0.85em; background: #0d0d0d; border-radius: 4px;">
@@ -1320,7 +1326,7 @@
                 <!-- Plantilla CSV Biblioteca (name, price, section, effect, tiempo, nivel, efLabel) -->
                 <div id="csv-template-section-biblioteca" style="display: none; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #4a3c31;">
                     <h4 style="color: #d4af37; margin-bottom: 10px;">📚 Formato CSV para <strong>Biblioteca</strong></h4>
-                    <p style="color: #8b7355; margin-bottom: 10px; font-size: 0.9em;">Copia esta tabla en Excel, rellena libros por sección, guarda como CSV y usa "Importar".</p>
+                    <p style="color: #8b7355; margin-bottom: 10px; font-size: 0.9em;">Copia esta tabla en Excel, rellena libros por sección, guarda como CSV o Excel (.xlsx) y usa "Importar".</p>
                     <button type="button" class="btn btn-small" onclick="downloadCSVTemplate('biblioteca')" style="margin-bottom: 10px;">📥 Descargar plantilla CSV</button>
                     <div style="overflow-x: auto;">
                         <table style="width: 100%; border-collapse: collapse; font-size: 0.85em; background: #0d0d0d; border-radius: 4px;">
@@ -1367,8 +1373,8 @@
                     <h4 style="color: #d4af37; margin-bottom: 15px;">📤 Importar Items desde CSV</h4>
                     
                     <div style="margin-bottom: 15px;">
-                        <button type="button" class="btn btn-secondary" onclick="document.getElementById('csv-file-input').click();" style="width: 100%;">📁 Seleccionar Archivo CSV</button>
-                        <input type="file" id="csv-file-input" accept=".csv,.txt" style="display: none;">
+                        <button type="button" class="btn btn-secondary" onclick="document.getElementById('csv-file-input').click();" style="width: 100%;">📁 Seleccionar Archivo CSV o Excel</button>
+                        <input type="file" id="csv-file-input" accept=".csv,.txt,.xlsx,.xls" style="display: none;">
                     </div>
                     
                     <div id="csv-file-preview" style="display: none; background: #0d0d0d; padding: 15px; border-radius: 4px; border: 1px solid #4a3c31; margin-bottom: 15px;">
@@ -1575,7 +1581,7 @@
                     <label>Tipo de usuario</label>
                     <select id="login-user-type" onchange="toggleLoginFields()">
                         <option value="dm">👑 Dungeon Master</option>
-                        <option value="player">⚔️ Personaje</option>
+                        <option value="player">⚔️ Aventurero</option>
                     </select>
                 </div>
                 <div class="form-group" id="login-dm-name-group">
@@ -1583,11 +1589,11 @@
                     <input type="text" id="login-nombre" placeholder="Nombre del DM">
                 </div>
                 <div class="form-group" id="login-player-select-group" style="display: none;">
-                    <label>Personaje</label>
+                    <label>Aventurero</label>
                     <select id="login-player-select">
-                        <option value="">— Selecciona tu personaje —</option>
+                        <option value="">— Selecciona tu aventurero —</option>
                     </select>
-                    <p style="color: #8b7355; font-size: 0.85em; margin-top: 6px;">Lista de personajes creados por el DM en el dashboard.</p>
+                    <p style="color: #8b7355; font-size: 0.85em; margin-top: 6px;">Lista de aventureros creados por el DM en el dashboard.</p>
                 </div>
                 <div class="form-group">
                     <label>PIN</label>
@@ -1630,9 +1636,24 @@
 
     <div class="toast" id="toast"></div>
 
+    <!-- Footer Placa Metálica -->
+    <footer class="metal-plaque-footer">
+        <div class="metal-plaque">
+            <span class="screw-bottom-left"></span>
+            <span class="screw-bottom-right"></span>
+            <div class="metal-plaque-content">
+                <div class="metal-plaque-text">powered by GjDahik</div>
+                <div class="metal-plaque-subtitle">Caos a la orden del dia</div>
+            </div>
+        </div>
+    </footer>
+
     <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    
+    <!-- SheetJS para soporte Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
     <!-- App Scripts -->
     <script src="js/auth.js"></script>
