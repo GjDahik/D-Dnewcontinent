@@ -109,6 +109,7 @@ body {
 .city-card.expanded { border-color: #8b5a2b; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4); }
 .city-header {
     padding: 20px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+    gap: 16px;
 }
 .city-header:hover { background: rgba(139, 90, 43, 0.1); }
 .city-info h3 { font-family: 'Cinzel', serif; font-size: 1.4em; color: #d4af37; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 2px; }
@@ -746,4 +747,29 @@ body {
     .city-actions .btn {
         flex: 1 1 100%;
     }
+}
+
+/* Estilos para notas del jugador por ciudad */
+.player-city-notes-input {
+    width: 100%;
+    background: #1a1a1a;
+    border: 1px solid #4a3c31;
+    color: #d4c4a8;
+    padding: 8px;
+    border-radius: 4px;
+    font-family: 'Crimson Text', serif;
+    font-size: 0.95em;
+    resize: vertical;
+    transition: border-color 0.3s ease;
+}
+
+.player-city-notes-input:focus {
+    outline: none;
+    border-color: #8b5a2b;
+    box-shadow: 0 0 5px rgba(139, 90, 43, 0.3);
+}
+
+.player-city-notes-input::placeholder {
+    color: #6b5d4a;
+    font-style: italic;
 }

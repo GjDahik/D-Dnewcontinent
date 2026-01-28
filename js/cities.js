@@ -43,33 +43,140 @@ function isOldMistfallCity(cityOrNombre) {
 }
 
 function loadWorld() {
+    console.log('loadWorld llamado');
+    
+    if (!db) {
+        console.error('Error: db no está definido');
+        return;
+    }
+    
+    // Prevenir múltiples suscripciones
+    if (window._worldSubscribed) {
+        console.log('loadWorld ya estaba suscrito, omitiendo...');
+        return;
+    }
+    window._worldSubscribed = true;
+    
+    console.log('Iniciando snapshots de Firestore...');
+    
+    // Cargar ciudades - usar el mismo patrón que funciona en loadPlayerWorld
     db.collection('cities').onSnapshot(snap => {
-        citiesData = [];
-        snap.forEach(doc => citiesData.push({ id: doc.id, ...doc.data() }));
-        renderCities();
+        console.log('=== SNAPSHOT DE CITIES RECIBIDO ===');
+        console.log('Snapshot completo:', snap);
+        console.log('Tamaño:', snap ? snap.size : 'null');
+        console.log('Docs:', snap ? snap.docs : 'null');
+        
+        if (snap && snap.docs && snap.docs.length > 0) {
+            citiesData = snap.docs.map(d => {
+                const data = { id: d.id, ...d.data() };
+                console.log('Ciudad mapeada:', data.nombre);
+                return data;
+            });
+            console.log('Total ciudades en citiesData:', citiesData.length);
+            console.log('Ciudades:', citiesData.map(c => c.nombre));
+            
+            // Forzar renderizado inmediatamente y también después de un delay
+            renderCities();
+            setTimeout(function() {
+                renderCities();
+            }, 500);
+        } else {
+            console.warn('No hay documentos en el snapshot o snap está vacío');
+            citiesData = [];
+            renderCities();
+        }
+    }, error => {
+        console.error('ERROR en snapshot de cities:', error);
+        console.error('Detalles del error:', error.code, error.message);
+        if (typeof showToast === 'function') {
+            showToast('Error al cargar ciudades: ' + error.message, true);
+        }
     });
+    
+    // Cargar NPCs
     db.collection('npcs').onSnapshot(snap => {
-        npcsData = [];
-        snap.forEach(doc => npcsData.push({ id: doc.id, ...doc.data() }));
-        renderCities();
+        if (snap && snap.docs) {
+            npcsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            window.npcsData = npcsData;
+            renderCities();
+        }
+    }, error => {
+        console.error('Error en snapshot de npcs:', error);
     });
+    
+    // Cargar tiendas
     db.collection('shops').onSnapshot(snap => {
-        shopsData = [];
-        snap.forEach(doc => shopsData.push({ id: doc.id, ...doc.data() }));
-        renderCities();
+        if (snap && snap.docs) {
+            shopsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            window.shopsData = shopsData;
+            renderCities();
+        }
+    }, error => {
+        console.error('Error en snapshot de shops:', error);
     });
 }
 
 function renderCities() {
-    const container = document.getElementById('cities-container');
-    if (!citiesData.length) {
+    console.log('renderCities llamado');
+    
+    // Usar las variables globales directamente
+    const cities = citiesData || [];
+    const npcs = npcsData || [];
+    const shops = shopsData || [];
+    
+    console.log('Datos:', {
+        citiesCount: cities.length,
+        npcsCount: npcs.length,
+        shopsCount: shops.length,
+        citiesDataExists: typeof citiesData !== 'undefined',
+        citiesIsArray: Array.isArray(cities)
+    });
+    
+    // Intentar encontrar el contenedor varias veces
+    let container = document.getElementById('cities-container');
+    if (!container) {
+        console.warn('cities-container no encontrado, esperando...');
+        // Esperar un poco y volver a intentar
+        setTimeout(function() {
+            container = document.getElementById('cities-container');
+            if (container) {
+                console.log('Contenedor encontrado en segundo intento');
+                renderCities();
+            } else {
+                console.error('ERROR: cities-container NO EXISTE en el DOM');
+                // Intentar crear un mensaje de error visible
+                const citiesSection = document.getElementById('cities');
+                if (citiesSection) {
+                    citiesSection.innerHTML += '<div style="background:red;color:white;padding:20px;margin:20px;">ERROR: El contenedor cities-container no existe</div>';
+                }
+            }
+        }, 1000);
+        return;
+    }
+    
+    console.log('Contenedor encontrado:', container);
+    
+    if (!cities || !Array.isArray(cities)) {
+        console.error('Error: citiesData no es un array válido');
+        container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🏘️</div><p>Error al cargar ciudades</p></div>';
+        return;
+    }
+    
+    if (!cities.length) {
+        console.log('No hay ciudades en el array');
         container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🏘️</div><p>No hay ciudades. ¡Crea la primera!</p></div>';
         return;
     }
-    container.innerHTML = '';
-    citiesData.forEach(city => {
-        const cityNpcs = npcsData.filter(n => n.ciudadId === city.id);
-        const cityShops = shopsData.filter(s => s.ciudadId === city.id);
+    
+    console.log('Renderizando', cities.length, 'ciudades');
+    console.log('Primeras 3 ciudades:', cities.slice(0, 3));
+    
+    try {
+        let htmlContent = '';
+        cities.forEach((city, index) => {
+            console.log(`Procesando ciudad ${index + 1}:`, city.nombre);
+            const cityNpcs = npcs.filter(n => n.ciudadId === city.id);
+            const cityShops = shops.filter(s => s.ciudadId === city.id);
         const nivelColor = city.nivel <= 2 ? '🟢' : city.nivel <= 4 ? '🟡' : city.nivel <= 5 ? '🟠' : '🔴';
         const tipoEmoji = { herreria: '⚔️', pociones: '🧪', taberna: '🍺', biblioteca: '📚', arqueria: '🏹', emporio: '🛒', batalla: '🥊', santuario: '🪞', banco: '🏦', posada: '🏨' };
         const actitudEmoji = { amigable: '😊', neutral: '😐', hostil: '😠' };
@@ -77,7 +184,8 @@ function renderCities() {
         const html = `
             <div class="city-card" id="city-${city.id}">
                 <div class="city-header" onclick="toggleCity('${city.id}')">
-                    <div class="city-info">
+                    ${city.imagenUrl ? `<div class="city-image" style="width:120px; height:80px; border-radius:8px; overflow:hidden; margin-right:16px; flex-shrink:0; background:#2a231c; display:flex; align-items:center; justify-content:center;"><img src="${city.imagenUrl.replace(/"/g, '&quot;')}" alt="${(city.nombre || '').replace(/"/g, '&quot;')}" style="width:100%; height:100%; object-fit:cover;" onerror="this.style.display='none'; this.parentElement.innerHTML='🖼️';"></div>` : ''}
+                    <div class="city-info" style="flex:1;">
                         <h3>🏰 ${city.nombre}</h3>
                         <p>${city.descripcion || 'Sin descripción'}</p>
                     </div>
@@ -128,7 +236,7 @@ function renderCities() {
                         </div>
                         <div class="mini-cards">
                             ${cityShops.length ? cityShops.map(s => {
-                                const owner = npcsData.find(n => n.id === s.npcDueno);
+                                const owner = npcs.find(n => n.id === s.npcDueno);
                                 const isSantuario = (s.tipo || '').toLowerCase() === 'santuario';
                                 const isBanco = (s.tipo || '').toLowerCase() === 'banco';
                                 const isPosada = (s.tipo || '').toLowerCase() === 'posada';
@@ -148,9 +256,58 @@ function renderCities() {
                     </div>
                 </div>
             </div>`;
-        container.innerHTML += html;
-    });
+            htmlContent += html;
+        });
+        
+        console.log('HTML generado, longitud:', htmlContent.length);
+        container.innerHTML = htmlContent;
+        console.log('Ciudades renderizadas exitosamente. Contenedor ahora tiene:', container.children.length, 'elementos hijos');
+    } catch (error) {
+        console.error('Error renderizando ciudades:', error);
+        console.error('Stack trace:', error.stack);
+        if (container) {
+            container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><p>Error al renderizar ciudades: ' + error.message + '</p><p style="font-size:0.8em;color:#888;">Revisa la consola para más detalles</p></div>';
+        }
+    }
 }
+
+// Hacer funciones globalmente accesibles
+window.renderCities = renderCities;
+window.loadWorld = loadWorld;
+
+// Función de diagnóstico que se puede llamar desde la consola
+window.debugCities = function() {
+    console.log('=== DIAGNÓSTICO DE CIUDADES ===');
+    console.log('citiesData:', citiesData);
+    console.log('window.citiesData:', window.citiesData);
+    console.log('Número de ciudades:', (citiesData || []).length);
+    console.log('Contenedor existe:', !!document.getElementById('cities-container'));
+    console.log('db existe:', typeof db !== 'undefined');
+    console.log('loadWorld existe:', typeof loadWorld !== 'function');
+    console.log('renderCities existe:', typeof renderCities === 'function');
+    
+    const container = document.getElementById('cities-container');
+    if (container) {
+        console.log('Contenedor encontrado, contenido actual:', container.innerHTML.length, 'caracteres');
+    }
+    
+    // Intentar renderizar manualmente
+    if (typeof renderCities === 'function') {
+        console.log('Intentando renderizar ciudades...');
+        renderCities();
+    }
+    
+    // Intentar cargar manualmente
+    if (typeof loadWorld === 'function' && typeof db !== 'undefined') {
+        console.log('Intentando cargar ciudades desde Firestore...');
+        db.collection('cities').get().then(snap => {
+            console.log('Ciudades en Firestore:', snap.size);
+            snap.forEach(doc => {
+                console.log('Ciudad:', doc.id, doc.data());
+            });
+        });
+    }
+};
 
 function toggleCity(id) {
     document.getElementById('city-' + id).classList.toggle('expanded');
@@ -164,7 +321,8 @@ function setEstablecimientoRecomendado(cityId, shopId) {
 }
 
 function toggleCityVisibility(cityId) {
-    var city = citiesData.find(function(c) { return c.id === cityId; });
+    const cities = window.citiesData || citiesData || [];
+    var city = cities.find(function(c) { return c.id === cityId; });
     if (!city) return;
     var next = city.visibleToPlayers === false;
     db.collection('cities').doc(cityId).update({ visibleToPlayers: next }).then(function() {
@@ -174,7 +332,8 @@ function toggleCityVisibility(cityId) {
 
 // ==================== IMPORT SHOPS CSV ====================
 function openImportShopsModal(cityId) {
-    var city = citiesData.find(function(c) { return c.id === cityId; });
+    const cities = window.citiesData || citiesData || [];
+    var city = cities.find(function(c) { return c.id === cityId; });
     if (!city) {
         showToast('Ciudad no encontrada', true);
         return;
@@ -252,7 +411,8 @@ function importShopsCSV(event) {
 
 // ==================== IMPORT NPCs CSV ====================
 function openImportNpcsModal(cityId) {
-    var city = citiesData.find(function(c) { return c.id === cityId; });
+    const cities = window.citiesData || citiesData || [];
+    var city = cities.find(function(c) { return c.id === cityId; });
     if (!city) {
         showToast('Ciudad no encontrada', true);
         return;
@@ -269,9 +429,7 @@ function importNpcsCSV(event) {
     var cityId = document.getElementById('import-npcs-city-id').value;
     var validActitudes = ['amigable', 'neutral', 'hostil'];
 
-    var reader = new FileReader();
-    reader.onload = function(e) {
-        var text = e.target.result;
+    readFileAsText(file, function(text) {
         var lines = text.split('\n').filter(function(line) { return line.trim(); });
 
         if (lines.length < 2) {
@@ -333,37 +491,160 @@ function importNpcsCSV(event) {
 
 // City CRUD
 function openCityModal() {
-    document.getElementById('city-id').value = '';
-    document.getElementById('city-nombre').value = '';
-    document.getElementById('city-nivel').value = '3';
-    document.getElementById('city-descripcion').value = '';
-    document.getElementById('city-visible-jugadores').checked = true;
-    document.getElementById('city-modal-title').textContent = '🏘️ Nueva Ciudad';
-    openModal('city-modal');
+    console.log('openCityModal llamado');
+    console.log('db disponible:', typeof db !== 'undefined');
+    console.log('openModal disponible:', typeof openModal !== 'undefined');
+    console.log('showToast disponible:', typeof showToast !== 'undefined');
+    
+    try {
+        const cityIdEl = document.getElementById('city-id');
+        const cityNombreEl = document.getElementById('city-nombre');
+        const cityNivelEl = document.getElementById('city-nivel');
+        const cityDescripcionEl = document.getElementById('city-descripcion');
+        const cityVisibleEl = document.getElementById('city-visible-jugadores');
+        const cityModalTitleEl = document.getElementById('city-modal-title');
+        
+        console.log('Elementos encontrados:', {
+            cityIdEl: !!cityIdEl,
+            cityNombreEl: !!cityNombreEl,
+            cityNivelEl: !!cityNivelEl,
+            cityDescripcionEl: !!cityDescripcionEl,
+            cityVisibleEl: !!cityVisibleEl,
+            cityModalTitleEl: !!cityModalTitleEl
+        });
+        
+        if (!cityIdEl || !cityNombreEl || !cityNivelEl || !cityDescripcionEl || !cityVisibleEl || !cityModalTitleEl) {
+            console.error('Error: Elementos del modal de ciudad no encontrados');
+            alert('Error: Elementos del formulario no encontrados. Revisa la consola.');
+            if (typeof showToast === 'function') {
+                showToast('Error: No se puede abrir el modal de ciudad', true);
+            }
+            return;
+        }
+        
+        const cityImagenUrlEl = document.getElementById('city-imagen-url');
+        
+        cityIdEl.value = '';
+        cityNombreEl.value = '';
+        cityNivelEl.value = '3';
+        cityDescripcionEl.value = '';
+        if (cityImagenUrlEl) cityImagenUrlEl.value = '';
+        cityVisibleEl.checked = true;
+        cityModalTitleEl.textContent = '🏘️ Nueva Ciudad';
+        
+        if (typeof openModal === 'function') {
+            console.log('Abriendo modal city-modal');
+            openModal('city-modal');
+        } else {
+            console.error('Error: función openModal no está definida');
+            alert('Error: función openModal no está definida');
+            if (typeof showToast === 'function') {
+                showToast('Error: No se puede abrir el modal', true);
+            }
+        }
+    } catch (error) {
+        console.error('Error en openCityModal:', error);
+        alert('Error: ' + error.message);
+        if (typeof showToast === 'function') {
+            showToast('Error al abrir el modal: ' + error.message, true);
+        }
+    }
 }
 
+// Hacer funciones globalmente accesibles
+window.openCityModal = openCityModal;
+window.editCity = editCity;
+window.saveCity = saveCity;
+window.deleteCity = deleteCity;
+window.toggleCity = toggleCity;
+window.toggleCityVisibility = toggleCityVisibility;
+window.setEstablecimientoRecomendado = setEstablecimientoRecomendado;
+
 function editCity(id) {
-    const c = citiesData.find(x => x.id === id);
-    document.getElementById('city-id').value = id;
-    document.getElementById('city-nombre').value = c.nombre;
-    document.getElementById('city-nivel').value = c.nivel;
-    document.getElementById('city-descripcion').value = c.descripcion || '';
-    document.getElementById('city-visible-jugadores').checked = c.visibleToPlayers !== false;
-    document.getElementById('city-modal-title').textContent = '✏️ Editar Ciudad';
-    openModal('city-modal');
+    const cities = window.citiesData || citiesData || [];
+    const c = cities.find(x => x.id === id);
+    if (!c) {
+        showToast('Ciudad no encontrada', true);
+        return;
+    }
+    const cityIdEl = document.getElementById('city-id');
+    const cityNombreEl = document.getElementById('city-nombre');
+    const cityNivelEl = document.getElementById('city-nivel');
+    const cityDescripcionEl = document.getElementById('city-descripcion');
+    const cityImagenUrlEl = document.getElementById('city-imagen-url');
+    const cityVisibleEl = document.getElementById('city-visible-jugadores');
+    const cityModalTitleEl = document.getElementById('city-modal-title');
+    
+    if (!cityIdEl || !cityNombreEl || !cityNivelEl || !cityDescripcionEl || !cityVisibleEl || !cityModalTitleEl) {
+        showToast('Error: Campos del formulario no encontrados', true);
+        return;
+    }
+    
+    cityIdEl.value = id;
+    cityNombreEl.value = c.nombre;
+    cityNivelEl.value = c.nivel;
+    cityDescripcionEl.value = c.descripcion || '';
+    if (cityImagenUrlEl) cityImagenUrlEl.value = c.imagenUrl || '';
+    cityVisibleEl.checked = c.visibleToPlayers !== false;
+    cityModalTitleEl.textContent = '✏️ Editar Ciudad';
+    
+    if (typeof openModal === 'function') {
+        openModal('city-modal');
+    } else {
+        showToast('Error: No se puede abrir el modal', true);
+    }
 }
 
 function saveCity() {
-    const id = document.getElementById('city-id').value;
-    const data = {
-        nombre: document.getElementById('city-nombre').value,
-        nivel: parseInt(document.getElementById('city-nivel').value),
-        descripcion: document.getElementById('city-descripcion').value,
-        visibleToPlayers: document.getElementById('city-visible-jugadores').checked
-    };
-    if (!data.nombre) { showToast('Nombre requerido', true); return; }
-    (id ? db.collection('cities').doc(id).update(data) : db.collection('cities').add(data))
-        .then(() => { showToast(id ? 'Ciudad actualizada' : 'Ciudad creada'); closeModal('city-modal'); });
+    try {
+        if (!db) {
+            showToast('Error: Base de datos no disponible', true);
+            return;
+        }
+        const id = document.getElementById('city-id').value;
+        const nombreEl = document.getElementById('city-nombre');
+        const nivelEl = document.getElementById('city-nivel');
+        const descripcionEl = document.getElementById('city-descripcion');
+        const imagenUrlEl = document.getElementById('city-imagen-url');
+        const visibleEl = document.getElementById('city-visible-jugadores');
+        
+        if (!nombreEl || !nivelEl || !descripcionEl || !visibleEl) {
+            showToast('Error: Campos del formulario no encontrados', true);
+            return;
+        }
+        
+        const data = {
+            nombre: nombreEl.value.trim(),
+            nivel: parseInt(nivelEl.value) || 3,
+            descripcion: descripcionEl.value.trim(),
+            imagenUrl: imagenUrlEl ? imagenUrlEl.value.trim() : '',
+            visibleToPlayers: visibleEl.checked
+        };
+        
+        if (!data.nombre) { 
+            showToast('Nombre requerido', true); 
+            return; 
+        }
+        
+        const promise = id 
+            ? db.collection('cities').doc(id).update(data)
+            : db.collection('cities').add(data);
+            
+        promise
+            .then(() => { 
+                showToast(id ? 'Ciudad actualizada' : 'Ciudad creada'); 
+                if (typeof closeModal === 'function') {
+                    closeModal('city-modal');
+                }
+            })
+            .catch(error => {
+                console.error('Error guardando ciudad:', error);
+                showToast('Error al guardar: ' + error.message, true);
+            });
+    } catch (error) {
+        console.error('Error en saveCity:', error);
+        showToast('Error: ' + error.message, true);
+    }
 }
 
 function deleteCity(id, nombre) {
@@ -372,11 +653,16 @@ function deleteCity(id, nombre) {
         return;
     }
     if (confirm(`¿Eliminar ${nombre} y todos sus NPCs/tiendas?`)) {
+        const npcs = window.npcsData || npcsData || [];
+        const shops = window.shopsData || shopsData || [];
         const batch = db.batch();
         batch.delete(db.collection('cities').doc(id));
-        npcsData.filter(n => n.ciudadId === id).forEach(n => batch.delete(db.collection('npcs').doc(n.id)));
-        shopsData.filter(s => s.ciudadId === id).forEach(s => batch.delete(db.collection('shops').doc(s.id)));
-        batch.commit().then(() => showToast('Ciudad eliminada'));
+        npcs.filter(n => n.ciudadId === id).forEach(n => batch.delete(db.collection('npcs').doc(n.id)));
+        shops.filter(s => s.ciudadId === id).forEach(s => batch.delete(db.collection('shops').doc(s.id)));
+        batch.commit().then(() => showToast('Ciudad eliminada')).catch(e => {
+            console.error('Error eliminando ciudad:', e);
+            showToast('Error al eliminar: ' + e.message, true);
+        });
     }
 }
 
@@ -472,5 +758,5 @@ function deleteShop(id, nombre) {
         db.collection('shops').doc(id).delete().then(() => showToast('Tienda eliminada'));
 }
 
-// Initialize
-loadWorld();
+// Initialize - No cargar automáticamente aquí, se carga desde app.js cuando el DM inicia sesión
+// loadWorld() se llama desde showDashboard() en app.js

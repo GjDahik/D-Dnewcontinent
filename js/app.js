@@ -11,8 +11,8 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
 // ==================== GLOBAL DATA ====================
-let citiesData = [], npcsData = [], shopsData = [], playersData = [];
-let playerCitiesData = [], playerShopsData = [], playerNpcsData = [];
+var citiesData = [], npcsData = [], shopsData = [], playersData = [];
+var playerCitiesData = [], playerShopsData = [], playerNpcsData = [];
 let playerPotionCart = [], playerPotionShopId = null, playerPotionProducts = [], playerPotionFilter = 'all', playerPotionSearchTerm = '';
 let playerTavernShopId = null, playerTavernCart = [];
 let playerForgeShopId = null, playerForgeCart = [], playerForgeLevel = 1, playerForgeTab = 'forge-shop';
@@ -521,15 +521,18 @@ function renderPlayerCities() {
     el.innerHTML = visibleCities.map(city => {
         const shops = playerShopsData.filter(s => s.ciudadId === city.id);
         const npcs = playerNpcsData.filter(n => n.ciudadId === city.id);
+        const cityId = city.id;
+        const cityNombre = (city.nombre || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
         return `
-            <div class="card">
+            <div class="card" id="player-city-card-${cityId}">
+                ${city.imagenUrl ? `<div style="width:100%; height:200px; overflow:hidden; border-radius:8px 8px 0 0; background:#2a231c; display:flex; align-items:center; justify-content:center;"><img src="${city.imagenUrl.replace(/"/g, '&quot;')}" alt="${cityNombre}" style="width:100%; height:100%; object-fit:cover;" onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\\'padding:40px; color:#8b7355;\\'>🖼️</div>';"></div>` : ''}
                 <div class="card-header">
                     <h3 class="card-title">🏰 ${city.nombre || 'Sin nombre'}</h3>
                 </div>
                 <div class="card-body">
                     <p style="color:#8b7355; font-size:0.95em; margin-bottom:12px;">${city.descripcion || 'Sin descripción'}</p>
                     <p style="color:#a89878; font-size:0.9em; margin-bottom:12px;">🛒 ${shops.length} tienda${shops.length !== 1 ? 's' : ''} · 🎭 ${npcs.length} personaje${npcs.length !== 1 ? 's' : ''}</p>
-                    <button class="btn" onclick="openPlayerCityShops('${city.id}', '${(city.nombre || '').replace(/'/g, "\\'")}')">Ver directorio</button>
+                    <button class="btn" onclick="openPlayerCityShops('${cityId}', '${cityNombre}')">Ver directorio</button>
                 </div>
             </div>`;
     }).join('');
@@ -547,6 +550,44 @@ function openPlayerCityShops(cityId, cityNombre) {
     document.getElementById('player-directorio-habitantes-wrap').style.display = 'none';
     document.getElementById('player-directorio-wrap').style.display = 'block';
     document.getElementById('player-directorio-city-name').textContent = (cityNombre || 'Ciudad').toUpperCase();
+    
+    // Mostrar imagen de la ciudad si existe
+    const imageContainer = document.getElementById('player-directorio-city-image-container');
+    if (imageContainer && city && city.imagenUrl) {
+        imageContainer.innerHTML = `<div style="width:100%; border-radius:8px; background:#2a231c; display:flex; align-items:center; justify-content:center; padding:10px;"><img src="${city.imagenUrl.replace(/"/g, '&quot;')}" alt="${(cityNombre || '').replace(/"/g, '&quot;')}" style="width:100%; height:auto; max-width:100%; border-radius:8px;" onerror="this.style.display='none'; this.parentElement.innerHTML='';"></div>`;
+    } else if (imageContainer) {
+        imageContainer.innerHTML = '';
+    }
+    
+    // Cargar y configurar notas del jugador
+    const notesInput = document.getElementById('player-directorio-city-notes-input');
+    if (notesInput && currentUser && currentUser.type === 'player' && currentUser.id) {
+        // Cargar notas existentes
+        db.collection('cities').doc(cityId).collection('playerNotes').doc(currentUser.id).get()
+            .then(doc => {
+                if (doc.exists && doc.data().notes) {
+                    notesInput.value = doc.data().notes;
+                } else {
+                    notesInput.value = '';
+                }
+            })
+            .catch(err => console.error('Error cargando notas:', err));
+        
+        // Guardar notas automáticamente con debounce (remover listeners anteriores si existen)
+        notesInput.removeEventListener('input', window._playerCityNotesHandler);
+        window._playerCityNotesHandler = function() {
+            clearTimeout(window._playerCityNotesSaveTimeout);
+            window._playerCityNotesSaveTimeout = setTimeout(() => {
+                const notes = notesInput.value.trim();
+                db.collection('cities').doc(cityId).collection('playerNotes').doc(currentUser.id).set({
+                    notes: notes,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true })
+                .catch(err => console.error('Error guardando notas:', err));
+            }, 1000);
+        };
+        notesInput.addEventListener('input', window._playerCityNotesHandler);
+    }
 
     const tipoEmoji = { herreria: '⚔️', pociones: '🧪', taberna: '🍺', biblioteca: '📚', arqueria: '🏹', emporio: '🛒', batalla: '🥊', santuario: '🪞', banco: '🏦', posada: '🏨' };
     const tipoClass = { herreria: 'herreria', pociones: 'pociones', taberna: 'taberna', biblioteca: 'biblioteca', arqueria: 'arqueria', emporio: 'emporio', batalla: 'batalla', santuario: 'santuario', banco: 'banco', posada: 'posada' };
@@ -2284,7 +2325,19 @@ async function showDashboard() {
         document.getElementById('login-modal').classList.remove('active');
         document.getElementById('current-user-name').textContent = '👑 ' + user.nombre;
         if (typeof loadPlayers === 'function') loadPlayers();
-        if (typeof loadWorld === 'function') loadWorld();
+        if (typeof loadWorld === 'function') {
+            console.log('Llamando loadWorld desde showDashboard');
+            loadWorld();
+            // También intentar renderizar después de un delay por si acaso
+            setTimeout(function() {
+                if (typeof renderCities === 'function') {
+                    console.log('Renderizando ciudades después del delay');
+                    renderCities();
+                }
+            }, 1000);
+        } else {
+            console.error('loadWorld no está definido');
+        }
         if (typeof loadTransactions === 'function') loadTransactions();
         loadMapImage();
     } else {
@@ -2308,6 +2361,14 @@ document.addEventListener('DOMContentLoaded', function() {
 // Tabs por contenedor: solo se activan los del mismo panel (DM o Personaje)
 document.querySelectorAll('.nav-tab').forEach(tab => {
     tab.addEventListener('click', (e) => {
+        // Si se hace clic en el tab de ciudades, forzar renderizado
+        const tabName = tab.getAttribute('data-tab');
+        if (tabName === 'cities' && typeof renderCities === 'function') {
+            console.log('Tab de ciudades clickeado, forzando renderizado...');
+            setTimeout(function() {
+                renderCities();
+            }, 100);
+        }
         if (!tab.dataset.tab) return; // ej. botón "+ DM"
         const container = tab.closest('#main-container') || tab.closest('#player-view-container');
         if (!container) return;
@@ -2318,6 +2379,14 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
         container.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
         tab.classList.add('active');
         targetSection.classList.add('active');
+        
+        // Si se hace clic en el tab de ciudades, forzar renderizado
+        if (tab.dataset.tab === 'cities' && typeof renderCities === 'function') {
+            console.log('Tab de ciudades activado, forzando renderizado...');
+            setTimeout(function() {
+                renderCities();
+            }, 200);
+        }
     });
 });
 

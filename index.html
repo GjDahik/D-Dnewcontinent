@@ -151,8 +151,13 @@
                     <span class="player-mistfall-divider-icon">⚜️</span>
                     <div class="player-mistfall-divider-line"></div>
                 </div>
+                <div id="player-directorio-city-image-container" style="margin-bottom:30px;"></div>
                 <h3 class="player-mistfall-section-title">Comercios y Artesanos</h3>
                 <div id="player-directorio-shops-grid" class="player-mistfall-shops-grid"></div>
+                <div id="player-directorio-city-notes-section" style="margin-top:40px; padding:20px; background:rgba(26,26,26,0.6); border:1px solid #4a3c31; border-radius:8px;">
+                    <h3 style="font-family:'Cinzel', serif; color:#d4af37; font-size:1.2em; margin-bottom:12px; text-transform:uppercase; letter-spacing:2px;">📝 Mis Notas</h3>
+                    <textarea id="player-directorio-city-notes-input" class="player-city-notes-input" rows="5" placeholder="Escribe tus notas sobre esta ciudad..."></textarea>
+                </div>
             </div>
             <!-- Directorio de habitantes (solo lista de NPCs) -->
             <div id="player-directorio-habitantes-wrap" class="player-mistfall-page" style="display:none;">
@@ -788,6 +793,11 @@
                 <div class="form-group">
                     <label>📝 Descripción</label>
                     <textarea id="city-descripcion" rows="4" placeholder="Descripción de la ciudad..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>🖼️ URL de Imagen</label>
+                    <input type="url" id="city-imagen-url" placeholder="https://ejemplo.com/imagen.jpg">
+                    <p style="color:#8b7355; font-size:0.85em; margin-top:4px;">URL de la imagen que se mostrará para esta ciudad.</p>
                 </div>
                 <div class="form-group">
                     <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
