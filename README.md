@@ -2,7 +2,9 @@
 
 Sistema completo de gestión para campañas de Dungeons & Dragons. **Dashboard para Dungeon Masters** y **aplicación para jugadores** integrados en una sola plataforma.
 
-## 📋 DescripciónNueva Valdoria es una aplicación web completa diseñada para facilitar la gestión de campañas de D&D. Permite a los Dungeon Masters gestionar jugadores, ciudades, NPCs, tiendas e inventarios, mientras que los jugadores pueden acceder a sus personajes, explorar ciudades, comprar en tiendas y gestionar sus inventarios.
+## 📋 Descripción
+
+Nueva Valdoria es una aplicación web completa diseñada para facilitar la gestión de campañas de D&D. Permite a los Dungeon Masters gestionar jugadores, ciudades, NPCs, tiendas e inventarios, mientras que los jugadores pueden acceder a sus personajes, explorar ciudades, comprar en tiendas y gestionar sus inventarios.
 
 ## 🚀 Características Principales
 
