@@ -21,6 +21,7 @@ let playerEmporioShopId = null, playerEmporioCart = [], playerEmporioTab = 'mate
 let playerBibliotecaShopId = null, playerBibliotecaCart = [];
 let playerBancoShopId = null;
 let playerPosadaShopId = null;
+let playerPosadaCart = [];
 
 /** Cuartos de la Posada de Nebula (tipos fijos, sin inventario) */
 const POSADA_CUARTOS = [
@@ -596,20 +597,20 @@ function openPlayerCityShops(cityId, cityNombre) {
         ? [shops.find(s => s.id === recomendadoId), ...shops.filter(s => s.id !== recomendadoId)].filter(Boolean)
         : shops;
 
-    const cityNameNorm = ('' + (cityNombre || '')).trim().toLowerCase();
-    const isOldMistfall = cityNameNorm === 'old mistfall' || (cityNameNorm.includes('mistfall') && cityNameNorm.includes('old'));
-    const nuestrosHeroesCard = isOldMistfall ? `
-        <div class="player-mistfall-shop-card player-mistfall-shop-pociones" style="border:2px solid rgba(155,89,182,0.6);" onclick="openNuestrosHeroesModal()" role="button" tabindex="0">
-            <span class="player-mistfall-shop-icon">🧪</span>
+    const shopsGrid = document.getElementById('player-directorio-shops-grid');
+    
+    // Tarjeta "Mi Casa" para el aventurero
+    const miCasaCard = currentUser && currentUser.type === 'player' ? `
+        <div class="player-mistfall-shop-card player-mistfall-shop-habitantes" style="border:2px solid rgba(139,90,43,0.6);" onclick="openMiCasaModal()" role="button" tabindex="0">
+            <span class="player-mistfall-shop-icon">🏠</span>
             <div class="player-mistfall-shop-info">
-                <h3 class="player-mistfall-shop-name">Nuestros Héroes — Tienda de JimJam</h3>
-                <p class="player-mistfall-shop-desc">Tienda fija de Old Mistfall</p>
-                <p class="player-mistfall-shop-enter">— Entrar al establecimiento →</p>
+                <h3 class="player-mistfall-shop-name">Home</h3>
+                <p class="player-mistfall-shop-desc">Tu fortaleza personal</p>
+                <p class="player-mistfall-shop-enter">— Entrar a Home →</p>
             </div>
         </div>` : '';
-
-    const shopsGrid = document.getElementById('player-directorio-shops-grid');
-    const shopCards = nuestrosHeroesCard + orderedShops.map(s => {
+    
+    const shopCards = miCasaCard + orderedShops.map(s => {
         const t = (s.tipo || '').toLowerCase();
         const isRecomendado = s.id === recomendadoId;
         const cls = 'player-mistfall-shop-card player-mistfall-shop-' + (tipoClass[t] || '') + (isRecomendado ? ' player-mistfall-shop-recomendado' : '');
@@ -998,6 +999,7 @@ function openPlayerPosadaModal(shopId) {
     const shop = playerShopsData.find(s => s.id === shopId);
     if (!shop) return;
     playerPosadaShopId = shopId;
+    playerPosadaCart = []; // Limpiar carrito al abrir
     document.getElementById('player-posada-title').textContent = '🏨 ' + (shop.nombre || 'Posada');
     const bodyEl = document.getElementById('player-posada-body');
     const recEl = document.getElementById('player-posada-receipt');
@@ -1006,13 +1008,18 @@ function openPlayerPosadaModal(shopId) {
     bodyEl.style.display = 'block';
     recEl.style.display = 'none';
     recEl.innerHTML = '';
+    updatePosadaCart(); // Inicializar carrito
     const user = getCurrentUser();
     const renderOro = (oro) => {
         const el = document.getElementById('player-posada-oro');
         if (el) el.innerHTML = 'Tu oro: <strong>' + (oro != null ? oro : 0).toLocaleString() + '</strong> GP';
     };
-    listEl.innerHTML = POSADA_CUARTOS.map(c => `
-        <div class="player-posada-cuarto" data-room-id="${c.id}" style="background:rgba(0,0,0,0.25); border:1px solid #4a3c31; border-radius:10px; padding:16px; margin-bottom:12px;">
+    
+    // Usar cuartos de la tienda si existen, sino usar los por defecto
+    const cuartos = (shop.posadaCuartos && shop.posadaCuartos.length > 0) ? shop.posadaCuartos : POSADA_CUARTOS;
+    
+    listEl.innerHTML = cuartos.map((c, idx) => `
+        <div class="player-posada-cuarto" data-room-id="${c.id || idx}" style="background:rgba(0,0,0,0.25); border:1px solid #4a3c31; border-radius:10px; padding:16px; margin-bottom:12px;">
             <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
                 <div style="flex:1; min-width:180px;">
                     <h4 style="color:#d4af37; font-family:'Cinzel',serif; margin-bottom:6px;">${c.nombre}</h4>
@@ -1020,7 +1027,11 @@ function openPlayerPosadaModal(shopId) {
                 </div>
                 <div style="flex-shrink:0; text-align:right;">
                     <div class="gold-value" style="margin-bottom:8px;">${c.precio} GP / noche</div>
-                    <button type="button" class="btn btn-small" onclick="doPlayerPosadaRent('${c.id}')">Reservar noche</button>
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                        <label style="color:#8b7355; font-size:0.85em;">Noches:</label>
+                        <input type="number" id="posada-nights-${c.id || idx}" min="1" value="1" style="width:60px; background:#1a1a1a; border:1px solid #4a3c31; color:#d4c4a8; padding:4px 8px; border-radius:4px; text-align:center;">
+                    </div>
+                    <button type="button" class="btn btn-small" onclick="addToPosadaCart('${c.id || idx}', '${(c.nombre || '').replace(/'/g, "\\'")}', ${c.precio}, '${(c.efecto || '').replace(/'/g, "\\'")}')">➕ Agregar al Carrito</button>
                 </div>
             </div>
         </div>
@@ -1036,36 +1047,191 @@ function openPlayerPosadaModal(shopId) {
     openModal('player-posada-modal');
 }
 
-async function doPlayerPosadaRent(roomId) {
-    const user = getCurrentUser();
-    if (!user || !user.id || !isPlayer()) { showToast('Debes estar logueado como personaje', true); return; }
-    const shopId = playerPosadaShopId;
-    if (!shopId) return;
-    const room = POSADA_CUARTOS.find(c => c.id === roomId);
-    if (!room) return;
-    const shop = playerShopsData.find(s => s.id === shopId);
-    const shopName = shop ? (shop.nombre || 'Posada') : 'Posada';
-    if (!confirm('¿Reservar ' + room.nombre + ' por ' + room.precio + ' GP por noche?')) return;
-    const docRef = db.collection('players').doc(user.id);
-    const doc = await docRef.get();
-    if (!doc.exists) { showToast('No se encontró el personaje', true); return; }
-    const data = doc.data();
-    const oro = (data.oro != null ? data.oro : 0);
-    if (oro < room.precio) {
-        showToast('No tienes suficiente oro. Necesitas ' + room.precio + ' GP. Tienes ' + oro.toLocaleString() + ' GP.', true);
+window.addToPosadaCart = function(roomId, roomNombre, roomPrecio, roomEfecto) {
+    const nightsInput = document.getElementById(`posada-nights-${roomId}`);
+    const nights = parseInt(nightsInput ? nightsInput.value : 1) || 1;
+    
+    if (nights < 1) {
+        showToast('Debes seleccionar al menos 1 noche', true);
         return;
     }
-    const newOro = oro - room.precio;
-    await docRef.update({ oro: newOro });
-    await db.collection('transactions').add({
-        tipo: 'hospedaje',
-        itemName: room.nombre,
-        playerId: user.id,
-        playerName: user.nombre || 'Jugador',
-        shopName,
-        precio: room.precio,
-        fecha: firebase.firestore.FieldValue.serverTimestamp()
+    
+    // Buscar si ya existe en el carrito
+    const existingIndex = playerPosadaCart.findIndex(item => item.roomId === roomId);
+    
+    if (existingIndex >= 0) {
+        // Actualizar cantidad
+        playerPosadaCart[existingIndex].nights = nights;
+        showToast('Cantidad actualizada en el carrito');
+    } else {
+        // Agregar nuevo item
+        playerPosadaCart.push({
+            roomId: roomId,
+            nombre: roomNombre,
+            precio: roomPrecio,
+            efecto: roomEfecto || '',
+            nights: nights
+        });
+        showToast('Agregado al carrito');
+    }
+    
+    updatePosadaCart();
+}
+
+window.removeFromPosadaCart = function(roomId) {
+    playerPosadaCart = playerPosadaCart.filter(item => item.roomId !== roomId);
+    updatePosadaCart();
+    showToast('Eliminado del carrito');
+}
+
+window.clearPosadaCart = function() {
+    playerPosadaCart = [];
+    updatePosadaCart();
+    showToast('Carrito vaciado');
+}
+
+function updatePosadaCart() {
+    const cartEl = document.getElementById('player-posada-cart');
+    const cartItemsEl = document.getElementById('player-posada-cart-items');
+    const subtotalEl = document.getElementById('player-posada-cart-subtotal');
+    const discountEl = document.getElementById('player-posada-cart-discount');
+    const discountAmountEl = document.getElementById('player-posada-cart-discount-amount');
+    const totalEl = document.getElementById('player-posada-cart-total');
+    
+    if (!cartEl || !cartItemsEl) return;
+    
+    if (playerPosadaCart.length === 0) {
+        cartEl.style.display = 'none';
+        return;
+    }
+    
+    cartEl.style.display = 'block';
+    
+    // Calcular subtotal
+    let subtotal = 0;
+    const totalNights = playerPosadaCart.reduce((sum, item) => sum + item.nights, 0);
+    
+    cartItemsEl.innerHTML = playerPosadaCart.map(item => {
+        const itemTotal = item.precio * item.nights;
+        subtotal += itemTotal;
+        return `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #4a3c31;">
+                <div style="flex:1;">
+                    <div style="color:#d4c4a8; font-weight:bold;">${item.nombre}</div>
+                    <div style="color:#8b7355; font-size:0.85em;">${item.nights} noche${item.nights !== 1 ? 's' : ''} × ${item.precio} GP</div>
+                </div>
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <span class="gold-value">${itemTotal.toLocaleString()} GP</span>
+                    <button class="btn btn-small btn-danger" onclick="removeFromPosadaCart('${item.roomId}')" style="padding:4px 8px; font-size:0.8em;">🗑️</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    // Calcular descuento (25% si 3+ noches)
+    let discount = 0;
+    if (totalNights >= 3) {
+        discount = subtotal * 0.25;
+    }
+    
+    const total = subtotal - discount;
+    
+    subtotalEl.textContent = subtotal.toLocaleString() + ' GP';
+    
+    if (discount > 0) {
+        discountEl.style.display = 'flex';
+        discountAmountEl.textContent = '-' + discount.toLocaleString() + ' GP';
+    } else {
+        discountEl.style.display = 'none';
+    }
+    
+    totalEl.textContent = total.toLocaleString() + ' GP';
+}
+
+window.checkoutPosada = async function() {
+    const user = getCurrentUser();
+    if (!user || !user.id || !isPlayer()) {
+        showToast('Debes estar logueado como personaje', true);
+        return;
+    }
+    
+    if (playerPosadaCart.length === 0) {
+        showToast('El carrito está vacío', true);
+        return;
+    }
+    
+    const shopId = playerPosadaShopId;
+    if (!shopId) return;
+    
+    const shop = playerShopsData.find(s => s.id === shopId);
+    const shopName = shop ? (shop.nombre || 'Posada') : 'Posada';
+    
+    // Calcular total
+    let subtotal = 0;
+    const totalNights = playerPosadaCart.reduce((sum, item) => sum + item.nights, 0);
+    playerPosadaCart.forEach(item => {
+        subtotal += item.precio * item.nights;
     });
+    
+    let discount = 0;
+    if (totalNights >= 3) {
+        discount = subtotal * 0.25;
+    }
+    
+    const total = subtotal - discount;
+    
+    // Verificar oro
+    const docRef = db.collection('players').doc(user.id);
+    const doc = await docRef.get();
+    if (!doc.exists) {
+        showToast('No se encontró el personaje', true);
+        return;
+    }
+    
+    const data = doc.data();
+    const oro = (data.oro != null ? data.oro : 0);
+    
+    if (oro < total) {
+        showToast('No tienes suficiente oro. Necesitas ' + total.toLocaleString() + ' GP. Tienes ' + oro.toLocaleString() + ' GP.', true);
+        return;
+    }
+    
+    // Procesar reservas
+    const newOro = oro - total;
+    await docRef.update({ oro: newOro });
+    
+    // Crear transacciones
+    const items = [];
+    for (const item of playerPosadaCart) {
+        const itemTotal = item.precio * item.nights;
+        items.push({
+            name: item.nombre + (item.nights > 1 ? ` (${item.nights} noches)` : ''),
+            line: itemTotal.toLocaleString() + ' GP'
+        });
+        
+        // Crear transacción individual por cada noche
+        for (let i = 0; i < item.nights; i++) {
+            await db.collection('transactions').add({
+                tipo: 'hospedaje',
+                itemName: item.nombre,
+                playerId: user.id,
+                playerName: user.nombre || 'Jugador',
+                shopName,
+                precio: item.precio,
+                fecha: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
+    }
+    
+    // Agregar descuento si aplica
+    if (discount > 0) {
+        items.push({
+            name: 'Descuento (25% por 3+ noches)',
+            line: '-' + discount.toLocaleString() + ' GP'
+        });
+    }
+    
+    // Mostrar recibo
     const bodyEl = document.getElementById('player-posada-body');
     const recEl = document.getElementById('player-posada-receipt');
     if (bodyEl) bodyEl.style.display = 'none';
@@ -1074,15 +1240,27 @@ async function doPlayerPosadaRent(roomId) {
             shopName: shopName,
             logo: '🏨',
             subtitle: 'Recibo de hospedaje',
-            items: [{ name: room.nombre, line: room.precio + ' GP / noche' }],
+            items: items,
             totalLabel: 'TOTAL:',
-            totalValue: room.precio + ' GP',
+            totalValue: total.toLocaleString() + ' GP',
             footerThanks: '¡Descansa bien, aventurero!',
             modalId: 'player-posada-modal'
         });
         recEl.style.display = 'block';
     }
-    showToast('Has reservado ' + room.nombre + ' por ' + room.precio + ' GP.');
+    
+    // Limpiar carrito
+    playerPosadaCart = [];
+    updatePosadaCart();
+    
+    // Actualizar oro mostrado
+    const renderOro = (oro) => {
+        const el = document.getElementById('player-posada-oro');
+        if (el) el.innerHTML = 'Tu oro: <strong>' + (oro != null ? oro : 0).toLocaleString() + '</strong> GP';
+    };
+    renderOro(newOro);
+    
+    showToast('Has reservado ' + totalNights + ' noche' + (totalNights !== 1 ? 's' : '') + ' por ' + total.toLocaleString() + ' GP.');
 }
 
 function openPlayerShop(shopId) {
@@ -2404,16 +2582,100 @@ function openModal(id) {
 
 function closeModal(id) { 
     document.getElementById(id).classList.remove('active');
-    if (id === 'player-nuestros-heroes-modal') {
-        const iframe = document.getElementById('player-nuestros-heroes-iframe');
-        if (iframe) iframe.src = 'about:blank';
-    }
 }
 
-function openNuestrosHeroesModal() {
-    const iframe = document.getElementById('player-nuestros-heroes-iframe');
-    if (iframe) iframe.src = 'old-mistfall.html';
-    openModal('player-nuestros-heroes-modal');
+window.openMiCasaModal = function() {
+    const user = getCurrentUser();
+    if (!user || !user.id || !isPlayer()) {
+        showToast('Debes estar logueado como aventurero', true);
+        return;
+    }
+    
+    // Cargar información de la casa del jugador
+    db.collection('players').doc(user.id).get().then(doc => {
+        const playerData = doc.exists ? doc.data() : {};
+        const casaInfo = playerData.casa || {};
+        
+        // Mostrar imagen si existe
+        const imagenContainer = document.getElementById('mi-casa-imagen-container');
+        if (!imagenContainer) {
+            console.error('Error: mi-casa-imagen-container no encontrado');
+            showToast('Error: Elementos del modal no encontrados', true);
+            return;
+        }
+        
+        if (casaInfo.imagenUrl) {
+            imagenContainer.innerHTML = `<img src="${casaInfo.imagenUrl.replace(/"/g, '&quot;')}" alt="${(casaInfo.nombre || 'Home').replace(/"/g, '&quot;')}" style="width:100%; height:auto; max-height:600px; object-fit:cover; display:block;" onerror="this.style.display='none'; this.parentElement.innerHTML='<div id=\\'mi-casa-imagen-placeholder\\' style=\\'padding:80px; color:#8b7355; font-size:4em; text-align:center;\\'><div style=\\'font-size:0.3em; margin-top:20px; color:#6b5d4a;\\'>Error al cargar la imagen</div></div>';"><div id="mi-casa-imagen-placeholder" style="display:none;"></div>`;
+        } else {
+            imagenContainer.innerHTML = '<div id="mi-casa-imagen-placeholder" style="padding:80px; color:#8b7355; font-size:4em; text-align:center;"><div style="font-size:0.3em; margin-top:20px; color:#6b5d4a;">El DM aún no ha agregado una imagen</div></div>';
+        }
+        
+        // Mostrar nombre de la casa en el título
+        const nombreEl = document.getElementById('mi-casa-nombre-display');
+        if (nombreEl) {
+            nombreEl.textContent = casaInfo.nombre || 'Home';
+        }
+        
+        // Mostrar descripción
+        const descEl = document.getElementById('mi-casa-descripcion-display');
+        if (descEl) {
+            descEl.textContent = casaInfo.descripcion || 'El DM aún no ha agregado una descripción para tu casa.';
+        }
+        
+        // Mostrar información adicional
+        const ubicacionEl = document.getElementById('mi-casa-ubicacion-display');
+        if (ubicacionEl) {
+            ubicacionEl.textContent = casaInfo.ubicacion || 'No especificada';
+        }
+        
+        const notasDmEl = document.getElementById('mi-casa-notas-dm-display');
+        if (notasDmEl) {
+            notasDmEl.textContent = casaInfo.notas || 'No hay notas del DM.';
+        }
+        
+        // Cargar notas personales del jugador
+        const notasPersonalesEl = document.getElementById('mi-casa-notas-personales');
+        if (notasPersonalesEl) {
+            notasPersonalesEl.value = casaInfo.notasPersonales || '';
+        }
+        
+        openModal('mi-casa-modal');
+    }).catch(err => {
+        console.error('Error cargando información de la casa:', err);
+        showToast('Error al cargar información de tu casa', true);
+    });
+}
+
+window.saveMiCasaNotas = function() {
+    const user = getCurrentUser();
+    if (!user || !user.id || !isPlayer()) {
+        showToast('Debes estar logueado como aventurero', true);
+        return;
+    }
+    
+    const notasPersonales = document.getElementById('mi-casa-notas-personales').value.trim();
+    
+    // Obtener datos existentes para preservar la información del DM
+    db.collection('players').doc(user.id).get().then(doc => {
+        const playerData = doc.exists ? doc.data() : {};
+        const casaExistente = playerData.casa || {};
+        
+        const casaData = {
+            ...casaExistente, // Preservar toda la información del DM
+            notasPersonales: notasPersonales // Solo actualizar las notas personales
+        };
+        
+        return db.collection('players').doc(user.id).update({
+            casa: casaData,
+            casaUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    }).then(() => {
+        showToast('Tus notas personales guardadas');
+        closeModal('mi-casa-modal');
+    }).catch(err => {
+        console.error('Error guardando notas:', err);
+        showToast('Error al guardar tus notas', true);
+    });
 }
 
 function togglePlayersCard() {

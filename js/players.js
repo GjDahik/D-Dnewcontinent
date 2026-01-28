@@ -30,6 +30,7 @@ function renderPlayers() {
                 <div class="mini-card-actions" style="margin-top:10px;">
                     <button class="btn btn-small" onclick="openGoldModal('${p.id}', '${p.nombre}', ${p.oro})">💰</button>
                     <button class="btn btn-small" onclick="openBancoModal('${p.id}', '${p.nombre}', ${bancoBalance})" style="background:linear-gradient(180deg, #5a8a5a 0%, #4a7a4a 100%);">🏦</button>
+                    <button class="btn btn-small" onclick="openPlayerCasaModal('${p.id}', '${(p.nombre || '').replace(/'/g, "\\'")}')" style="background:linear-gradient(180deg, #8b5a2b 0%, #6b4a1b 100%);">🏠</button>
                     <button class="btn btn-small btn-secondary" onclick="editPlayer('${p.id}')">✏️</button>
                     <button class="btn btn-small btn-danger" onclick="deletePlayer('${p.id}', '${p.nombre}')">🗑️</button>
                 </div>
@@ -233,6 +234,58 @@ function removeItemFromPlayer(index) {
             renderPlayerInventory(player);
         })
         .catch(e => showToast('Error: ' + e.message, true));
+}
+
+function openPlayerCasaModal(playerId, playerNombre) {
+    document.getElementById('dm-casa-player-id').value = playerId;
+    document.getElementById('dm-casa-player-name').textContent = playerNombre;
+    
+    db.collection('players').doc(playerId).get().then(doc => {
+        const playerData = doc.exists ? doc.data() : {};
+        const casaInfo = playerData.casa || {};
+        
+        document.getElementById('dm-casa-nombre').value = casaInfo.nombre || '';
+        document.getElementById('dm-casa-descripcion').value = casaInfo.descripcion || '';
+        document.getElementById('dm-casa-ubicacion').value = casaInfo.ubicacion || '';
+        document.getElementById('dm-casa-imagen-url').value = casaInfo.imagenUrl || '';
+        document.getElementById('dm-casa-notas').value = casaInfo.notas || '';
+        
+        openModal('dm-casa-modal');
+    }).catch(err => {
+        console.error('Error cargando información de la casa:', err);
+        showToast('Error al cargar información de la casa', true);
+    });
+}
+
+function savePlayerCasa() {
+    const playerId = document.getElementById('dm-casa-player-id').value;
+    if (!playerId) return;
+    
+    // Obtener datos existentes para preservar las notas personales del jugador
+    db.collection('players').doc(playerId).get().then(doc => {
+        const playerData = doc.exists ? doc.data() : {};
+        const casaExistente = playerData.casa || {};
+        
+        const casaData = {
+            nombre: document.getElementById('dm-casa-nombre').value.trim(),
+            descripcion: document.getElementById('dm-casa-descripcion').value.trim(),
+            ubicacion: document.getElementById('dm-casa-ubicacion').value.trim(),
+            imagenUrl: document.getElementById('dm-casa-imagen-url').value.trim(),
+            notas: document.getElementById('dm-casa-notas').value.trim(),
+            notasPersonales: casaExistente.notasPersonales || '' // Preservar notas personales del jugador
+        };
+        
+        return db.collection('players').doc(playerId).update({
+            casa: casaData,
+            casaUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    }).then(() => {
+        showToast('Información de la casa guardada');
+        closeModal('dm-casa-modal');
+    }).catch(err => {
+        console.error('Error guardando casa:', err);
+        showToast('Error al guardar información de la casa', true);
+    });
 }
 
 // Initialize

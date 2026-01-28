@@ -116,10 +116,10 @@
         </header>
         <nav class="nav-tabs" id="player-nav-tabs">
             <button class="nav-tab active" data-tab="player-map">🗺️ Mapa</button>
-            <button class="nav-tab" data-tab="player-ciudades">🏘️ Ciudades</button>
+            <button class="nav-tab" data-tab="player-ciudades">🏛️ Ciudades</button>
             <button class="nav-tab" data-tab="player-inventario">🎒 Inventario</button>
+            <button class="nav-tab" type="button" onclick="openMiCasaModal()" title="Ver mi home">🏠 Home</button>
             <button class="nav-tab" type="button" onclick="window.open('battle-tracker.html', '_blank')" title="Abrir en nueva pestaña">⚔️ Battle Tracker</button>
-            <button class="nav-tab" type="button" onclick="window.open('heroes-legendarios.html', '_blank')" title="Abrir en nueva pestaña">⭐ Héroes Legendarios</button>
         </nav>
         <section id="player-map" class="tab-content active">
             <div class="section-header">
@@ -217,18 +217,62 @@
         </div>
     </div>
 
-    <!-- Modal Nuestros Héroes (tienda fija de Old Mistfall, contenido en iframe) -->
-    <div class="modal-overlay" id="player-nuestros-heroes-modal">
-        <div class="modal" style="max-width: 95%; width: 1200px; height: 90vh; display: flex; flex-direction: column;">
-            <div class="modal-header">
-                <h3>🧪 Nuestros Héroes — Tienda de JimJam</h3>
-                <button class="modal-close" onclick="closeModal('player-nuestros-heroes-modal')">&times;</button>
+    <!-- Modal Mi Casa -->
+    <div class="modal-overlay" id="mi-casa-modal">
+        <div class="modal" style="max-width: 1100px; width: 95%;">
+            <div class="modal-header" style="border-bottom: 2px solid #8b5a2b; padding: 20px;">
+                <button class="btn btn-secondary btn-small" onclick="closeModal('mi-casa-modal')" style="margin-right: auto;">← Volver</button>
+                <h3 id="mi-casa-titulo" style="margin: 0 auto; font-family:'Cinzel', serif; color:#d4af37; text-transform: uppercase; letter-spacing: 3px; font-size: 1.5em; text-shadow: 2px 2px 4px rgba(0,0,0,0.8);">🏠 Home</h3>
+                <button class="modal-close" onclick="closeModal('mi-casa-modal')" style="margin-left: auto;">&times;</button>
             </div>
-            <div class="modal-body" style="flex:1; padding:0; overflow:hidden;">
-                <iframe id="player-nuestros-heroes-iframe" src="about:blank" style="width:100%; height:100%; min-height:70vh; border:none;"></iframe>
+            <div class="modal-body" style="padding:0;">
+                <!-- Bloque principal de la casa -->
+                <div class="mi-casa-main-block" style="background: linear-gradient(180deg, rgba(26, 26, 26, 0.98) 0%, rgba(20, 20, 20, 0.98) 100%); border: 2px solid #8b5a2b; margin: 24px; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.6);">
+                    <!-- Título del módulo -->
+                    <div style="padding: 20px 24px; border-bottom: 2px solid #8b5a2b; background: linear-gradient(135deg, rgba(139, 90, 43, 0.15) 0%, rgba(107, 74, 27, 0.1) 100%);">
+                        <h2 style="font-family:'Cinzel', serif; color:#d4af37; font-size: 1.6em; margin: 0; text-transform: uppercase; letter-spacing: 3px; display: flex; align-items: center; gap: 12px; text-shadow: 2px 2px 4px rgba(0,0,0,0.8);">
+                            <span style="font-size: 1.2em;">🏠</span>
+                            <span id="mi-casa-nombre-display">Home</span>
+                        </h2>
+                    </div>
+                    
+                    <!-- Imagen de la casa -->
+                    <div id="mi-casa-imagen-container" style="width:100%; min-height:450px; max-height:650px; overflow:hidden; background:linear-gradient(135deg, #1a1a1a 0%, #2a231c 100%); display:flex; align-items:center; justify-content:center; position:relative; border-bottom: 2px solid #4a3c31;">
+                        <div id="mi-casa-imagen-placeholder" style="padding:100px; color:#8b7355; font-size:5em; text-align:center;">
+                            <div style="font-size:0.25em; margin-top:30px; color:#6b5d4a; font-family:'Crimson Text', serif; font-style:italic;">El DM aún no ha agregado una imagen</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Descripción de la casa -->
+                    <div style="padding:28px; border-top: 1px solid #4a3c31; background: rgba(0,0,0,0.1);">
+                        <p id="mi-casa-descripcion-display" style="color:#d4c4a8; font-size:1.1em; line-height:1.9; margin:0; text-align:justify; white-space:pre-wrap; font-family:'Crimson Text', serif; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">El DM aún no ha agregado una descripción para tu casa.</p>
+                    </div>
+                    
+                    <!-- Información adicional -->
+                    <div style="padding:24px 28px; border-top: 2px solid #4a3c31; background: linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.2) 100%); display:grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap:24px;">
+                        <div style="padding:16px; background: rgba(0,0,0,0.2); border-radius: 8px; border-left: 3px solid #8b5a2b;">
+                            <div style="color:#8b7355; font-size:0.9em; text-transform:uppercase; margin-bottom:8px; letter-spacing:1.5px; font-family:'Cinzel', serif;">📍 Ubicación</div>
+                            <div id="mi-casa-ubicacion-display" style="color:#d4c4a8; font-size:1.05em; font-family:'Crimson Text', serif;">No especificada</div>
+                        </div>
+                        <div style="padding:16px; background: rgba(0,0,0,0.2); border-radius: 8px; border-left: 3px solid #8b5a2b;">
+                            <div style="color:#8b7355; font-size:0.9em; text-transform:uppercase; margin-bottom:8px; letter-spacing:1.5px; font-family:'Cinzel', serif;">📝 Notas del DM</div>
+                            <div id="mi-casa-notas-dm-display" style="color:#a89878; font-size:1em; line-height:1.6; white-space:pre-wrap; font-family:'Crimson Text', serif;">No hay notas del DM.</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Sección de notas personales -->
+                <div class="mi-casa-notes-block" style="background: linear-gradient(180deg, rgba(26, 26, 26, 0.98) 0%, rgba(20, 20, 20, 0.98) 100%); border: 2px solid #8b5a2b; margin: 0 24px 24px 24px; border-radius: 12px; padding: 24px; box-shadow: 0 4px 16px rgba(0,0,0,0.4);">
+                    <h3 style="font-family:'Cinzel', serif; color:#d4af37; font-size:1.3em; margin-bottom:16px; text-transform:uppercase; letter-spacing:2px; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); display: flex; align-items: center; gap: 8px;">
+                        <span>📔</span>
+                        <span>Mis Notas Personales</span>
+                    </h3>
+                    <textarea id="mi-casa-notas-personales" rows="7" placeholder="Escribe tus notas personales sobre tu casa, objetos importantes, secretos, recuerdos, etc..." style="width:100%; background:#1a1a1a; border:2px solid #4a3c31; color:#d4c4a8; padding:16px; border-radius:8px; font-family:'Crimson Text', serif; font-size:1em; resize:vertical; line-height:1.7; transition: all 0.3s ease;"></textarea>
+                </div>
             </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeModal('player-nuestros-heroes-modal')">Cerrar</button>
+            <div class="modal-footer" style="border-top: 2px solid #4a3c31; padding: 16px 24px;">
+                <button class="btn btn-secondary" onclick="closeModal('mi-casa-modal')">Cerrar</button>
+                <button class="btn" onclick="saveMiCasaNotas()">💾 Guardar Mis Notas</button>
             </div>
         </div>
     </div>
@@ -326,14 +370,39 @@
 
     <!-- Modal Posada (cuartos fijos, sin inventario; precios y efectos de la Posada de Nebula) -->
     <div class="modal-overlay" id="player-posada-modal">
-        <div class="modal" style="max-width: 640px;">
+        <div class="modal" style="max-width: 800px;">
             <div class="modal-header">
                 <h3 id="player-posada-title">🏨 Posada</h3>
                 <button class="modal-close" onclick="closeModal('player-posada-modal')">&times;</button>
             </div>
             <div class="modal-body" style="display:flex; flex-direction:column; gap:16px;">
                 <div id="player-posada-body">
-                    <p id="player-posada-oro" class="gold-value" style="margin-bottom:8px; font-size:1em;">Tu oro: <strong>0</strong> GP</p>
+                    <p id="player-posada-oro" class="gold-value" style="margin-bottom:16px; font-size:1em;">Tu oro: <strong>0</strong> GP</p>
+                    
+                    <!-- Carrito de compras -->
+                    <div id="player-posada-cart" style="margin-bottom:20px; padding:16px; background:rgba(0,0,0,0.3); border:1px solid #4a3c31; border-radius:8px; display:none;">
+                        <h4 style="font-family:'Cinzel', serif; color:#d4af37; margin-bottom:12px; text-transform:uppercase; letter-spacing:1px;">🛒 Carrito de Reservas</h4>
+                        <div id="player-posada-cart-items" style="margin-bottom:12px;"></div>
+                        <div style="border-top:1px solid #4a3c31; padding-top:12px;">
+                            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                                <span style="color:#8b7355;">Subtotal:</span>
+                                <span id="player-posada-cart-subtotal" class="gold-value">0 GP</span>
+                            </div>
+                            <div id="player-posada-cart-discount" style="display:none; display:flex; justify-content:space-between; margin-bottom:8px; color:#5a8a5a;">
+                                <span>Descuento (25%):</span>
+                                <span id="player-posada-cart-discount-amount">-0 GP</span>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; border-top:1px solid #4a3c31; padding-top:8px; margin-top:8px;">
+                                <strong style="color:#d4af37; font-size:1.1em;">Total:</strong>
+                                <strong id="player-posada-cart-total" class="gold-value" style="font-size:1.1em;">0 GP</strong>
+                            </div>
+                        </div>
+                        <div style="margin-top:16px; display:flex; gap:8px;">
+                            <button class="btn btn-secondary btn-small" onclick="clearPosadaCart()" style="flex:1;">Vaciar Carrito</button>
+                            <button class="btn btn-small" onclick="checkoutPosada()" style="flex:1;">💳 Reservar</button>
+                        </div>
+                    </div>
+                    
                     <div class="player-posada-cuartos" id="player-posada-cuartos-list"></div>
                 </div>
                 <div id="player-posada-receipt" style="display:none;"></div>
@@ -883,7 +952,7 @@
                 </div>
                 <div class="form-group">
                     <label>Tipo</label>
-                    <select id="shop-tipo">
+                    <select id="shop-tipo" onchange="toggleShopPosadaConfig()">
                         <option value="pociones">🧪 Pociones</option>
                         <option value="herreria">⚔️ Herrería</option>
                         <option value="arqueria">🏹 Arquería / Artífice</option>
@@ -900,10 +969,54 @@
                     <label>NPC Dueño (opcional)</label>
                     <select id="shop-npc"></select>
                 </div>
+                <div id="shop-posada-config" style="display:none; margin-top:20px; padding-top:20px; border-top:1px solid #4a3c31;">
+                    <h4 style="color:#d4af37; font-family:'Cinzel', serif; margin-bottom:15px;">🏨 Configuración de Posada</h4>
+                    <p style="color:#8b7355; font-size:0.85em; margin-bottom:15px;">Configura los cuartos disponibles en esta posada. Usa el formato: nombre|precio|efecto (una línea por cuarto)</p>
+                    <textarea id="shop-posada-cuartos" rows="8" placeholder="Ejemplo:&#10;Cuarto del Guerrero Valiente|50|El aventurero recibe un aumento temporal en su salud. Al siguiente combate, su máximo de puntos de golpe aumenta en 10 durante 1 hora.&#10;Cuarto del Sabio Estelar|75|El aventurero recibe un bono a sus tiradas de inteligencia en su próxima aventura. Al realizar un chequeo de habilidad que dependa de Inteligencia, el aventurero obtiene un +2 por 1 hora."></textarea>
+                    <p style="color:#8b7355; font-size:0.8em; margin-top:8px;">Formato: nombre|precio|descripción del efecto</p>
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeModal('shop-modal')">Cancelar</button>
                 <button class="btn" onclick="saveShop()">💾 Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Casa del Jugador (DM) -->
+    <div class="modal-overlay" id="dm-casa-modal">
+        <div class="modal" style="max-width: 700px;">
+            <div class="modal-header">
+                <h3>🏠 Casa de <span id="dm-casa-player-name"></span></h3>
+                <button class="modal-close" onclick="closeModal('dm-casa-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="dm-casa-player-id">
+                <div class="form-group">
+                    <label>Nombre de la Casa</label>
+                    <input type="text" id="dm-casa-nombre" placeholder="Ej: La Mansión del Guerrero">
+                </div>
+                <div class="form-group">
+                    <label>Ubicación</label>
+                    <input type="text" id="dm-casa-ubicacion" placeholder="Ej: Old Mistfall, Calle Principal 123">
+                </div>
+                <div class="form-group">
+                    <label>🖼️ URL de Imagen</label>
+                    <input type="url" id="dm-casa-imagen-url" placeholder="https://ejemplo.com/imagen-casa.jpg">
+                    <p style="color:#8b7355; font-size:0.85em; margin-top:4px;">URL de la imagen que se mostrará de la casa.</p>
+                </div>
+                <div class="form-group">
+                    <label>Descripción</label>
+                    <textarea id="dm-casa-descripcion" rows="4" placeholder="Describe la casa..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Notas (visibles para el jugador)</label>
+                    <textarea id="dm-casa-notas" rows="5" placeholder="Notas sobre la casa, objetos importantes, secretos, etc..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('dm-casa-modal')">Cancelar</button>
+                <button class="btn" onclick="savePlayerCasa()">💾 Guardar</button>
             </div>
         </div>
     </div>

@@ -372,18 +372,52 @@ function importShopsCSV(event) {
         var validTypes = ['pociones', 'herreria', 'arqueria', 'emporio', 'biblioteca', 'taberna', 'batalla', 'santuario', 'banco', 'posada'];
         function normalizeTipo(s) {
             if (!s) return '';
-            return (s + '').toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            // Normalizar: quitar tildes, convertir a minúsculas, y limpiar espacios
+            var normalized = (s + '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+            // Mapeo directo de tipos normalizados
+            var typeMap = {
+                'arqueria': 'arqueria',
+                'arquería': 'arqueria',
+                'arqueria / artifice': 'arqueria',
+                'arquería / artífice': 'arqueria',
+                'artesano': 'arqueria',
+                'herreria': 'herreria',
+                'herrería': 'herreria',
+                'herreria / forja': 'herreria',
+                'herrería / forja': 'herreria',
+                'pociones': 'pociones',
+                'emporio': 'emporio',
+                'biblioteca': 'biblioteca',
+                'taberna': 'taberna',
+                'batalla': 'batalla',
+                'santuario': 'santuario',
+                'banco': 'banco',
+                'posada': 'posada'
+            };
+            return typeMap[normalized] || normalized;
         }
         var batch = db.batch();
         var count = 0;
+        var skipped = [];
 
         for (var i = 1; i < lines.length; i++) {
             var values = lines[i].split(separator).map(function(v) { return v.trim(); });
             var nombre = values[nombreIdx];
             var tipoRaw = (values[tipoIdx] || '').trim();
+            
+            if (!nombre || !nombre.trim()) {
+                skipped.push('Línea ' + (i + 1) + ': Sin nombre');
+                continue;
+            }
+            
+            if (!tipoRaw || !tipoRaw.trim()) {
+                skipped.push('Línea ' + (i + 1) + ' (' + nombre + '): Sin tipo');
+                continue;
+            }
+            
             var tipo = normalizeTipo(tipoRaw);
 
-            if (nombre && validTypes.indexOf(tipo) !== -1) {
+            if (validTypes.indexOf(tipo) !== -1) {
                 var ref = db.collection('shops').doc();
                 batch.set(ref, {
                     nombre: nombre,
@@ -393,12 +427,24 @@ function importShopsCSV(event) {
                     inventario: []
                 });
                 count++;
+            } else {
+                skipped.push('Línea ' + (i + 1) + ' (' + nombre + '): Tipo inválido "' + tipoRaw + '"');
             }
         }
 
         if (count === 0) {
-            showToast('No se encontraron tiendas válidas. Tipos aceptados: pociones, herrería, arquería, emporio, biblioteca, taberna, batalla, santuario, banco, posada', true);
+            var errorMsg = 'No se encontraron tiendas válidas. Tipos aceptados: pociones, herrería, arquería, emporio, biblioteca, taberna, batalla, santuario, banco, posada';
+            if (skipped.length > 0) {
+                errorMsg += '\n\nLíneas omitidas:\n' + skipped.slice(0, 5).join('\n');
+                if (skipped.length > 5) errorMsg += '\n... y ' + (skipped.length - 5) + ' más';
+            }
+            showToast(errorMsg, true);
+            console.log('Tiendas omitidas:', skipped);
             return;
+        }
+        
+        if (skipped.length > 0) {
+            console.log('Tiendas omitidas:', skipped);
         }
 
         batch.commit().then(function() {
@@ -715,9 +761,19 @@ function openShopModal(ciudadId) {
     document.getElementById('shop-ciudad-id').value = ciudadId;
     document.getElementById('shop-nombre').value = '';
     document.getElementById('shop-tipo').value = 'herreria';
+    document.getElementById('shop-posada-cuartos').value = '';
     updateShopNpcSelect(ciudadId);
+    toggleShopPosadaConfig();
     document.getElementById('shop-modal-title').textContent = '🛒 Nueva Tienda';
     openModal('shop-modal');
+}
+
+function toggleShopPosadaConfig() {
+    const tipo = document.getElementById('shop-tipo').value;
+    const posadaConfig = document.getElementById('shop-posada-config');
+    if (posadaConfig) {
+        posadaConfig.style.display = tipo === 'posada' ? 'block' : 'none';
+    }
 }
 
 function editShop(id) {
@@ -726,8 +782,17 @@ function editShop(id) {
     document.getElementById('shop-ciudad-id').value = s.ciudadId;
     document.getElementById('shop-nombre').value = s.nombre;
     document.getElementById('shop-tipo').value = s.tipo;
+    if (s.posadaCuartos && Array.isArray(s.posadaCuartos)) {
+        const cuartosText = s.posadaCuartos.map(c => `${c.nombre}|${c.precio}|${c.efecto}`).join('\n');
+        document.getElementById('shop-posada-cuartos').value = cuartosText;
+    } else {
+        document.getElementById('shop-posada-cuartos').value = '';
+    }
     updateShopNpcSelect(s.ciudadId);
-    setTimeout(() => document.getElementById('shop-npc').value = s.npcDueno || '', 50);
+    setTimeout(() => {
+        document.getElementById('shop-npc').value = s.npcDueno || '';
+        toggleShopPosadaConfig();
+    }, 50);
     document.getElementById('shop-modal-title').textContent = '✏️ Editar Tienda';
     openModal('shop-modal');
 }
@@ -741,12 +806,36 @@ function updateShopNpcSelect(ciudadId) {
 
 function saveShop() {
     const id = document.getElementById('shop-id').value;
+    const tipo = document.getElementById('shop-tipo').value;
     const data = {
         nombre: document.getElementById('shop-nombre').value,
         ciudadId: document.getElementById('shop-ciudad-id').value,
-        tipo: document.getElementById('shop-tipo').value,
+        tipo: tipo,
         npcDueno: document.getElementById('shop-npc').value
     };
+    
+    // Si es una posada, procesar los cuartos
+    if (tipo === 'posada') {
+        const cuartosText = document.getElementById('shop-posada-cuartos').value.trim();
+        if (cuartosText) {
+            const cuartos = [];
+            const lines = cuartosText.split('\n').filter(l => l.trim());
+            lines.forEach(line => {
+                const parts = line.split('|').map(p => p.trim());
+                if (parts.length >= 3) {
+                    cuartos.push({
+                        nombre: parts[0],
+                        precio: parseInt(parts[1]) || 0,
+                        efecto: parts.slice(2).join('|')
+                    });
+                }
+            });
+            if (cuartos.length > 0) {
+                data.posadaCuartos = cuartos;
+            }
+        }
+    }
+    
     if (!id) data.inventario = [];
     if (!data.nombre) { showToast('Nombre requerido', true); return; }
     (id ? db.collection('shops').doc(id).update(data) : db.collection('shops').add(data))
@@ -757,6 +846,9 @@ function deleteShop(id, nombre) {
     if (confirm(`¿Eliminar ${nombre}?`))
         db.collection('shops').doc(id).delete().then(() => showToast('Tienda eliminada'));
 }
+
+// Hacer función disponible globalmente
+window.toggleShopPosadaConfig = toggleShopPosadaConfig;
 
 // Initialize - No cargar automáticamente aquí, se carga desde app.js cuando el DM inicia sesión
 // loadWorld() se llama desde showDashboard() en app.js
