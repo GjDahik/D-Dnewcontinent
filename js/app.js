@@ -865,14 +865,15 @@ function openPlayerBancoModal(shopId) {
     const shop = playerShopsData.find(s => s.id === shopId);
     if (!shop) return;
     playerBancoShopId = shopId;
-    document.getElementById('player-banco-title').textContent = '🏦 ' + (shop.nombre || 'Banco');
+    document.getElementById('player-banco-title').textContent = '🏦 Banco';
     document.getElementById('player-banco-amount').value = '';
     const user = getCurrentUser();
     if (user && user.id) {
         db.collection('players').doc(user.id).get().then(doc => {
             const data = doc.exists ? doc.data() : {};
             const oro = (data.oro != null ? data.oro : 0);
-            const bal = (data.bancoBalances && typeof data.bancoBalances === 'object') ? (data.bancoBalances[shopId] || 0) : 0;
+            // Balance global del banco (mismo en todas las ciudades)
+            const bal = (data.bancoBalance != null ? data.bancoBalance : 0);
             document.getElementById('player-banco-oro').textContent = oro.toLocaleString() + ' GP';
             document.getElementById('player-banco-balance').textContent = bal.toLocaleString() + ' GP';
         });
@@ -887,32 +888,30 @@ async function doPlayerBancoDeposit() {
     if (!shopId) return;
     const amount = parseInt(document.getElementById('player-banco-amount').value, 10);
     if (!amount || amount < 1) { showToast('Indica una cantidad válida (≥ 1 GP)', true); return; }
-    const shop = playerShopsData.find(s => s.id === shopId);
-    const shopName = shop ? (shop.nombre || 'Banco') : 'Banco';
     const docRef = db.collection('players').doc(user.id);
     const doc = await docRef.get();
     if (!doc.exists) { showToast('No se encontró el personaje', true); return; }
     const data = doc.data();
     const oro = (data.oro != null ? data.oro : 0);
     if (oro < amount) { showToast('No tienes suficiente oro. Tienes ' + oro.toLocaleString() + ' GP.', true); return; }
-    const bal = (data.bancoBalances && typeof data.bancoBalances === 'object') ? (data.bancoBalances[shopId] || 0) : 0;
+    // Balance global del banco (mismo en todas las ciudades)
+    const bal = (data.bancoBalance != null ? data.bancoBalance : 0);
     const newOro = oro - amount;
     const newBal = bal + amount;
-    const bancoBalances = { ...(data.bancoBalances || {}), [shopId]: newBal };
-    await docRef.update({ oro: newOro, bancoBalances });
+    await docRef.update({ oro: newOro, bancoBalance: newBal });
     await db.collection('transactions').add({
         tipo: 'deposito',
         itemName: 'Depósito en banco',
         playerId: user.id,
         playerName: user.nombre || 'Jugador',
-        shopName,
+        shopName: 'Banco',
         precio: amount,
         fecha: firebase.firestore.FieldValue.serverTimestamp()
     });
     document.getElementById('player-banco-oro').textContent = newOro.toLocaleString() + ' GP';
     document.getElementById('player-banco-balance').textContent = newBal.toLocaleString() + ' GP';
     document.getElementById('player-banco-amount').value = '';
-    showToast('Depositados ' + amount.toLocaleString() + ' GP en ' + shopName);
+    showToast('Depositados ' + amount.toLocaleString() + ' GP en el banco');
 }
 
 async function doPlayerBancoWithdraw() {
@@ -924,13 +923,12 @@ async function doPlayerBancoWithdraw() {
     if (!amount || amount < 1) { showToast('Indica una cantidad válida (≥ 1 GP)', true); return; }
     const fee = Math.ceil(amount * (BANCO_RETIRO_COMISION_PORCENTAJE / 100));
     const totalDeducir = amount + fee;
-    const shop = playerShopsData.find(s => s.id === shopId);
-    const shopName = shop ? (shop.nombre || 'Banco') : 'Banco';
     const docRef = db.collection('players').doc(user.id);
     const doc = await docRef.get();
     if (!doc.exists) { showToast('No se encontró el personaje', true); return; }
     const data = doc.data();
-    const bal = (data.bancoBalances && typeof data.bancoBalances === 'object') ? (data.bancoBalances[shopId] || 0) : 0;
+    // Balance global del banco (mismo en todas las ciudades)
+    const bal = (data.bancoBalance != null ? data.bancoBalance : 0);
     if (bal < totalDeducir) {
         showToast('Saldo insuficiente. Necesitas ' + totalDeducir.toLocaleString() + ' GP (incl. ' + fee + ' GP de comisión 2%). Tienes ' + bal.toLocaleString() + ' GP.', true);
         return;
@@ -938,14 +936,13 @@ async function doPlayerBancoWithdraw() {
     const oro = (data.oro != null ? data.oro : 0);
     const newOro = oro + amount;
     const newBal = bal - totalDeducir;
-    const bancoBalances = { ...(data.bancoBalances || {}), [shopId]: newBal };
-    await docRef.update({ oro: newOro, bancoBalances });
+    await docRef.update({ oro: newOro, bancoBalance: newBal });
     await db.collection('transactions').add({
         tipo: 'retiro',
         itemName: 'Retiro de banco',
         playerId: user.id,
         playerName: user.nombre || 'Jugador',
-        shopName,
+        shopName: 'Banco',
         precio: amount,
         comision: fee,
         fecha: firebase.firestore.FieldValue.serverTimestamp()

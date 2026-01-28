@@ -17,16 +17,19 @@ function renderPlayers() {
     }
     container.innerHTML = '';
     playersData.forEach(p => {
+        const bancoBalance = (p.bancoBalance != null ? p.bancoBalance : 0);
         container.innerHTML += `
             <div class="mini-card">
                 <div class="mini-card-title">⚔️ ${p.nombre}</div>
                 <div class="mini-card-info">${p.clase} • Nivel ${p.nivel}</div>
                 <div class="mini-card-info gold-value">💰 ${p.oro.toLocaleString()} GP</div>
+                <div class="mini-card-info gold-value" style="color:#5a8a5a;">🏦 ${bancoBalance.toLocaleString()} GP</div>
                 <div class="mini-card-info">🔐 PIN: ${p.pin}</div>
                 <div class="mini-card-info">🎒 Items: ${(p.inventario || []).length}</div>
                 <div style="margin-top:10px;font-size:0.85em;color:#a89a8c;">${p.notas || 'Sin notas'}</div>
                 <div class="mini-card-actions" style="margin-top:10px;">
                     <button class="btn btn-small" onclick="openGoldModal('${p.id}', '${p.nombre}', ${p.oro})">💰</button>
+                    <button class="btn btn-small" onclick="openBancoModal('${p.id}', '${p.nombre}', ${bancoBalance})" style="background:linear-gradient(180deg, #5a8a5a 0%, #4a7a4a 100%);">🏦</button>
                     <button class="btn btn-small btn-secondary" onclick="editPlayer('${p.id}')">✏️</button>
                     <button class="btn btn-small btn-danger" onclick="deletePlayer('${p.id}', '${p.nombre}')">🗑️</button>
                 </div>
@@ -71,7 +74,10 @@ function savePlayer() {
         pin: document.getElementById('player-pin').value,
         notas: document.getElementById('player-notas').value
     };
-    if (!id) data.inventario = [];
+    if (!id) {
+        data.inventario = [];
+        data.bancoBalance = 0; // Inicializar balance del banco en 0 para nuevos jugadores
+    }
     if (!data.nombre || !data.pin) { showToast('Nombre y PIN requeridos', true); return; }
     (id ? db.collection('players').doc(id).update(data) : db.collection('players').add(data))
         .then(() => { showToast(id ? 'Jugador actualizado' : 'Jugador creado'); closeModal('player-modal'); })
@@ -104,6 +110,28 @@ function adjustGold() {
         else g = amt;
         return db.collection('players').doc(id).update({ oro: g });
     }).then(() => { showToast('Oro actualizado'); closeModal('gold-modal'); });
+}
+
+function openBancoModal(id, nombre, bancoBalance) {
+    document.getElementById('banco-player-id').value = id;
+    document.getElementById('banco-player-name').textContent = nombre;
+    document.getElementById('banco-current').textContent = bancoBalance.toLocaleString() + ' GP';
+    document.getElementById('banco-amount').value = 0;
+    openModal('banco-modal');
+}
+
+function adjustBanco() {
+    const id = document.getElementById('banco-player-id').value;
+    const op = document.getElementById('banco-operation').value;
+    const amt = parseInt(document.getElementById('banco-amount').value);
+    db.collection('players').doc(id).get().then(doc => {
+        const data = doc.data();
+        let b = (data.bancoBalance != null ? data.bancoBalance : 0);
+        if (op === 'add') b += amt;
+        else if (op === 'subtract') b = Math.max(0, b - amt);
+        else b = amt;
+        return db.collection('players').doc(id).update({ bancoBalance: b });
+    }).then(() => { showToast('Balance del banco actualizado'); closeModal('banco-modal'); });
 }
 
 // ==================== PLAYER INVENTORY ====================

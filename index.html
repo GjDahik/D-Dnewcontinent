@@ -287,6 +287,7 @@
         <div class="modal" style="max-width: 480px;">
             <div class="modal-header">
                 <h3 id="player-banco-title">🏦 Banco</h3>
+                <p style="color: #7a6a5a; font-size: 0.85em; margin-top: 5px; font-style: italic;">Cuenta compartida entre todas las ciudades</p>
                 <button class="modal-close" onclick="closeModal('player-banco-modal')">&times;</button>
             </div>
             <div class="modal-body" style="display:flex; flex-direction:column; gap:16px;">
@@ -296,8 +297,8 @@
                         <div id="player-banco-oro" class="gold-value" style="font-size:1.4em;">0 GP</div>
                     </div>
                     <div class="player-banco-box" style="background:rgba(0,0,0,0.3); border:1px solid #4a3c31; border-radius:8px; padding:16px; text-align:center;">
-                        <div style="font-size:0.8em; color:#8b7355; text-transform:uppercase; margin-bottom:4px;">En este banco</div>
-                        <div id="player-banco-balance" class="gold-value" style="font-size:1.4em;">0 GP</div>
+                        <div style="font-size:0.8em; color:#8b7355; text-transform:uppercase; margin-bottom:4px;">En el banco</div>
+                        <div id="player-banco-balance" class="gold-value" style="font-size:1.4em; color:#5a8a5a;">0 GP</div>
                     </div>
                 </div>
                 <p style="color:#8b7355; font-size:0.85em; text-align:center;">Los retiros tienen una comisión del 2% del valor retirado.</p>
@@ -717,6 +718,44 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeModal('gold-modal')">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Banco -->
+    <div class="modal-overlay" id="banco-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>🏦 Gestionar Banco</h3>
+                <button class="modal-close" onclick="closeModal('banco-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="banco-player-id">
+                <p style="margin-bottom: 15px; color: #8b7355;">Jugador: <span id="banco-player-name" style="color: #5a8a5a;"></span></p>
+                <p style="margin-bottom: 20px;">Balance actual en banco: <span id="banco-current" class="gold-value" style="color:#5a8a5a;">0 GP</span></p>
+                <p style="color: #7a6a5a; font-size: 0.85em; margin-bottom: 20px; font-style: italic; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 6px;">El banco es compartido entre todas las ciudades. El balance es el mismo en cualquier banco.</p>
+                
+                <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px;">
+                    <h4 style="color: #5a8a5a; margin-bottom: 15px; font-family: 'Cinzel', serif;">🏦 Ajustar Balance del Banco</h4>
+                    <div class="form-row">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label>Operación</label>
+                            <select id="banco-operation">
+                                <option value="add">➕ Agregar</option>
+                                <option value="subtract">➖ Restar</option>
+                                <option value="set">🔄 Establecer</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label>Cantidad</label>
+                            <input type="number" id="banco-amount" min="0" value="0">
+                        </div>
+                    </div>
+                    <button class="btn" style="width: 100%; margin-top: 15px; background:linear-gradient(180deg, #5a8a5a 0%, #4a7a4a 100%);" onclick="adjustBanco()">🏦 Aplicar Cambio</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('banco-modal')">Cerrar</button>
             </div>
         </div>
     </div>
