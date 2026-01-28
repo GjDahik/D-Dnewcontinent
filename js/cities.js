@@ -201,6 +201,7 @@ function renderCities() {
                     <button class="btn btn-small" onclick="event.stopPropagation(); openShopModal('${city.id}')">+ Tienda</button>
                     <button class="btn btn-small btn-secondary" onclick="event.stopPropagation(); openImportShopsModal('${city.id}')">📤 Importar Tiendas</button>
                     <button class="btn btn-small btn-secondary" onclick="event.stopPropagation(); openImportNpcsModal('${city.id}')">📤 Importar NPCs</button>
+                    <button class="btn btn-small btn-danger" onclick="event.stopPropagation(); deleteAllShopsFromCity('${city.id}', '${(city.nombre || '').replace(/'/g, "\\'")}')" title="Eliminar todas las tiendas de esta ciudad">🗑️ Eliminar Tiendas</button>
                     <button class="btn btn-small btn-secondary" onclick="event.stopPropagation(); editCity('${city.id}')">✏️</button>
                     ${!isOldMistfallCity(city) ? `<button class="btn btn-small btn-danger" onclick="event.stopPropagation(); deleteCity('${city.id}', '${(city.nombre || '').replace(/'/g, "\\'")}')">🗑️</button>` : '<span class="btn btn-small btn-secondary" style="opacity:0.7; cursor:not-allowed;" title="Old Mistfall solo puede eliminarse desde la base de datos">🗑️</span>'}
                     <button class="btn btn-small ${(city.visibleToPlayers !== false) ? 'btn-success' : 'btn-secondary'}" onclick="event.stopPropagation(); toggleCityVisibility('${city.id}')" title="${(city.visibleToPlayers !== false) ? 'Visible para jugadores. Clic para ocultar.' : 'Oculta para jugadores. Clic para mostrar.'}">${(city.visibleToPlayers !== false) ? '👁️ Visible' : '👁️‍🗨️ Oculta'}</button>
@@ -338,8 +339,25 @@ function openImportShopsModal(cityId) {
         showToast('Ciudad no encontrada', true);
         return;
     }
-    document.getElementById('import-shops-city-id').value = cityId;
-    document.getElementById('import-shops-city-name').textContent = city.nombre;
+    
+    var cityIdEl = document.getElementById('import-shops-city-id');
+    var cityNameEl = document.getElementById('import-shops-city-name');
+    
+    if (!cityIdEl || !cityNameEl) {
+        showToast('Error: Elementos del modal no encontrados', true);
+        return;
+    }
+    
+    // Establecer el cityId y nombre de la ciudad
+    cityIdEl.value = cityId;
+    cityNameEl.textContent = city.nombre;
+    
+    console.log('Abriendo modal de importación para ciudad:', cityId, city.nombre);
+    
+    // Limpiar el input de archivo si existe
+    var fileInput = document.querySelector('#import-shops-modal input[type="file"]');
+    if (fileInput) fileInput.value = '';
+    
     openModal('import-shops-modal');
 }
 
@@ -347,7 +365,16 @@ function importShopsCSV(event) {
     var file = event.target.files[0];
     if (!file) return;
 
-    var cityId = document.getElementById('import-shops-city-id').value;
+    var cityIdEl = document.getElementById('import-shops-city-id');
+    var cityId = cityIdEl ? cityIdEl.value : '';
+    
+    if (!cityId || !cityId.trim()) {
+        showToast('Error: No se ha seleccionado una ciudad. Por favor, cierra y vuelve a abrir el modal de importación.', true);
+        console.error('Error: cityId vacío al importar tiendas');
+        return;
+    }
+    
+    console.log('Importando tiendas para ciudad ID:', cityId);
 
     readFileAsText(file, function(text) {
         var lines = text.split('\n').filter(function(line) { return line.trim(); });
@@ -419,13 +446,15 @@ function importShopsCSV(event) {
 
             if (validTypes.indexOf(tipo) !== -1) {
                 var ref = db.collection('shops').doc();
-                batch.set(ref, {
+                var shopData = {
                     nombre: nombre,
                     tipo: tipo,
                     ciudadId: cityId,
                     npcDueno: '',
                     inventario: []
-                });
+                };
+                console.log('Agregando tienda:', nombre, 'a ciudad:', cityId);
+                batch.set(ref, shopData);
                 count++;
             } else {
                 skipped.push('Línea ' + (i + 1) + ' (' + nombre + '): Tipo inválido "' + tipoRaw + '"');
@@ -448,9 +477,14 @@ function importShopsCSV(event) {
         }
 
         batch.commit().then(function() {
-            showToast(count + ' tiendas importadas');
+            showToast(count + ' tiendas importadas para la ciudad seleccionada');
             closeModal('import-shops-modal');
-        }).catch(function(e) { showToast('Error: ' + e.message, true); });
+            // Limpiar el campo para evitar reutilización
+            if (cityIdEl) cityIdEl.value = '';
+        }).catch(function(e) {
+            console.error('Error al importar tiendas:', e);
+            showToast('Error: ' + e.message, true);
+        });
     });
     event.target.value = '';
 }
@@ -847,8 +881,48 @@ function deleteShop(id, nombre) {
         db.collection('shops').doc(id).delete().then(() => showToast('Tienda eliminada'));
 }
 
+function deleteAllShopsFromCity(cityId, cityNombre) {
+    if (!cityId) {
+        showToast('Error: ID de ciudad no válido', true);
+        return;
+    }
+    
+    if (!confirm(`⚠️ ADVERTENCIA: Esto eliminará TODAS las tiendas de la ciudad "${cityNombre}".\n\nEsta acción NO se puede deshacer.\n\n¿Estás seguro de que deseas continuar?`)) {
+        return;
+    }
+    
+    showToast('Eliminando tiendas de ' + cityNombre + '...', false);
+    
+    db.collection('shops').where('ciudadId', '==', cityId).get().then(snapshot => {
+        if (snapshot.empty) {
+            showToast('No hay tiendas en esta ciudad para eliminar');
+            return;
+        }
+        
+        const batch = db.batch();
+        let count = 0;
+        
+        snapshot.forEach(doc => {
+            batch.delete(doc.ref);
+            count++;
+        });
+        
+        return batch.commit().then(() => {
+            showToast(`Se eliminaron ${count} tienda${count !== 1 ? 's' : ''} de ${cityNombre}`);
+            // Recargar las ciudades para actualizar la vista
+            if (typeof renderCities === 'function') {
+                setTimeout(() => renderCities(), 500);
+            }
+        });
+    }).catch(error => {
+        console.error('Error al eliminar tiendas:', error);
+        showToast('Error al eliminar tiendas: ' + error.message, true);
+    });
+}
+
 // Hacer función disponible globalmente
 window.toggleShopPosadaConfig = toggleShopPosadaConfig;
+window.deleteAllShopsFromCity = deleteAllShopsFromCity;
 
 // Initialize - No cargar automáticamente aquí, se carga desde app.js cuando el DM inicia sesión
 // loadWorld() se llama desde showDashboard() en app.js

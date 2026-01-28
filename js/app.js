@@ -2582,6 +2582,14 @@ function openModal(id) {
 
 function closeModal(id) { 
     document.getElementById(id).classList.remove('active');
+    
+    // Limpiar campos específicos del modal de importación de tiendas
+    if (id === 'import-shops-modal') {
+        var cityIdEl = document.getElementById('import-shops-city-id');
+        var fileInput = document.querySelector('#import-shops-modal input[type="file"]');
+        if (cityIdEl) cityIdEl.value = '';
+        if (fileInput) fileInput.value = '';
+    }
 }
 
 window.openMiCasaModal = function() {
