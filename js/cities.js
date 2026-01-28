@@ -1,0 +1,446 @@
+// ==================== CITIES + NPCs + SHOPS ====================
+/** Ciudad fija "Old Mistfall": no se puede borrar desde el dashboard, solo desde la base de datos. */
+const OLD_MISTFALL_CITY_NAME = 'Old Mistfall';
+function isOldMistfallCity(cityOrNombre) {
+    const n = (typeof cityOrNombre === 'object' ? (cityOrNombre && cityOrNombre.nombre) : cityOrNombre) || '';
+    return ('' + n).trim().toLowerCase() === OLD_MISTFALL_CITY_NAME.toLowerCase();
+}
+
+function loadWorld() {
+    db.collection('cities').onSnapshot(snap => {
+        citiesData = [];
+        snap.forEach(doc => citiesData.push({ id: doc.id, ...doc.data() }));
+        renderCities();
+    });
+    db.collection('npcs').onSnapshot(snap => {
+        npcsData = [];
+        snap.forEach(doc => npcsData.push({ id: doc.id, ...doc.data() }));
+        renderCities();
+    });
+    db.collection('shops').onSnapshot(snap => {
+        shopsData = [];
+        snap.forEach(doc => shopsData.push({ id: doc.id, ...doc.data() }));
+        renderCities();
+    });
+}
+
+function renderCities() {
+    const container = document.getElementById('cities-container');
+    if (!citiesData.length) {
+        container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🏘️</div><p>No hay ciudades. ¡Crea la primera!</p></div>';
+        return;
+    }
+    container.innerHTML = '';
+    citiesData.forEach(city => {
+        const cityNpcs = npcsData.filter(n => n.ciudadId === city.id);
+        const cityShops = shopsData.filter(s => s.ciudadId === city.id);
+        const nivelColor = city.nivel <= 2 ? '🟢' : city.nivel <= 4 ? '🟡' : city.nivel <= 5 ? '🟠' : '🔴';
+        const tipoEmoji = { herreria: '⚔️', pociones: '🧪', taberna: '🍺', biblioteca: '📚', arqueria: '🏹', emporio: '🛒', batalla: '🥊', santuario: '🪞', banco: '🏦', posada: '🏨' };
+        const actitudEmoji = { amigable: '😊', neutral: '😐', hostil: '😠' };
+
+        const html = `
+            <div class="city-card" id="city-${city.id}">
+                <div class="city-header" onclick="toggleCity('${city.id}')">
+                    <div class="city-info">
+                        <h3>🏰 ${city.nombre}</h3>
+                        <p>${city.descripcion || 'Sin descripción'}</p>
+                    </div>
+                    <div class="city-meta">
+                        <span>${nivelColor} Nivel ${city.nivel}</span>
+                        <span>🎭 ${cityNpcs.length}</span>
+                        <span>🛒 ${cityShops.length}</span>
+                        <span class="city-toggle">▼</span>
+                    </div>
+                </div>
+                <div class="city-actions" style="flex-wrap:wrap; align-items:center;">
+                    <button class="btn btn-small" onclick="event.stopPropagation(); openNpcModal('${city.id}')">+ NPC</button>
+                    <button class="btn btn-small" onclick="event.stopPropagation(); openShopModal('${city.id}')">+ Tienda</button>
+                    <button class="btn btn-small btn-secondary" onclick="event.stopPropagation(); openImportShopsModal('${city.id}')">📤 Importar Tiendas</button>
+                    <button class="btn btn-small btn-secondary" onclick="event.stopPropagation(); openImportNpcsModal('${city.id}')">📤 Importar NPCs</button>
+                    <button class="btn btn-small btn-secondary" onclick="event.stopPropagation(); editCity('${city.id}')">✏️</button>
+                    ${!isOldMistfallCity(city) ? `<button class="btn btn-small btn-danger" onclick="event.stopPropagation(); deleteCity('${city.id}', '${(city.nombre || '').replace(/'/g, "\\'")}')">🗑️</button>` : '<span class="btn btn-small btn-secondary" style="opacity:0.7; cursor:not-allowed;" title="Old Mistfall solo puede eliminarse desde la base de datos">🗑️</span>'}
+                    <button class="btn btn-small ${(city.visibleToPlayers !== false) ? 'btn-success' : 'btn-secondary'}" onclick="event.stopPropagation(); toggleCityVisibility('${city.id}')" title="${(city.visibleToPlayers !== false) ? 'Visible para jugadores. Clic para ocultar.' : 'Oculta para jugadores. Clic para mostrar.'}">${(city.visibleToPlayers !== false) ? '👁️ Visible' : '👁️‍🗨️ Oculta'}</button>
+                    <div style="display:flex; align-items:center; gap:8px; margin-left:auto;">
+                        <span style="color:#8b7355; font-size:0.9em; white-space:nowrap;">Est. recomendado:</span>
+                        <select onchange="setEstablecimientoRecomendado('${city.id}', this.value)" style="background:#1a1a1a; border:1px solid #4a3c31; color:#d4c4a8; padding:6px 10px; border-radius:4px; font-size:0.9em; min-width:140px;">
+                            <option value="">Ninguno</option>
+                            ${cityShops.map(s => `<option value="${s.id}" ${(city.establecimientoRecomendadoId === s.id) ? 'selected' : ''}>${(s.nombre || 'Tienda').replace(/"/g, '&quot;')}</option>`).join('')}
+                        </select>
+                    </div>
+                </div>
+                <div class="city-content">
+                    <div class="subsection">
+                        <div class="subsection-header">
+                            <h4>🎭 NPCs (${cityNpcs.length})</h4>
+                        </div>
+                        <div class="mini-cards">
+                            ${cityNpcs.length ? cityNpcs.map(n => `
+                                <div class="mini-card">
+                                    <div class="mini-card-title">${n.nombre}</div>
+                                    <div class="mini-card-info">${n.rol} • ${actitudEmoji[n.actitud] || ''} ${n.actitud}</div>
+                                    <div class="mini-card-actions">
+                                        <button class="btn btn-small btn-secondary" onclick="editNpc('${n.id}')">✏️</button>
+                                        <button class="btn btn-small btn-danger" onclick="deleteNpc('${n.id}', '${n.nombre}')">🗑️</button>
+                                    </div>
+                                </div>
+                            `).join('') : '<p style="color:#a89a8c;padding:10px;">Sin NPCs</p>'}
+                        </div>
+                    </div>
+                    <div class="subsection">
+                        <div class="subsection-header">
+                            <h4>🛒 Tiendas (${cityShops.length})</h4>
+                        </div>
+                        <div class="mini-cards">
+                            ${cityShops.length ? cityShops.map(s => {
+                                const owner = npcsData.find(n => n.id === s.npcDueno);
+                                const isSantuario = (s.tipo || '').toLowerCase() === 'santuario';
+                                const isBanco = (s.tipo || '').toLowerCase() === 'banco';
+                                const isPosada = (s.tipo || '').toLowerCase() === 'posada';
+                                const sinInventario = isSantuario || isBanco || isPosada;
+                                return `
+                                <div class="mini-card">
+                                    <div class="mini-card-title">${tipoEmoji[s.tipo] || '🏪'} ${s.nombre}</div>
+                                    <div class="mini-card-info">${s.tipo} ${owner ? '• ' + owner.nombre : ''}${sinInventario ? ' <span style="color:#8b7355; font-size:0.85em;">(sin inventario)</span>' : ''}</div>
+                                    <div class="mini-card-actions">
+                                        ${!sinInventario ? `<button class="btn btn-small" onclick="manageInventory('${s.id}')">📦</button>` : ''}
+                                        <button class="btn btn-small btn-secondary" onclick="editShop('${s.id}')">✏️</button>
+                                        <button class="btn btn-small btn-danger" onclick="deleteShop('${s.id}', '${s.nombre}')">🗑️</button>
+                                    </div>
+                                </div>`;
+                            }).join('') : '<p style="color:#a89a8c;padding:10px;">Sin tiendas</p>'}
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        container.innerHTML += html;
+    });
+}
+
+function toggleCity(id) {
+    document.getElementById('city-' + id).classList.toggle('expanded');
+}
+
+function setEstablecimientoRecomendado(cityId, shopId) {
+    var payload = { establecimientoRecomendadoId: shopId || null };
+    db.collection('cities').doc(cityId).update(payload).then(function() {
+        showToast(shopId ? 'Establecimiento recomendado actualizado' : 'Recomendado quitado');
+    }).catch(function(e) { showToast('Error: ' + (e.message || e), true); });
+}
+
+function toggleCityVisibility(cityId) {
+    var city = citiesData.find(function(c) { return c.id === cityId; });
+    if (!city) return;
+    var next = city.visibleToPlayers === false;
+    db.collection('cities').doc(cityId).update({ visibleToPlayers: next }).then(function() {
+        showToast(next ? 'Ciudad visible para jugadores' : 'Ciudad oculta para jugadores');
+    }).catch(function(e) { showToast('Error: ' + (e.message || e), true); });
+}
+
+// ==================== IMPORT SHOPS CSV ====================
+function openImportShopsModal(cityId) {
+    var city = citiesData.find(function(c) { return c.id === cityId; });
+    if (!city) {
+        showToast('Ciudad no encontrada', true);
+        return;
+    }
+    document.getElementById('import-shops-city-id').value = cityId;
+    document.getElementById('import-shops-city-name').textContent = city.nombre;
+    openModal('import-shops-modal');
+}
+
+function importShopsCSV(event) {
+    var file = event.target.files[0];
+    if (!file) return;
+
+    var cityId = document.getElementById('import-shops-city-id').value;
+
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        var text = e.target.result;
+        var lines = text.split('\n').filter(function(line) { return line.trim(); });
+        
+        if (lines.length < 2) {
+            showToast('El archivo está vacío', true);
+            return;
+        }
+
+        // Detectar separador (coma o punto y coma)
+        var separator = lines[0].indexOf(';') !== -1 ? ';' : ',';
+
+        var header = lines[0].split(separator).map(function(h) { return h.trim().toLowerCase(); });
+        var nombreIdx = header.indexOf('nombre');
+        var tipoIdx = header.indexOf('tipo');
+
+        if (nombreIdx === -1 || tipoIdx === -1) {
+            showToast('El CSV debe tener columnas "nombre" y "tipo"', true);
+            return;
+        }
+
+        var validTypes = ['pociones', 'herreria', 'arqueria', 'emporio', 'biblioteca', 'taberna', 'batalla', 'santuario', 'banco', 'posada'];
+        function normalizeTipo(s) {
+            if (!s) return '';
+            return (s + '').toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        }
+        var batch = db.batch();
+        var count = 0;
+
+        for (var i = 1; i < lines.length; i++) {
+            var values = lines[i].split(separator).map(function(v) { return v.trim(); });
+            var nombre = values[nombreIdx];
+            var tipoRaw = (values[tipoIdx] || '').trim();
+            var tipo = normalizeTipo(tipoRaw);
+
+            if (nombre && validTypes.indexOf(tipo) !== -1) {
+                var ref = db.collection('shops').doc();
+                batch.set(ref, {
+                    nombre: nombre,
+                    tipo: tipo,
+                    ciudadId: cityId,
+                    npcDueno: '',
+                    inventario: []
+                });
+                count++;
+            }
+        }
+
+        if (count === 0) {
+            showToast('No se encontraron tiendas válidas. Tipos aceptados: pociones, herrería, arquería, emporio, biblioteca, taberna, batalla, santuario, banco, posada', true);
+            return;
+        }
+
+        batch.commit().then(function() {
+            showToast(count + ' tiendas importadas');
+            closeModal('import-shops-modal');
+        }).catch(function(e) { showToast('Error: ' + e.message, true); });
+    };
+
+    reader.readAsText(file);
+    event.target.value = '';
+}
+
+// ==================== IMPORT NPCs CSV ====================
+function openImportNpcsModal(cityId) {
+    var city = citiesData.find(function(c) { return c.id === cityId; });
+    if (!city) {
+        showToast('Ciudad no encontrada', true);
+        return;
+    }
+    document.getElementById('import-npcs-city-id').value = cityId;
+    document.getElementById('import-npcs-city-name').textContent = city.nombre;
+    openModal('import-npcs-modal');
+}
+
+function importNpcsCSV(event) {
+    var file = event.target.files[0];
+    if (!file) return;
+
+    var cityId = document.getElementById('import-npcs-city-id').value;
+    var validActitudes = ['amigable', 'neutral', 'hostil'];
+
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        var text = e.target.result;
+        var lines = text.split('\n').filter(function(line) { return line.trim(); });
+
+        if (lines.length < 2) {
+            showToast('El archivo está vacío', true);
+            return;
+        }
+
+        var separator = lines[0].indexOf(';') !== -1 ? ';' : ',';
+        var header = lines[0].split(separator).map(function(h) { return h.trim().toLowerCase(); });
+        var nombreIdx = header.indexOf('nombre');
+        var rolIdx = header.indexOf('rol');
+        var actitudIdx = header.indexOf('actitud');
+        var notasIdx = header.indexOf('notas');
+
+        if (nombreIdx === -1) {
+            showToast('El CSV debe tener al menos la columna "nombre"', true);
+            return;
+        }
+        if (rolIdx === -1) rolIdx = -1;
+        if (actitudIdx === -1) actitudIdx = -1;
+        if (notasIdx === -1) notasIdx = -1;
+
+        var batch = db.batch();
+        var count = 0;
+
+        for (var i = 1; i < lines.length; i++) {
+            var values = lines[i].split(separator).map(function(v) { return v.trim(); });
+            var nombre = values[nombreIdx];
+            var rol = rolIdx >= 0 ? (values[rolIdx] || '') : '';
+            var actitudRaw = actitudIdx >= 0 ? (values[actitudIdx] || 'neutral').toLowerCase().trim() : 'neutral';
+            var actitud = validActitudes.indexOf(actitudRaw) !== -1 ? actitudRaw : 'neutral';
+            var notas = notasIdx >= 0 ? (values[notasIdx] || '') : '';
+
+            if (nombre) {
+                var ref = db.collection('npcs').doc();
+                batch.set(ref, {
+                    nombre: nombre,
+                    ciudadId: cityId,
+                    rol: rol,
+                    actitud: actitud,
+                    notas: notas
+                });
+                count++;
+            }
+        }
+
+        if (count === 0) {
+            showToast('No se encontraron NPCs válidos (nombre requerido)', true);
+            return;
+        }
+
+        batch.commit().then(function() {
+            showToast(count + ' NPCs importados');
+            closeModal('import-npcs-modal');
+        }).catch(function(err) { showToast('Error: ' + err.message, true); });
+    };
+
+    reader.readAsText(file);
+    event.target.value = '';
+}
+
+// City CRUD
+function openCityModal() {
+    document.getElementById('city-id').value = '';
+    document.getElementById('city-nombre').value = '';
+    document.getElementById('city-nivel').value = '3';
+    document.getElementById('city-descripcion').value = '';
+    document.getElementById('city-visible-jugadores').checked = true;
+    document.getElementById('city-modal-title').textContent = '🏘️ Nueva Ciudad';
+    openModal('city-modal');
+}
+
+function editCity(id) {
+    const c = citiesData.find(x => x.id === id);
+    document.getElementById('city-id').value = id;
+    document.getElementById('city-nombre').value = c.nombre;
+    document.getElementById('city-nivel').value = c.nivel;
+    document.getElementById('city-descripcion').value = c.descripcion || '';
+    document.getElementById('city-visible-jugadores').checked = c.visibleToPlayers !== false;
+    document.getElementById('city-modal-title').textContent = '✏️ Editar Ciudad';
+    openModal('city-modal');
+}
+
+function saveCity() {
+    const id = document.getElementById('city-id').value;
+    const data = {
+        nombre: document.getElementById('city-nombre').value,
+        nivel: parseInt(document.getElementById('city-nivel').value),
+        descripcion: document.getElementById('city-descripcion').value,
+        visibleToPlayers: document.getElementById('city-visible-jugadores').checked
+    };
+    if (!data.nombre) { showToast('Nombre requerido', true); return; }
+    (id ? db.collection('cities').doc(id).update(data) : db.collection('cities').add(data))
+        .then(() => { showToast(id ? 'Ciudad actualizada' : 'Ciudad creada'); closeModal('city-modal'); });
+}
+
+function deleteCity(id, nombre) {
+    if (isOldMistfallCity(nombre)) {
+        showToast('Old Mistfall no puede borrarse desde aquí. Solo desde la base de datos.', true);
+        return;
+    }
+    if (confirm(`¿Eliminar ${nombre} y todos sus NPCs/tiendas?`)) {
+        const batch = db.batch();
+        batch.delete(db.collection('cities').doc(id));
+        npcsData.filter(n => n.ciudadId === id).forEach(n => batch.delete(db.collection('npcs').doc(n.id)));
+        shopsData.filter(s => s.ciudadId === id).forEach(s => batch.delete(db.collection('shops').doc(s.id)));
+        batch.commit().then(() => showToast('Ciudad eliminada'));
+    }
+}
+
+// NPC CRUD
+function openNpcModal(ciudadId) {
+    document.getElementById('npc-id').value = '';
+    document.getElementById('npc-ciudad-id').value = ciudadId;
+    document.getElementById('npc-nombre').value = '';
+    document.getElementById('npc-rol').value = 'Mercader';
+    document.getElementById('npc-actitud').value = 'neutral';
+    document.getElementById('npc-notas').value = '';
+    document.getElementById('npc-modal-title').textContent = '🎭 Nuevo NPC';
+    openModal('npc-modal');
+}
+
+function editNpc(id) {
+    const n = npcsData.find(x => x.id === id);
+    document.getElementById('npc-id').value = id;
+    document.getElementById('npc-ciudad-id').value = n.ciudadId;
+    document.getElementById('npc-nombre').value = n.nombre;
+    document.getElementById('npc-rol').value = n.rol;
+    document.getElementById('npc-actitud').value = n.actitud;
+    document.getElementById('npc-notas').value = n.notas || '';
+    document.getElementById('npc-modal-title').textContent = '✏️ Editar NPC';
+    openModal('npc-modal');
+}
+
+function saveNpc() {
+    const id = document.getElementById('npc-id').value;
+    const data = {
+        nombre: document.getElementById('npc-nombre').value,
+        ciudadId: document.getElementById('npc-ciudad-id').value,
+        rol: document.getElementById('npc-rol').value,
+        actitud: document.getElementById('npc-actitud').value,
+        notas: document.getElementById('npc-notas').value
+    };
+    if (!data.nombre) { showToast('Nombre requerido', true); return; }
+    (id ? db.collection('npcs').doc(id).update(data) : db.collection('npcs').add(data))
+        .then(() => { showToast(id ? 'NPC actualizado' : 'NPC creado'); closeModal('npc-modal'); });
+}
+
+function deleteNpc(id, nombre) {
+    if (confirm(`¿Eliminar a ${nombre}?`))
+        db.collection('npcs').doc(id).delete().then(() => showToast('NPC eliminado'));
+}
+
+// Shop CRUD
+function openShopModal(ciudadId) {
+    document.getElementById('shop-id').value = '';
+    document.getElementById('shop-ciudad-id').value = ciudadId;
+    document.getElementById('shop-nombre').value = '';
+    document.getElementById('shop-tipo').value = 'herreria';
+    updateShopNpcSelect(ciudadId);
+    document.getElementById('shop-modal-title').textContent = '🛒 Nueva Tienda';
+    openModal('shop-modal');
+}
+
+function editShop(id) {
+    const s = shopsData.find(x => x.id === id);
+    document.getElementById('shop-id').value = id;
+    document.getElementById('shop-ciudad-id').value = s.ciudadId;
+    document.getElementById('shop-nombre').value = s.nombre;
+    document.getElementById('shop-tipo').value = s.tipo;
+    updateShopNpcSelect(s.ciudadId);
+    setTimeout(() => document.getElementById('shop-npc').value = s.npcDueno || '', 50);
+    document.getElementById('shop-modal-title').textContent = '✏️ Editar Tienda';
+    openModal('shop-modal');
+}
+
+function updateShopNpcSelect(ciudadId) {
+    const sel = document.getElementById('shop-npc');
+    const cityNpcs = npcsData.filter(n => n.ciudadId === ciudadId);
+    sel.innerHTML = '<option value="">— Sin dueño —</option>' +
+        cityNpcs.map(n => `<option value="${n.id}">${n.nombre}</option>`).join('');
+}
+
+function saveShop() {
+    const id = document.getElementById('shop-id').value;
+    const data = {
+        nombre: document.getElementById('shop-nombre').value,
+        ciudadId: document.getElementById('shop-ciudad-id').value,
+        tipo: document.getElementById('shop-tipo').value,
+        npcDueno: document.getElementById('shop-npc').value
+    };
+    if (!id) data.inventario = [];
+    if (!data.nombre) { showToast('Nombre requerido', true); return; }
+    (id ? db.collection('shops').doc(id).update(data) : db.collection('shops').add(data))
+        .then(() => { showToast(id ? 'Tienda actualizada' : 'Tienda creada'); closeModal('shop-modal'); });
+}
+
+function deleteShop(id, nombre) {
+    if (confirm(`¿Eliminar ${nombre}?`))
+        db.collection('shops').doc(id).delete().then(() => showToast('Tienda eliminada'));
+}
+
+// Initialize
+loadWorld();
