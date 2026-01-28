@@ -22,6 +22,8 @@ let playerBibliotecaShopId = null, playerBibliotecaCart = [];
 let playerBancoShopId = null;
 let playerPosadaShopId = null;
 let playerPosadaCart = [];
+let playerBatallaShopId = null;
+let playerBatallaSelected = [];
 
 /** Cuartos de la Posada de Nebula (tipos fijos, sin inventario) */
 const POSADA_CUARTOS = [
@@ -38,15 +40,28 @@ function getItemDesc(obj) {
     return (typeof t === 'string' ? t : String(t)).trim();
 }
 
-/** Construye HTML de recibo para cualquier tienda. opts: { shopName, logo, subtitle, items: [{name, line}], totalLabel, totalValue, extraLines: [{label, value}], footerThanks, modalId } */
+/** Construye HTML de recibo para cualquier tienda.
+ *  opts: {
+ *    shopName, logo, subtitle,
+ *    items: [{name, line}],
+ *    totalLabel, totalValue,
+ *    extraLines: [{label, value}],
+ *    footerThanks,
+ *    modalId,
+ *    primaryButton?: { label: string, onclick: string } // si se pasa, reemplaza el botón "Cerrar" del recibo
+ *  }
+ */
 function buildShopReceiptHTML(opts) {
-    const { shopName, logo, subtitle, items, totalLabel, totalValue, extraLines, footerThanks, modalId } = opts;
+    const { shopName, logo, subtitle, items, totalLabel, totalValue, extraLines, footerThanks, modalId, primaryButton } = opts;
     const now = new Date();
     const dateStr = now.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
     const timeStr = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
     const esc = s => String(s || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const itemRows = (items || []).map(i => `<div class="player-shop-receipt-item"><span class="player-shop-receipt-item-name">${esc(i.name)}</span><span class="player-shop-receipt-item-price">${esc(i.line)}</span></div>`).join('');
     const extraRows = (extraLines || []).map(l => `<div class="player-shop-receipt-item"><span class="player-shop-receipt-item-name">${esc(l.label)}</span><span class="player-shop-receipt-item-price">${esc(l.value)}</span></div>`).join('');
+    const primaryBtnHtml = (primaryButton && primaryButton.label && primaryButton.onclick)
+        ? `<button type="button" class="btn player-shop-receipt-close" onclick="${String(primaryButton.onclick)}">${esc(primaryButton.label)}</button>`
+        : `<button type="button" class="btn player-shop-receipt-close" onclick="closeModal('${String(modalId || '')}')">Cerrar</button>`;
     return `<div class="player-shop-receipt">
         <div class="player-shop-receipt-header">
             <div class="player-shop-receipt-logo">${logo || '🧾'}</div>
@@ -59,7 +74,7 @@ function buildShopReceiptHTML(opts) {
             <div class="player-shop-receipt-date">${dateStr} — ${timeStr}</div>
             <div class="player-shop-receipt-thanks">${esc(footerThanks)}</div>
         </div>
-        <button type="button" class="btn player-shop-receipt-close" onclick="closeModal('${String(modalId || '')}')">Cerrar</button>
+        ${primaryBtnHtml}
     </div>`;
 }
 
@@ -1148,6 +1163,265 @@ function updatePosadaCart() {
     totalEl.textContent = total.toLocaleString() + ' GP';
 }
 
+function openPlayerBatallaModal(shopId) {
+    const shop = playerShopsData.find(s => s.id === shopId);
+    if (!shop) return;
+    playerBatallaShopId = shopId;
+    playerBatallaSelected = [];
+    
+    document.getElementById('player-batalla-title').textContent = '🥊 ' + (shop.nombre || 'Arena de Batalla');
+    const bodyEl = document.getElementById('player-batalla-body');
+    const recEl = document.getElementById('player-batalla-receipt');
+    const npcsListEl = document.getElementById('player-batalla-npcs-list');
+    const selectedEl = document.getElementById('player-batalla-selected');
+    
+    if (!bodyEl || !recEl || !npcsListEl || !selectedEl) return;
+    
+    bodyEl.style.display = 'block';
+    recEl.style.display = 'none';
+    recEl.innerHTML = '';
+    selectedEl.style.display = 'none';
+    
+    const user = getCurrentUser();
+    const renderOro = (oro) => {
+        const el = document.getElementById('player-batalla-oro');
+        if (el) el.innerHTML = 'Tu oro: <strong>' + (oro != null ? oro : 0).toLocaleString() + '</strong> GP';
+    };
+    
+    // Solo usar oponentes configurados por el DM
+    let oponentes = [];
+    
+    if (shop.batallaOponentes && Array.isArray(shop.batallaOponentes) && shop.batallaOponentes.length > 0) {
+        // Usar oponentes configurados por el DM (sin precio individual)
+        oponentes = shop.batallaOponentes.map((op, idx) => ({
+            id: op.npcId || ('custom-' + idx),
+            nombre: op.nombre,
+            isCustom: op.isCustom || !op.npcId
+        }));
+    }
+    
+    // Si no hay oponentes configurados, mostrar mensaje
+    if (oponentes.length === 0) {
+        npcsListEl.innerHTML = '<div style="text-align:center; padding:40px; background:rgba(0,0,0,0.3); border-radius:8px; border:2px dashed #4a3c31;"><p style="color:#8b7355; font-size:1.1em; margin-bottom:8px;">🥊</p><p style="color:#8b7355; font-size:1em; margin-bottom:4px;">No hay oponentes disponibles</p><p style="color:#6b5d4a; font-size:0.9em; font-style:italic;">El DM debe configurar los oponentes de batalla desde el dashboard.</p></div>';
+        if (user && user.id) {
+            db.collection('players').doc(user.id).get().then(doc => {
+                const oro = (doc.exists && doc.data().oro != null) ? doc.data().oro : 0;
+                renderOro(oro);
+            });
+        } else {
+            renderOro(0);
+        }
+        openModal('player-batalla-modal');
+        return;
+    }
+    
+    const precioFijo = (shop.batallaPrecioFijo != null ? shop.batallaPrecioFijo : 0);
+
+    // Mostrar oponentes configurados
+    npcsListEl.innerHTML = oponentes.map((op, idx) => {
+        const opId = op.id || ('op-' + idx);
+        const isSelected = playerBatallaSelected.some(s => s.opId === opId);
+        return `
+            <div class="player-batalla-npc-card" data-op-id="${opId}" style="background:rgba(0,0,0,0.25); border:2px solid ${isSelected ? '#8b5a2b' : '#4a3c31'}; border-radius:10px; padding:16px; cursor:pointer; transition:all 0.3s ease;" onclick="toggleBatallaOponente('${opId}', '${(op.nombre || '').replace(/'/g, "\\'")}')">
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+                    <div style="flex:1; min-width:180px;">
+                        <h4 style="color:#d4af37; font-family:'Cinzel',serif; margin-bottom:6px;">${op.nombre || 'Sin nombre'}</h4>
+                        <p style="color:#8b7355; font-size:0.9em; line-height:1.4;">${op.isCustom ? 'Bestia/Oponente' : 'NPC'}</p>
+                    </div>
+                    <div style="flex-shrink:0; text-align:right;">
+                        <div class="gold-value" style="margin-bottom:8px;">${precioFijo > 0 ? (precioFijo.toLocaleString() + ' GP / combate') : 'Precio no configurado'}</div>
+                        <div style="color:${isSelected ? '#d4af37' : '#8b7355'}; font-size:0.85em;">${isSelected ? '✓ Seleccionado' : 'Clic para seleccionar'}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    if (user && user.id) {
+        db.collection('players').doc(user.id).get().then(doc => {
+            const oro = (doc.exists && doc.data().oro != null) ? doc.data().oro : 0;
+            renderOro(oro);
+        });
+    } else {
+        renderOro(0);
+    }
+    
+    updateBatallaSelected();
+    openModal('player-batalla-modal');
+}
+
+function toggleBatallaOponente(opId, opNombre) {
+    const index = playerBatallaSelected.findIndex(s => s.opId === opId);
+    
+    if (index >= 0) {
+        // Deseleccionar
+        playerBatallaSelected.splice(index, 1);
+    } else {
+        // Seleccionar
+        playerBatallaSelected.push({
+            opId: opId,
+            nombre: opNombre,
+            precio: 0
+        });
+    }
+    
+    updateBatallaSelected();
+    // Actualizar visualmente la tarjeta
+    const card = document.querySelector(`[data-op-id="${opId}"]`);
+    if (card) {
+        const isSelected = playerBatallaSelected.some(s => s.opId === opId);
+        card.style.borderColor = isSelected ? '#8b5a2b' : '#4a3c31';
+        const statusEl = card.querySelector('div[style*="text-align:right"] div:last-child');
+        if (statusEl) {
+            statusEl.textContent = isSelected ? '✓ Seleccionado' : 'Clic para seleccionar';
+            statusEl.style.color = isSelected ? '#d4af37' : '#8b7355';
+        }
+    }
+}
+
+// Mantener compatibilidad con el nombre anterior
+window.toggleBatallaNpc = toggleBatallaOponente;
+
+function updateBatallaSelected() {
+    const selectedEl = document.getElementById('player-batalla-selected');
+    const selectedListEl = document.getElementById('player-batalla-selected-list');
+    const totalEl = document.getElementById('player-batalla-total');
+    
+    if (!selectedEl || !selectedListEl || !totalEl) return;
+    
+    if (playerBatallaSelected.length === 0) {
+        selectedEl.style.display = 'none';
+        return;
+    }
+    
+    selectedEl.style.display = 'block';
+    
+    const shop = playerShopsData.find(s => s.id === playerBatallaShopId);
+    const precioFijo = shop && shop.batallaPrecioFijo != null ? shop.batallaPrecioFijo : 0;
+
+    selectedListEl.innerHTML = playerBatallaSelected.map(item => {
+        return `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #4a3c31;">
+                <div style="flex:1;">
+                    <div style="color:#d4c4a8; font-weight:bold;">${item.nombre}</div>
+                </div>
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <button class="btn btn-small btn-danger" onclick="toggleBatallaOponente('${item.opId || item.npcId}', '${(item.nombre || '').replace(/'/g, "\\'")}')" style="padding:4px 8px; font-size:0.8em;">✕</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    // Calcular total: precio fijo por cada oponente seleccionado
+    const total = precioFijo > 0 ? precioFijo * playerBatallaSelected.length : 0;
+    totalEl.textContent = total.toLocaleString() + ' GP';
+}
+
+async function processBatallaPayment() {
+    const user = getCurrentUser();
+    if (!user || !user.id || !isPlayer()) {
+        showToast('Debes estar logueado como personaje', true);
+        return;
+    }
+    
+    if (playerBatallaSelected.length === 0) {
+        showToast('Debes seleccionar al menos un oponente', true);
+        return;
+    }
+    
+    const shopId = playerBatallaShopId;
+    if (!shopId) return;
+    
+    const shop = playerShopsData.find(s => s.id === shopId);
+    const shopName = shop ? (shop.nombre || 'Arena de Batalla') : 'Arena de Batalla';
+    
+    // Calcular total: precio fijo por cada oponente seleccionado
+    const precioFijo = (shop && shop.batallaPrecioFijo != null) ? shop.batallaPrecioFijo : 0;
+    const total = precioFijo > 0 ? precioFijo * playerBatallaSelected.length : 0;
+
+    if (total <= 0) {
+        showToast('El DM aún no configuró el precio fijo del combate para esta tienda.', true);
+        return;
+    }
+    
+    // Verificar oro
+    const docRef = db.collection('players').doc(user.id);
+    const doc = await docRef.get();
+    if (!doc.exists) {
+        showToast('No se encontró el personaje', true);
+        return;
+    }
+    
+    const data = doc.data();
+    const oro = (data.oro != null ? data.oro : 0);
+    
+    if (oro < total) {
+        showToast('No tienes suficiente oro. Necesitas ' + total.toLocaleString() + ' GP. Tienes ' + oro.toLocaleString() + ' GP.', true);
+        return;
+    }
+    
+    // Procesar pago
+    const newOro = oro - total;
+    await docRef.update({ oro: newOro });
+    
+    // Crear transacción
+    const items = playerBatallaSelected.map(item => ({
+        name: 'Batalla vs ' + item.nombre,
+        line: 'Incluido'
+    }));
+    
+    await db.collection('transactions').add({
+        tipo: 'batalla',
+        itemName: 'Batalla contra ' + playerBatallaSelected.map(i => i.nombre).join(', '),
+        playerId: user.id,
+        playerName: user.nombre || 'Jugador',
+        shopName,
+        precio: total,
+        fecha: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    
+    // Mostrar recibo
+    const bodyEl = document.getElementById('player-batalla-body');
+    const recEl = document.getElementById('player-batalla-receipt');
+    if (bodyEl) bodyEl.style.display = 'none';
+    if (recEl) {
+        recEl.innerHTML = buildShopReceiptHTML({
+            shopName: shopName,
+            logo: '🥊',
+            subtitle: 'Recibo de batalla',
+            items: items,
+            totalLabel: 'TOTAL:',
+            totalValue: total.toLocaleString() + ' GP',
+            footerThanks: '¡Que la fortuna te acompañe en la batalla!',
+            modalId: 'player-batalla-modal',
+            primaryButton: {
+                label: 'Ir a Battle Tracker',
+                onclick: "window.open('battle-tracker.html','_blank')"
+            }
+        });
+        recEl.style.display = 'block';
+    }
+    
+    // Limpiar selección
+    playerBatallaSelected = [];
+    updateBatallaSelected();
+    
+    // Actualizar oro mostrado
+    const renderOro = (oro) => {
+        const el = document.getElementById('player-batalla-oro');
+        if (el) el.innerHTML = 'Tu oro: <strong>' + (oro != null ? oro : 0).toLocaleString() + '</strong> GP';
+    };
+    renderOro(newOro);
+    
+    showToast('Has pagado ' + total.toLocaleString() + ' GP para la batalla. ¡Buena suerte!');
+}
+
+window.openPlayerBatallaModal = openPlayerBatallaModal;
+// compatibilidad: antes se llamaba toggleBatallaNpc
+window.toggleBatallaNpc = toggleBatallaOponente;
+window.toggleBatallaOponente = toggleBatallaOponente;
+window.processBatallaPayment = processBatallaPayment;
+
 window.checkoutPosada = async function() {
     const user = getCurrentUser();
     if (!user || !user.id || !isPlayer()) {
@@ -1285,6 +1559,8 @@ function openPlayerShop(shopId) {
         openPlayerBancoModal(shopId);
     } else if (t === 'posada') {
         openPlayerPosadaModal(shopId);
+    } else if (t === 'batalla') {
+        openPlayerBatallaModal(shopId);
     } else {
         openPlayerShopCatalog(shopId);
     }

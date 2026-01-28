@@ -2,6 +2,13 @@
 function manageInventory(shopId) {
     const shop = shopsData.find(s => s.id === shopId);
     if (!shop) return;
+
+    // Las tiendas de batalla NO venden ítems
+    const tipo = (shop.tipo || '').toLowerCase();
+    if (tipo === 'batalla') {
+        showToast('Las tiendas de batalla no tienen inventario. Configura enemigos con el botón 🥊.', true);
+        return;
+    }
     
     document.getElementById('inventory-shop-id').value = shopId;
     document.getElementById('inventory-shop-name').textContent = shop.nombre;

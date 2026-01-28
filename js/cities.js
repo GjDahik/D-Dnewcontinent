@@ -238,16 +238,20 @@ function renderCities() {
                         <div class="mini-cards">
                             ${cityShops.length ? cityShops.map(s => {
                                 const owner = npcs.find(n => n.id === s.npcDueno);
-                                const isSantuario = (s.tipo || '').toLowerCase() === 'santuario';
-                                const isBanco = (s.tipo || '').toLowerCase() === 'banco';
-                                const isPosada = (s.tipo || '').toLowerCase() === 'posada';
-                                const sinInventario = isSantuario || isBanco || isPosada;
+                                const shopTipo = (s.tipo || '').toLowerCase();
+                                const isSantuario = shopTipo === 'santuario';
+                                const isBanco = shopTipo === 'banco';
+                                const isPosada = shopTipo === 'posada';
+                                const isBatalla = shopTipo === 'batalla';
+                                // En estos tipos NO se venden ítems / no hay inventario editable
+                                const sinInventario = isSantuario || isBanco || isPosada || isBatalla;
                                 return `
                                 <div class="mini-card">
                                     <div class="mini-card-title">${tipoEmoji[s.tipo] || '🏪'} ${s.nombre}</div>
                                     <div class="mini-card-info">${s.tipo} ${owner ? '• ' + owner.nombre : ''}${sinInventario ? ' <span style="color:#8b7355; font-size:0.85em;">(sin inventario)</span>' : ''}</div>
                                     <div class="mini-card-actions">
-                                        ${!sinInventario ? `<button class="btn btn-small" onclick="manageInventory('${s.id}')">📦</button>` : ''}
+                                    ${s.tipo === 'batalla' ? `<button class="btn btn-small" onclick="openBatallaConfigModal('${s.id}')" title="Configurar enemigos de esta tienda">🥊</button>` : ''}
+                                    ${!sinInventario ? `<button class="btn btn-small" onclick="manageInventory('${s.id}')">📦</button>` : ''}
                                         <button class="btn btn-small btn-secondary" onclick="editShop('${s.id}')">✏️</button>
                                         <button class="btn btn-small btn-danger" onclick="deleteShop('${s.id}', '${s.nombre}')">🗑️</button>
                                     </div>
@@ -754,6 +758,7 @@ function openNpcModal(ciudadId) {
     document.getElementById('npc-rol').value = 'Mercader';
     document.getElementById('npc-actitud').value = 'neutral';
     document.getElementById('npc-notas').value = '';
+    document.getElementById('npc-precio-batalla').value = '50';
     document.getElementById('npc-modal-title').textContent = '🎭 Nuevo NPC';
     openModal('npc-modal');
 }
@@ -766,18 +771,23 @@ function editNpc(id) {
     document.getElementById('npc-rol').value = n.rol;
     document.getElementById('npc-actitud').value = n.actitud;
     document.getElementById('npc-notas').value = n.notas || '';
+    document.getElementById('npc-precio-batalla').value = (n.precioBatalla != null && n.precioBatalla > 0) ? n.precioBatalla : '50';
     document.getElementById('npc-modal-title').textContent = '✏️ Editar NPC';
     openModal('npc-modal');
 }
 
 function saveNpc() {
     const id = document.getElementById('npc-id').value;
+    const precioBatallaEl = document.getElementById('npc-precio-batalla');
+    const precioBatalla = precioBatallaEl ? (parseInt(precioBatallaEl.value) || 0) : 0;
+    
     const data = {
         nombre: document.getElementById('npc-nombre').value,
         ciudadId: document.getElementById('npc-ciudad-id').value,
         rol: document.getElementById('npc-rol').value,
         actitud: document.getElementById('npc-actitud').value,
-        notas: document.getElementById('npc-notas').value
+        notas: document.getElementById('npc-notas').value,
+        precioBatalla: precioBatalla > 0 ? precioBatalla : null
     };
     if (!data.nombre) { showToast('Nombre requerido', true); return; }
     (id ? db.collection('npcs').doc(id).update(data) : db.collection('npcs').add(data))
@@ -920,9 +930,152 @@ function deleteAllShopsFromCity(cityId, cityNombre) {
     });
 }
 
+function openBatallaConfigModal(shopId) {
+    const shops = window.shopsData || shopsData || [];
+    const shop = shops.find(s => s.id === shopId);
+    if (!shop) {
+        showToast('Tienda no encontrada', true);
+        return;
+    }
+    if ((shop.tipo || '').toLowerCase() !== 'batalla') {
+        showToast('Esta tienda no es de tipo batalla', true);
+        return;
+    }
+
+    const cities = window.citiesData || citiesData || [];
+    const city = cities.find(c => c.id === shop.ciudadId);
+    const cityNombre = city ? city.nombre : '—';
+
+    const shopIdEl = document.getElementById('batalla-config-shop-id');
+    const shopNameEl = document.getElementById('batalla-config-shop-name');
+    const cityNameEl = document.getElementById('batalla-config-city-name');
+    if (!shopIdEl || !shopNameEl || !cityNameEl) {
+        showToast('Error: Modal de batalla no disponible', true);
+        return;
+    }
+
+    shopIdEl.value = shopId;
+    shopNameEl.textContent = shop.nombre || 'Tienda de batalla';
+    cityNameEl.textContent = cityNombre;
+    document.getElementById('batalla-config-npc-select').value = '';
+    document.getElementById('batalla-config-custom-name').value = '';
+    // Precio fijo por combate (si no existe, usar 300 por defecto)
+    const precioFijoEl = document.getElementById('batalla-config-precio-fijo');
+    if (precioFijoEl) precioFijoEl.value = (shop.batallaPrecioFijo != null ? shop.batallaPrecioFijo : 300);
+
+    // Cargar NPCs de la ciudad de la tienda
+    const cityNpcs = (window.npcsData || npcsData || []).filter(n => n.ciudadId === shop.ciudadId);
+    const npcSelect = document.getElementById('batalla-config-npc-select');
+    npcSelect.innerHTML = '<option value="">— Seleccionar NPC —</option>' +
+        cityNpcs.map(n => `<option value="${n.id}">${n.nombre || 'Sin nombre'}</option>`).join('');
+
+    // Cargar oponentes ya configurados EN ESTA TIENDA
+    const oponentes = (shop.batallaOponentes && Array.isArray(shop.batallaOponentes)) ? shop.batallaOponentes : [];
+    batallaConfigOponentes = oponentes.slice();
+    renderBatallaOponentes(batallaConfigOponentes);
+    openModal('batalla-config-modal');
+}
+
+let batallaConfigOponentes = [];
+
+function addBatallaOponente() {
+    const npcSelect = document.getElementById('batalla-config-npc-select');
+    const customName = document.getElementById('batalla-config-custom-name').value.trim();
+    
+    let nombre = '';
+    let npcId = null;
+    
+    if (npcSelect.value) {
+        const npcs = window.npcsData || npcsData || [];
+        const npc = npcs.find(n => n.id === npcSelect.value);
+        if (npc) {
+            nombre = npc.nombre;
+            npcId = npc.id;
+        }
+    } else if (customName) {
+        nombre = customName;
+    } else {
+        showToast('Debes seleccionar un NPC o escribir un nombre personalizado', true);
+        return;
+    }
+    
+    if (!nombre) {
+        showToast('Nombre requerido', true);
+        return;
+    }
+    
+    batallaConfigOponentes.push({
+        nombre: nombre,
+        npcId: npcId,
+        isCustom: !npcId
+    });
+    
+    renderBatallaOponentes(batallaConfigOponentes);
+    
+    // Limpiar campos
+    npcSelect.value = '';
+    document.getElementById('batalla-config-custom-name').value = '';
+}
+
+function removeBatallaOponente(index) {
+    batallaConfigOponentes.splice(index, 1);
+    renderBatallaOponentes(batallaConfigOponentes);
+}
+
+function renderBatallaOponentes(oponentes) {
+    const listEl = document.getElementById('batalla-config-oponentes-list');
+    if (!listEl) return;
+    
+    batallaConfigOponentes = oponentes;
+    
+    if (oponentes.length === 0) {
+        listEl.innerHTML = '<p style="color:#8b7355; text-align:center; padding:20px;">No hay oponentes configurados. Agrega algunos arriba.</p>';
+        return;
+    }
+    
+    listEl.innerHTML = oponentes.map((op, idx) => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; background:rgba(0,0,0,0.25); border:1px solid #4a3c31; border-radius:8px;">
+            <div style="flex:1;">
+                <div style="color:#d4c4a8; font-weight:bold;">${op.nombre}</div>
+                <div style="color:#8b7355; font-size:0.85em;">${op.isCustom ? 'Bestia/Oponente personalizado' : 'NPC de la ciudad'}</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:12px;">
+                <button class="btn btn-small btn-danger" onclick="removeBatallaOponente(${idx})" style="padding:4px 8px;">🗑️</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function saveBatallaConfig() {
+    const shopIdEl = document.getElementById('batalla-config-shop-id');
+    const shopId = shopIdEl ? shopIdEl.value : '';
+    if (!shopId) return;
+
+    const precioFijoEl = document.getElementById('batalla-config-precio-fijo');
+    const precioFijo = precioFijoEl ? (parseInt(precioFijoEl.value) || 0) : 0;
+
+    const ref = db.collection('shops').doc(shopId);
+    ref.update({
+        batallaOponentes: batallaConfigOponentes,
+        batallaPrecioFijo: precioFijo
+    }).then(() => {
+        showToast('Configuración guardada para esta tienda de batalla');
+        closeModal('batalla-config-modal');
+        // Recargar datos
+        if (typeof loadWorld === 'function') loadWorld();
+    }).catch(error => {
+        console.error('Error guardando configuración:', error);
+        showToast('Error al guardar: ' + error.message, true);
+    });
+}
+
 // Hacer función disponible globalmente
 window.toggleShopPosadaConfig = toggleShopPosadaConfig;
 window.deleteAllShopsFromCity = deleteAllShopsFromCity;
+window.openBatallaConfigModal = openBatallaConfigModal;
+window.addBatallaOponente = addBatallaOponente;
+window.removeBatallaOponente = removeBatallaOponente;
+window.saveBatallaConfig = saveBatallaConfig;
 
 // Initialize - No cargar automáticamente aquí, se carga desde app.js cuando el DM inicia sesión
 // loadWorld() se llama desde showDashboard() en app.js

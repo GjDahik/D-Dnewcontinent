@@ -368,6 +368,40 @@
         </div>
     </div>
 
+    <!-- Modal Batalla (pagar por pelear con NPCs) -->
+    <div class="modal-overlay" id="player-batalla-modal">
+        <div class="modal" style="max-width: 800px;">
+            <div class="modal-header">
+                <h3 id="player-batalla-title">🥊 Arena de Batalla</h3>
+                <button class="modal-close" onclick="closeModal('player-batalla-modal')">&times;</button>
+            </div>
+            <div class="modal-body" style="display:flex; flex-direction:column; gap:16px;">
+                <div id="player-batalla-body">
+                    <p id="player-batalla-oro" class="gold-value" style="margin-bottom:16px; font-size:1em;">Tu oro: <strong>0</strong> GP</p>
+                    <p style="color:#8b7355; margin-bottom:16px; font-style:italic;">Selecciona los oponentes con los que deseas pelear. Cada batalla tiene un costo.</p>
+                    
+                    <div id="player-batalla-npcs-list" style="display:flex; flex-direction:column; gap:12px;"></div>
+                    
+                    <div id="player-batalla-selected" style="margin-top:20px; padding:16px; background:rgba(0,0,0,0.3); border:1px solid #4a3c31; border-radius:8px; display:none;">
+                        <h4 style="font-family:'Cinzel', serif; color:#d4af37; margin-bottom:12px; text-transform:uppercase; letter-spacing:1px;">⚔️ Oponentes Seleccionados</h4>
+                        <div id="player-batalla-selected-list" style="margin-bottom:12px;"></div>
+                        <div style="border-top:1px solid #4a3c31; padding-top:12px;">
+                            <div style="display:flex; justify-content:space-between;">
+                                <strong style="color:#d4af37; font-size:1.1em;">Total:</strong>
+                                <strong id="player-batalla-total" class="gold-value" style="font-size:1.1em;">0 GP</strong>
+                            </div>
+                        </div>
+                        <button class="btn" onclick="processBatallaPayment()" style="width:100%; margin-top:16px;">💳 Pagar y Comenzar Batalla</button>
+                    </div>
+                </div>
+                <div id="player-batalla-receipt" style="display:none;"></div>
+            </div>
+            <div class="modal-footer" id="player-batalla-footer">
+                <button class="btn btn-secondary" onclick="closeModal('player-batalla-modal')">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal Posada (cuartos fijos, sin inventario; precios y efectos de la Posada de Nebula) -->
     <div class="modal-overlay" id="player-posada-modal">
         <div class="modal" style="max-width: 800px;">
@@ -928,6 +962,11 @@
                     <label>📝 Notas</label>
                     <textarea id="npc-notas" rows="3" placeholder="Qué sabe, secretos, motivaciones..."></textarea>
                 </div>
+                <div class="form-group">
+                    <label>🥊 Precio de Batalla (GP)</label>
+                    <input type="number" id="npc-precio-batalla" min="0" value="50" placeholder="50">
+                    <p style="color:#8b7355; font-size:0.85em; margin-top:4px;">Precio que cobra este NPC por pelear en tiendas de batalla. Deja en 0 o vacío para usar el precio por defecto (50 GP).</p>
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeModal('npc-modal')">Cancelar</button>
@@ -1017,6 +1056,63 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeModal('dm-casa-modal')">Cancelar</button>
                 <button class="btn" onclick="savePlayerCasa()">💾 Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Configurar Oponentes de Batalla (por tienda) -->
+    <div class="modal-overlay" id="batalla-config-modal">
+        <div class="modal" style="max-width: 900px;">
+            <div class="modal-header">
+                <h3>🥊 Configurar Oponentes de Batalla</h3>
+                <button class="modal-close" onclick="closeModal('batalla-config-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="batalla-config-shop-id">
+                <p style="color: #8b7355; margin-bottom: 10px;">Tienda: <span id="batalla-config-shop-name" style="color: #d4af37;"></span></p>
+                <p style="color: #8b7355; margin-bottom: 15px;">Ciudad: <span id="batalla-config-city-name" style="color: #d4af37;"></span></p>
+
+                <div style="margin-bottom: 20px; padding: 14px; background: rgba(0,0,0,0.25); border: 1px solid #4a3c31; border-radius: 8px;">
+                    <h4 style="font-family:'Cinzel', serif; color:#d4af37; margin-bottom:12px;">Precio del combate (precio fijo)</h4>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+                        <div class="form-group" style="flex:1; min-width:200px; margin-bottom:0;">
+                            <label>Precio (GP)</label>
+                            <input type="number" id="batalla-config-precio-fijo" min="0" value="300">
+                        </div>
+                        <p style="color:#8b7355; font-size:0.85em; margin:0; flex:2; min-width:260px;">
+                            Este precio se cobra <strong>una sola vez</strong> por combate, aunque el jugador elija varios oponentes.
+                        </p>
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <h4 style="font-family:'Cinzel', serif; color:#d4af37; margin-bottom:12px;">Agregar Oponente</h4>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+                        <div class="form-group" style="flex:2; min-width:200px;">
+                            <label>NPC de la Ciudad</label>
+                            <select id="batalla-config-npc-select">
+                                <option value="">— Seleccionar NPC —</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="flex:1; min-width:150px;">
+                            <label>O Nombre Personalizado</label>
+                            <input type="text" id="batalla-config-custom-name" placeholder="Ej: Lobo Gigante">
+                        </div>
+                        <button class="btn btn-small" onclick="addBatallaOponente()">➕ Agregar</button>
+                    </div>
+                    <p style="color:#8b7355; font-size:0.8em; margin-top:8px;">
+                        Los oponentes no tienen precio individual: el cobro es el <strong>precio fijo</strong> configurado arriba.
+                    </p>
+                </div>
+                
+                <div style="border-top: 1px solid #4a3c31; padding-top: 20px;">
+                    <h4 style="font-family:'Cinzel', serif; color:#d4af37; margin-bottom:12px;">Oponentes Configurados</h4>
+                    <div id="batalla-config-oponentes-list" style="display:flex; flex-direction:column; gap:8px; max-height:400px; overflow-y:auto;"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('batalla-config-modal')">Cerrar</button>
+                <button class="btn" onclick="saveBatallaConfig()">💾 Guardar Configuración</button>
             </div>
         </div>
     </div>
