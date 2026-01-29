@@ -3097,6 +3097,7 @@ async function showDashboard() {
 
 // ==================== INITIALIZE ====================
 document.addEventListener('DOMContentLoaded', function() {
+    updateFooterTagline();
     if (checkAuth()) {
         if (isDM()) showDashboard();
         else if (isPlayer()) showPlayerView();
