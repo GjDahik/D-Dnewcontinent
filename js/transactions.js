@@ -1,6 +1,6 @@
 // ==================== TRANSACTIONS ====================
 function loadTransactions() {
-    db.collection('transactions').orderBy('fecha', 'desc').limit(50).onSnapshot(snap => {
+    db.collection('transactions').orderBy('fecha', 'desc').limit(200).onSnapshot(snap => {
         const list = document.getElementById('transactions-list');
         if (snap.empty) {
             list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📜</div><p>No hay transacciones</p></div>';

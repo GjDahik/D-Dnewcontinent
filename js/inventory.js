@@ -430,16 +430,35 @@ Pan Curativo,12,Cura 1d4+1 PG,food,llevar
     },
     forja: {
         filename: '03_forja_herreria.csv',
-        content: `name,price,tier,tipo,damage,damageType,ac,desc
-Espada Corta,50,1,arma,1d6,Perforante,,Arma ligera 1d6 perforante
+        content: `name,price,tier,type,damage,damageType,ac,desc
+Espada Corta,50,1,arma,1d6,Perforante,,Arma marcial, Ligera, Finesse
+Daga,25,1,arma,1d4,Perforante,,Arma simple, Ligera, Finesse, Arrojadiza
+Hacha de Mano,30,1,arma,1d6,Cortante,,Arma simple, Ligera, Arrojadiza
+Maza,30,1,arma,1d6,Contundente,,Arma simple
 Armadura de Cuero,75,1,armadura,,,12 + DES,Armadura ligera
+Espada Larga,200,6,arma,1d8 (1d10),Cortante,,Arma marcial, Versátil
+Hacha de Batalla,200,6,arma,1d8 (1d10),Cortante,,Arma marcial, Versátil
+Martillo de Guerra,200,6,arma,1d8 (1d10),Contundente,,Arma marcial, Versátil
+Estoque (Rapier),250,6,arma,1d8,Perforante,,Arma marcial, Finesse
+Armadura de Hierro,300,6,armadura,,,16,Armadura pesada, FUE 13
+Espada Grande,600,11,arma,2d6,Cortante,,Arma marcial, Pesada, Dos manos
+Gran Hacha,600,11,arma,1d12,Cortante,,Arma marcial, Pesada, Dos manos
+Mazo (Maul),600,11,arma,2d6,Contundente,,Arma marcial, Pesada, Dos manos
+Alabarda,650,11,arma,1d10,Cortante,,Arma marcial, Alcance, Dos manos
+Armadura de Acero,750,11,armadura,,,17,Armadura pesada, FUE 15
+Espada Rúnica Legendaria,2500,16,arma,2d6+1d6⚡,Cortante+Elemental,,Arma mágica +2
+Gran Hacha de Hierro Oscuro,3000,16,arma,1d12+1d8🔥,Cortante+Fuego,,Arma mágica +2
+Martillo de los Titanes,3500,16,arma,2d6+1d6⚡,Contundente+Trueno,,Arma mágica +2
+Armadura de Hierro Oscuro,3500,16,armadura,,,18+1,Armadura legendaria, Res. fuego
 Reparación Básica,25,1,servicio,,,,Restauración de armas y armaduras dañadas
-Espada Larga,150,6,arma,1d8,Cortante,,Arma marcial versátil
-Armadura de Hierro,200,6,armadura,,,,18,Armadura de placas
-Hacha de Batalla,250,6,arma,1d8,Cortante,,Arma marcial a dos manos
-Armadura de Placas,400,11,armadura,,,,18,Armadura pesada de alta calidad
-Espada Rúnica,1200,11,arma,2d6,Radiante,,Arma con runas de poder
-Armadura de Dragón,2000,16,armadura,,,,20,Escamas de dragón forjadas
+Herramientas Simples,50,1,servicio,,,,Martillos, hachas, picos de calidad
+Afilado Express,50,6,servicio,,,,+1 daño hasta el final de la sesión
+Reparación Armas Mágicas,500,6,servicio,,,,Restauración de propiedades mágicas
+Mejora con Runas,1000,6,servicio,,,,Inscripción de runas mágicas
+Reparación de Reliquias,1500,11,servicio,,,,Restauración de artefactos antiguos
+Mejoras Mágicas Avanzadas,1200,11,servicio,,,,Potenciación de propiedades mágicas
+Creación de Reliquias,5000,16,servicio,,,,Forja de artefactos míticos
+Mejoras Legendarias,1500,16,servicio,,,,Potenciación máxima de equipo
 `
     },
     artesanias: {
@@ -622,12 +641,33 @@ function processCSVUpload() {
             var effectIdx = header.indexOf('effect');
             var typeIdx = header.indexOf('type');
             var categoriaIdx = header.indexOf('categoria');
+            // También aceptar "tab" como alternativa a "categoria" para la taberna
+            if (categoriaIdx === -1 && isTaberna) {
+                categoriaIdx = header.indexOf('tab');
+            }
             var avgIdx = header.indexOf('avg');
             var rarityIdx = header.indexOf('rarity');
             var tierIdx = header.indexOf('tier');
             var tipoForjaIdx = header.indexOf('tipo');
+            // También aceptar "type" como alternativa a "tipo" para la forja
+            if (tipoForjaIdx === -1 && isHerreria) {
+                tipoForjaIdx = header.indexOf('type');
+            }
             var damageIdx = header.indexOf('damage');
             var damageTypeIdx = header.indexOf('damagetype');
+            // También aceptar "damageType" (con mayúscula)
+            if (damageTypeIdx === -1) {
+                damageTypeIdx = header.indexOf('damagetype');
+            }
+            // Buscar también con mayúscula en la T
+            if (damageTypeIdx === -1) {
+                for (var h = 0; h < header.length; h++) {
+                    if (header[h].toLowerCase() === 'damagetype') {
+                        damageTypeIdx = h;
+                        break;
+                    }
+                }
+            }
             var acIdx = header.indexOf('ac');
             var descIdx = header.indexOf('desc');
             var typeArqIdx = header.indexOf('type');
@@ -643,12 +683,12 @@ function processCSVUpload() {
             }
 
             if (isTaberna && (typeIdx === -1 || categoriaIdx === -1)) {
-                showToast('Para taberna el CSV debe tener columnas: name, price, effect, type, categoria', true);
+                showToast('Para taberna el CSV debe tener columnas: name, price, effect, type, categoria (o tab). Valores de categoria: servir o llevar', true);
                 return;
             }
 
             if (isHerreria && (tierIdx === -1 || tipoForjaIdx === -1)) {
-                showToast('Para forja/herrería el CSV debe tener columnas: name, price, tier, tipo (arma|armadura|servicio)', true);
+                showToast('Para forja/herrería el CSV debe tener columnas: name, price, tier, tipo o type (arma|armadura|servicio)', true);
                 return;
             }
 
@@ -684,6 +724,10 @@ function processCSVUpload() {
                 var name = values[nameIdx];
                 var priceStr = values[priceIdx] || '0';
                 var effect = effectIdx !== -1 ? (values[effectIdx] || '') : '';
+                // Limpiar valores inválidos como "???" en effect
+                if (effect && (effect.trim() === '???' || effect.trim() === '??' || effect.trim() === '?')) {
+                    effect = '';
+                }
 
                 if (!name || name.length === 0) {
                     errors.push('Línea ' + (i + 1) + ': nombre vacío');
@@ -698,9 +742,23 @@ function processCSVUpload() {
                 var item;
                 if (isTaberna) {
                     var type = (typeIdx !== -1 ? (values[typeIdx] || 'drink') : 'drink').toLowerCase().trim();
-                    var categoria = (categoriaIdx !== -1 ? (values[categoriaIdx] || 'servir') : 'servir').toLowerCase().trim();
+                    var categoriaRaw = (categoriaIdx !== -1 ? (values[categoriaIdx] || '') : '').toLowerCase().trim();
                     if (validTypes.indexOf(type) === -1) type = 'drink';
-                    if (validCategorias.indexOf(categoria) === -1) categoria = 'servir';
+                    
+                    // Determinar categoria: si tiene effect, debe ser "llevar", si no, "servir"
+                    // Pero primero verificar si ya viene especificado correctamente
+                    var categoria;
+                    if (validCategorias.indexOf(categoriaRaw) !== -1) {
+                        // Ya viene con un valor válido (servir o llevar)
+                        categoria = categoriaRaw;
+                    } else if (categoriaRaw === 'bebidas' || categoriaRaw === 'cocina') {
+                        // Si viene de la columna "tab" con valores antiguos, determinar por effect
+                        categoria = (effect && effect.trim() && effect.trim() !== '???') ? 'llevar' : 'servir';
+                    } else {
+                        // Si no viene especificado o es inválido, determinar automáticamente por effect
+                        categoria = (effect && effect.trim() && effect.trim() !== '???') ? 'llevar' : 'servir';
+                    }
+                    
                     item = { name: name, price: price, effect: effect, type: type, categoria: categoria };
                 } else if (isHerreria) {
                     var tierNum = tierIdx >= 0 ? parseInt(values[tierIdx], 10) : 1;

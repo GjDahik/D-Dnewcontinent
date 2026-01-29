@@ -911,6 +911,20 @@ async function performPlayerSanctuaryOffering() {
         const inventario = Array.isArray(data.inventario) ? data.inventario.slice() : [];
         if (success) inventario.push({ name: 'Moneda de Héroe', effect: 'Puedes usarla para repetir una tirada o estabilizarte si estás a 0 HP.', rarity: 'legendaria', shopTipo: 'santuario' });
         await db.collection('players').doc(user.id).update({ oro: newOro, inventario });
+        
+        // Guardar transacción
+        const shop = playerShopsData.find(s => s.id === playerSanctuaryShopId);
+        const shopName = shop ? (shop.nombre || 'Santuario') : 'Santuario';
+        await db.collection('transactions').add({
+            tipo: 'compra',
+            itemName: success ? 'Donación al Santuario (Moneda de Héroe obtenida)' : 'Donación al Santuario',
+            playerId: user.id,
+            playerName: user.nombre || 'Jugador',
+            shopName: shopName,
+            precio: gp,
+            fecha: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
         document.getElementById('player-santuario-oro-display').textContent = newOro.toLocaleString();
         showToast(success ? '✦ Moneda de Héroe obtenida' : 'Donación ofrecida. ' + (success ? '' : 'Fallo del espejo.'));
     }, 1500);
@@ -1712,6 +1726,24 @@ async function playerArtesaniasCheckout() {
         for (let q = 0; q < e.qty; q++) playerInv.push(entry);
     });
     await db.collection('players').doc(user.id).update({ oro: newOro, inventario: playerInv });
+    
+    // Guardar transacción para cada item comprado
+    for (const e of playerArtesaniasCart) {
+        const it = inventario[e.inventarioIndex];
+        if (!it) continue;
+        const itemName = it.name || 'Item';
+        const itemPrice = (it.price != null ? it.price : 0) * (e.qty || 1);
+        await db.collection('transactions').add({
+            tipo: 'compra',
+            itemName: (e.qty > 1 ? e.qty + '× ' : '') + itemName,
+            playerId: user.id,
+            playerName: user.nombre || 'Jugador',
+            shopName: shop.nombre || 'Artesanías',
+            precio: itemPrice,
+            fecha: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    }
+    
     playerArtesaniasCart = [];
     renderPlayerArtesaniasCart();
     document.getElementById('player-artesanias-oro-display').textContent = newOro.toLocaleString();
@@ -1884,6 +1916,24 @@ async function playerEmporioCheckout() {
         for (let q = 0; q < e.qty; q++) playerInv.push(entry);
     });
     await db.collection('players').doc(user.id).update({ oro: newOro, inventario: playerInv });
+    
+    // Guardar transacción para cada item comprado
+    for (const e of playerEmporioCart) {
+        const it = inventario[e.inventarioIndex];
+        if (!it) continue;
+        const itemName = it.name || 'Item';
+        const itemPrice = (it.price != null ? it.price : 0) * (e.qty || 1);
+        await db.collection('transactions').add({
+            tipo: 'compra',
+            itemName: (e.qty > 1 ? e.qty + '× ' : '') + itemName,
+            playerId: user.id,
+            playerName: user.nombre || 'Jugador',
+            shopName: shop.nombre || 'Emporio',
+            precio: itemPrice,
+            fecha: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    }
+    
     playerEmporioCart = [];
     renderPlayerEmporioCart();
     document.getElementById('player-emporio-oro-display').textContent = newOro.toLocaleString();
@@ -2035,6 +2085,24 @@ async function playerBibliotecaCheckout() {
         playerInv.push(entry);
     });
     await db.collection('players').doc(user.id).update({ oro: newOro, inventario: playerInv });
+    
+    // Guardar transacción para cada libro alquilado
+    for (const e of playerBibliotecaCart) {
+        const it = inventario[e.inventarioIndex];
+        if (!it) continue;
+        const itemName = it.name || it.title || 'Libro';
+        const itemPrice = it.price != null ? it.price : 0;
+        await db.collection('transactions').add({
+            tipo: 'compra',
+            itemName: itemName,
+            playerId: user.id,
+            playerName: user.nombre || 'Jugador',
+            shopName: shop.nombre || 'Biblioteca',
+            precio: itemPrice,
+            fecha: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    }
+    
     const receiptItems = playerBibliotecaCart.map(e => {
         const it = inventario[e.inventarioIndex];
         return { title: it.name || it.title || 'Libro', deposito: it.price != null ? it.price : 0 };
@@ -2268,6 +2336,24 @@ async function playerForgeCheckout() {
         for (let q = 0; q < e.qty; q++) playerInv.push(entry);
     });
     await db.collection('players').doc(user.id).update({ oro: newOro, inventario: playerInv });
+    
+    // Guardar transacción para cada item comprado
+    for (const e of playerForgeCart) {
+        const it = inventario[e.inventarioIndex];
+        if (!it) continue;
+        const itemName = it.name || 'Item';
+        const itemPrice = (it.price != null ? it.price : 0) * (e.qty || 1);
+        await db.collection('transactions').add({
+            tipo: 'compra',
+            itemName: (e.qty > 1 ? e.qty + '× ' : '') + itemName,
+            playerId: user.id,
+            playerName: user.nombre || 'Jugador',
+            shopName: shop.nombre || 'Forja',
+            precio: itemPrice,
+            fecha: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    }
+    
     playerForgeCart = [];
     renderPlayerForgeCart();
     document.getElementById('player-forge-oro-display').textContent = newOro.toLocaleString();
@@ -2508,6 +2594,23 @@ async function playerPotionCheckout() {
         for (let q = 0; q < item.qty; q++) inventario.push(entry);
     }
     await db.collection('players').doc(user.id).update({ oro: newOro, inventario });
+    
+    // Guardar transacción para cada poción comprada
+    for (const item of playerPotionCart) {
+        const p = products[item.index];
+        if (!p) continue;
+        const itemName = p.name || 'Item';
+        const itemPrice = (p.price != null ? p.price : 0) * (item.qty || 1);
+        await db.collection('transactions').add({
+            tipo: 'compra',
+            itemName: (item.qty > 1 ? item.qty + '× ' : '') + itemName,
+            playerId: user.id,
+            playerName: user.nombre || 'Jugador',
+            shopName: shop.nombre || 'Tienda de Pociones',
+            precio: itemPrice,
+            fecha: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    }
     playerPotionCart = [];
     renderPlayerPotionCart();
     document.getElementById('player-potion-shop-oro-display').textContent = newOro.toLocaleString();
@@ -2749,6 +2852,24 @@ async function playerTavernCheckout() {
     }
     const newOro = oro - total;
     await db.collection('players').doc(user.id).update({ oro: newOro, inventario });
+    
+    // Guardar transacción para cada item comprado en la taberna
+    for (const row of playerTavernCart) {
+        const it = items.find(i => i.id === row.id);
+        if (!it) continue;
+        const itemName = it.name || 'Item';
+        const itemPrice = (it.price != null ? it.price : 0) * (row.qty || 1);
+        await db.collection('transactions').add({
+            tipo: 'compra',
+            itemName: (row.qty > 1 ? row.qty + '× ' : '') + itemName,
+            playerId: user.id,
+            playerName: user.nombre || 'Jugador',
+            shopName: shop.nombre || 'Taberna',
+            precio: itemPrice,
+            fecha: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    }
+    
     playerTavernCart = [];
     renderTavernCart();
     document.getElementById('player-tavern-oro-display').textContent = newOro.toLocaleString();
