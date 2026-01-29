@@ -28,12 +28,12 @@
         <div class="nav-overlay" id="dm-nav-overlay" onclick="closeMobileNav('dm')" aria-hidden="true"></div>
         <div class="nav-wrapper" id="dm-nav-wrapper">
         <nav class="nav-tabs">
-            <button class="nav-tab active" data-tab="map">🗺️ Mapa</button>
-            <button class="nav-tab" data-tab="players">👥 Jugadores</button>
-            <button class="nav-tab" data-tab="cities">🏘️ Ciudades/Pueblos</button>
-            <button class="nav-tab" data-tab="notifications">📮 Notificaciones</button>
-            <button class="nav-tab" data-tab="transactions">📜 Historial</button>
-            <button class="nav-tab" type="button" onclick="window.open('battle-tracker.html', '_blank')" title="Abrir en nueva pestaña">⚔️ Battle Tracker</button>
+            <button class="nav-tab nav-tab-type-map active" data-tab="map">🗺️ Mapa</button>
+            <button class="nav-tab nav-tab-type-players" data-tab="players">👥 Jugadores</button>
+            <button class="nav-tab nav-tab-type-cities" data-tab="cities">🏘️ Ciudades/Pueblos</button>
+            <button class="nav-tab nav-tab-type-notifications" data-tab="notifications">📮 Notificaciones</button>
+            <button class="nav-tab nav-tab-type-transactions" data-tab="transactions">📜 Historial</button>
+            <button class="nav-tab nav-tab-type-battle" type="button" onclick="window.open('battle-tracker.html', '_blank')" title="Abrir en nueva pestaña">⚔️ Battle Tracker</button>
             <button class="nav-tab nav-tab-logout" type="button" onclick="closeMobileNav('dm'); logout();">🚪 Salir</button>
         </nav>
         </div>
@@ -42,8 +42,9 @@
         <section id="map" class="tab-content active">
             <div class="section-header">
                 <h2 id="map-title-dm">🗺️ Mapa</h2>
+                <button type="button" class="btn btn-small" id="map-edit-toggle-btn" onclick="toggleMapEditMode()" title="Mostrar u ocultar configuración del mapa">✏️ Editar mapa</button>
             </div>
-            <div id="map-config-row" style="margin-bottom:16px; display:flex; flex-direction:column; gap:12px;">
+            <div id="map-config-row" class="map-config-row" style="display:none;">
                 <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px;">
                     <label for="map-continent-name" style="color:#a89878; font-size:0.9em;">Nombre del continente:</label>
                     <input type="text" id="map-continent-name" placeholder="Ej: Nueva Valdoria" class="map-url-input" style="flex:1; min-width:200px; padding:8px 12px; background:rgba(0,0,0,0.4); border:1px solid #4a3c31; border-radius:6px; color:#d4c4a8;">
@@ -185,12 +186,12 @@
         <div class="nav-overlay" id="player-nav-overlay" onclick="closeMobileNav('player')" aria-hidden="true"></div>
         <div class="nav-wrapper" id="player-nav-wrapper">
         <nav class="nav-tabs" id="player-nav-tabs">
-            <button class="nav-tab active" data-tab="player-map">🗺️ Mapa</button>
-            <button class="nav-tab" data-tab="player-ciudades">🏛️ Ciudades</button>
-            <button class="nav-tab" data-tab="player-inventario">🎒 Inventario</button>
-            <button class="nav-tab" data-tab="player-notifications">🃏 CDD & Correo</button>
-            <button class="nav-tab" data-tab="player-home" title="Ver mi home">🏠 Home</button>
-            <button class="nav-tab" type="button" onclick="window.open('battle-tracker.html', '_blank')" title="Abrir en nueva pestaña">⚔️ Battle Tracker</button>
+            <button class="nav-tab nav-tab-type-map active" data-tab="player-map">🗺️ Mapa</button>
+            <button class="nav-tab nav-tab-type-cities" data-tab="player-ciudades">🏛️ Ciudades</button>
+            <button class="nav-tab nav-tab-type-inventario" data-tab="player-inventario">🎒 Inventario</button>
+            <button class="nav-tab nav-tab-type-cdd" data-tab="player-notifications">🃏 CDD & Correo</button>
+            <button class="nav-tab nav-tab-type-home" data-tab="player-home" title="Ver mi home">🏠 Home</button>
+            <button class="nav-tab nav-tab-type-battle" type="button" onclick="window.open('battle-tracker.html', '_blank')" title="Abrir en nueva pestaña">⚔️ Battle Tracker</button>
             <button class="nav-tab nav-tab-logout" type="button" onclick="closeMobileNav('player'); logout();">🚪 Salir</button>
         </nav>
         </div>
@@ -253,6 +254,21 @@
                 <h2>🎒 Inventario</h2>
             </div>
             <div class="player-card">
+                <div id="player-inventory-toolbar" class="player-inventory-toolbar" style="display:none; flex-wrap:wrap; gap:10px; margin-bottom:16px; align-items:center;">
+                    <input type="text" id="player-inventory-search" class="form-group input" placeholder="🔍 Buscar por nombre o efecto..." style="flex:1; min-width:180px; padding:10px 14px; background:#1a1a1a; border:1px solid #4a3c31; border-radius:6px; color:#d4c4a8;">
+                    <label for="player-inventory-filter-shop" style="color:#a89878; font-size:0.9em;">Tienda:</label>
+                    <select id="player-inventory-filter-shop" class="form-group input" style="min-width:160px; padding:10px 12px; background:#1a1a1a; border:1px solid #4a3c31; border-radius:6px; color:#d4c4a8;">
+                        <option value="">Todas</option>
+                        <option value="pociones">Pociones</option>
+                        <option value="taberna">Taberna</option>
+                        <option value="herreria">Herrería</option>
+                        <option value="arqueria">Arquería</option>
+                        <option value="emporio">Emporio</option>
+                        <option value="biblioteca">Biblioteca</option>
+                        <option value="santuario">Santuario</option>
+                        <option value="dm">DM / Otros</option>
+                    </select>
+                </div>
                 <div id="player-view-inventory"></div>
             </div>
         </section>

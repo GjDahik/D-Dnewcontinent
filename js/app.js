@@ -21,6 +21,7 @@ function getCityInfoForShop(shop) {
 }
 
 let playerPotionCart = [], playerPotionShopId = null, playerPotionProducts = [], playerPotionFilter = 'all', playerPotionSearchTerm = '';
+let lastPlayerViewData = null;
 let playerTavernShopId = null, playerTavernCart = [];
 let playerForgeShopId = null, playerForgeCart = [], playerForgeLevel = 1, playerForgeTab = 'forge-shop';
 let playerArtesaniasShopId = null, playerArtesaniasCart = [], playerArtesaniasTab = 'flechas';
@@ -256,6 +257,23 @@ async function loadMapImage() {
     }
 }
 
+function toggleMapEditMode() {
+    if (!isDM()) return;
+    const row = document.getElementById('map-config-row');
+    const btn = document.getElementById('map-edit-toggle-btn');
+    if (!row || !btn) return;
+    const isEditing = row.style.display === 'flex';
+    if (isEditing) {
+        row.style.display = 'none';
+        btn.textContent = '✏️ Editar mapa';
+        btn.title = 'Mostrar configuración del mapa';
+    } else {
+        row.style.display = 'flex';
+        btn.textContent = '✔️ Ocultar configuración';
+        btn.title = 'Volver al modo solo ver';
+    }
+}
+
 async function saveMapImage() {
     if (!isDM()) return;
     const inputEl = document.getElementById('map-image-url');
@@ -328,6 +346,7 @@ function groupInventoryItems(items) {
 }
 
 function renderPlayerView(data) {
+    lastPlayerViewData = data;
     const nombre = data.nombre || '—';
     const classLevel = (data.clase || '—') + ' • Nivel ' + (data.nivel || 1);
     const oro = (data.oro != null ? data.oro : 0).toLocaleString() + ' GP';
@@ -335,40 +354,65 @@ function renderPlayerView(data) {
     document.getElementById('player-header-class-level').textContent = classLevel;
     document.getElementById('player-header-oro').textContent = '💰 ' + oro;
     const list = document.getElementById('player-view-inventory');
+    const toolbar = document.getElementById('player-inventory-toolbar');
     const items = data.inventario || [];
     const rarityColors = { común: '#2ecc71', infrecuente: '#3498db', rara: '#9b59b6', legendaria: '#e74c3c' };
     if (items.length === 0) {
+        if (toolbar) toolbar.style.display = 'none';
         list.innerHTML = '<p style="color:#8b7355; text-align:center; padding:20px;">Sin items</p>';
         return;
     }
+    if (toolbar) toolbar.style.display = 'flex';
+    const searchEl = document.getElementById('player-inventory-search');
+    const filterEl = document.getElementById('player-inventory-filter-shop');
+    const searchTerm = (searchEl && searchEl.value || '').trim().toLowerCase();
+    const filterShop = (filterEl && filterEl.value || '').trim();
     const groups = groupInventoryItems(items);
-    const rows = groups.map(g => {
+    const filtered = groups.filter(g => {
         const it = g.item;
-        const idxUse = g.indices[0];
-        const idxStr = g.indices.join(',');
-        const r = rarityColors[it.rarity] || '#555';
-        const tipoLabel = getTipoLabel(it);
-        const isMultiple = g.count > 1;
-        const sellControl = isMultiple
-            ? `<input type="number" min="1" max="${g.count}" value="1" class="inv-sell-qty" data-indices="${idxStr}" data-max="${g.count}" aria-label="Unidades a vender" title="Unidades a vender">`
-            : '';
-        const sellBtn = isMultiple
-            ? `<button type="button" class="btn btn-secondary btn-small" onclick="playerSellItemStack('${idxStr}', this)" title="Vender las unidades indicadas (75% c/u)">Vender</button>`
-            : `<button type="button" class="btn btn-secondary btn-small" onclick="playerSellItemStack('${idxStr}', this)" title="Vender (75% del valor)">Vender</button>`;
-        return `<tr class="player-inventory-row">
-            <td><span style="color:#d4c4a8; font-weight:600;">${it.name || 'Item'}</span></td>
-            <td><span class="inv-tipo">${tipoLabel}</span></td>
-            <td><span style="color:#8b7355; font-size:0.9em;">${it.effect || '—'}</span></td>
-            <td><span style="color:#f1c40f;">${it.price != null ? it.price + ' GP' : '—'}</span></td>
-            <td><span class="rarity-badge" style="background:${r}; color:#fff;">${it.rarity || 'común'}</span></td>
-            <td class="inv-qty">${g.count}</td>
-            <td class="inv-actions">
-                <button type="button" class="btn btn-small" onclick="playerUseItem(${idxUse})" title="Usar 1">Utilizar</button>
-                ${sellControl}
-                ${sellBtn}
-            </td>
-        </tr>`;
-    }).join('');
+        const matchText = !searchTerm ||
+            (it.name || '').toLowerCase().includes(searchTerm) ||
+            (getItemDesc(it) || '').toLowerCase().includes(searchTerm);
+        const st = (it.shopTipo || '').toLowerCase();
+        const matchShop = !filterShop ||
+            (filterShop === 'dm' ? !st : st === filterShop);
+        return matchText && matchShop;
+    });
+    let rows;
+    if (filtered.length === 0) {
+        const msg = searchTerm || filterShop
+            ? 'No hay items que coincidan con los filtros.'
+            : 'Sin items';
+        rows = `<tr><td colspan="7" style="color:#8b7355; text-align:center; padding:20px;">${msg}</td></tr>`;
+    } else {
+        rows = filtered.map(g => {
+            const it = g.item;
+            const idxUse = g.indices[0];
+            const idxStr = g.indices.join(',');
+            const r = rarityColors[it.rarity] || '#555';
+            const tipoLabel = getTipoLabel(it);
+            const isMultiple = g.count > 1;
+            const sellControl = isMultiple
+                ? `<input type="number" min="1" max="${g.count}" value="1" class="inv-sell-qty" data-indices="${idxStr}" data-max="${g.count}" aria-label="Unidades a vender" title="Unidades a vender">`
+                : '';
+            const sellBtn = isMultiple
+                ? `<button type="button" class="btn btn-secondary btn-small" onclick="playerSellItemStack('${idxStr}', this)" title="Vender las unidades indicadas (75% c/u)">Vender</button>`
+                : `<button type="button" class="btn btn-secondary btn-small" onclick="playerSellItemStack('${idxStr}', this)" title="Vender (75% del valor)">Vender</button>`;
+            return `<tr class="player-inventory-row">
+                <td><span style="color:#d4c4a8; font-weight:600;">${it.name || 'Item'}</span></td>
+                <td><span class="inv-tipo">${tipoLabel}</span></td>
+                <td><span style="color:#8b7355; font-size:0.9em;">${it.effect || '—'}</span></td>
+                <td><span style="color:#f1c40f;">${it.price != null ? it.price + ' GP' : '—'}</span></td>
+                <td><span class="rarity-badge" style="background:${r}; color:#fff;">${it.rarity || 'común'}</span></td>
+                <td class="inv-qty">${g.count}</td>
+                <td class="inv-actions">
+                    <button type="button" class="btn btn-small" onclick="playerUseItem(${idxUse})" title="Usar 1">Utilizar</button>
+                    ${sellControl}
+                    ${sellBtn}
+                </td>
+            </tr>`;
+        }).join('');
+    }
     list.innerHTML = `
         <div class="inventory-table-wrap">
             <table class="inventory-table">
@@ -509,6 +553,14 @@ function showPlayerView() {
     db.collection('players').doc(user.id).onSnapshot(doc => {
         if (doc.exists) renderPlayerView(doc.data());
     });
+    if (!window._playerInventorySearchListeners) {
+        window._playerInventorySearchListeners = true;
+        const onInvFilter = () => { if (lastPlayerViewData) renderPlayerView(lastPlayerViewData); };
+        const si = document.getElementById('player-inventory-search');
+        const sf = document.getElementById('player-inventory-filter-shop');
+        if (si) si.addEventListener('input', onInvFilter);
+        if (sf) sf.addEventListener('change', onInvFilter);
+    }
     loadPlayerWorld();
     // Cargar notificaciones después de un pequeño delay para asegurar que los contenedores existan
     setTimeout(() => {
