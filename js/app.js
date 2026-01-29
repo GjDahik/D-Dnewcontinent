@@ -150,6 +150,7 @@ async function handleLogin() {
     }
 
     if (success) {
+        updateFooterTagline();
         closeModal('login-modal');
         if (userType === 'dm') {
             showDashboard();
@@ -210,6 +211,27 @@ function showLoginModal() {
 
 const DEFAULT_MAP_IMAGE_URL = 'https://i.imgur.com/ppAIykX.png';
 const DEFAULT_CONTINENT_NAME = 'Nueva Valdoria';
+
+const FOOTER_TAGLINES = [
+    'Caos a la orden del dia',
+    'Caos calculado, consecuencias inevitables.',
+    'El orden es opcional. El destino, no.',
+    'Nada funciona… hasta que funciona demasiado bien.',
+    'Donde el sistema tiembla, el caos responde.',
+    'Cada decisión genera una grieta.',
+    'El azar observa. El caos ejecuta.',
+    'No es un error, es una señal.',
+    'El equilibrio se rompió primero.',
+    'Todo está bajo control. Eso es lo preocupante.',
+    'Aquí comienzan las consecuencias.'
+];
+
+function updateFooterTagline() {
+    const el = document.getElementById('footer-tagline');
+    if (!el || !FOOTER_TAGLINES.length) return;
+    const i = Math.floor(Math.random() * FOOTER_TAGLINES.length);
+    el.textContent = FOOTER_TAGLINES[i];
+}
 
 async function loadMapImage() {
     try {
