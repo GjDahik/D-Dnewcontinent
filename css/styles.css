@@ -85,6 +85,7 @@ body {
     align-items: center;
 }
 .nav-tab {
+    position: relative;
     background: linear-gradient(180deg, #2a2522 0%, #1e1b18 100%);
     border: 1px solid #4a3c31;
     color: #8b7355;
@@ -93,6 +94,31 @@ body {
     transition: all 0.3s ease; border-radius: 4px;
     text-transform: uppercase;
     letter-spacing: 1px;
+}
+
+/* Badge de notificación (correos sin leer) en nav */
+.nav-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7em;
+    font-weight: 700;
+    line-height: 1;
+    color: #1a1a1a;
+    background: #d4af37;
+    border: 1px solid #8b5a2b;
+    border-radius: 10px;
+    box-shadow: 0 0 6px rgba(212, 175, 55, 0.5);
+}
+.nav-badge:empty,
+.nav-badge.nav-badge--hidden {
+    display: none !important;
 }
 
 /* Tipos con colores bajos (muy desaturados) */
@@ -111,6 +137,10 @@ body {
 .nav-tab-type-notifications { border-color: #484c52; color: #6c7076; }
 .nav-tab-type-notifications:hover { border-color: #585c62; color: #888c92; }
 .nav-tab-type-notifications.active { border-color: #585c62; color: #888c92; box-shadow: 0 0 8px rgba(88, 92, 98, 0.25); }
+
+.nav-tab-type-automation { border-color: #4a5054; color: #6e7478; }
+.nav-tab-type-automation:hover { border-color: #5a6064; color: #8a9094; }
+.nav-tab-type-automation.active { border-color: #5a6064; color: #8a9094; box-shadow: 0 0 8px rgba(90, 96, 100, 0.25); }
 
 .nav-tab-type-transactions { border-color: #504c46; color: #746e68; }
 .nav-tab-type-transactions:hover { border-color: #605c56; color: #8e8882; }
@@ -201,6 +231,7 @@ body {
     flex-wrap: wrap;
 }
 .player-notifications-subtab {
+    position: relative;
     background: linear-gradient(180deg, #2a2522 0%, #1e1b18 100%);
     border: 1px solid #4a3c31;
     color: #8b7355;
@@ -340,6 +371,17 @@ body {
 .dm-notifications-historial-desc {
     color: #8b7355;
     margin-bottom: 16px;
+    font-style: italic;
+}
+.dm-notifications-automation-wrap {
+    max-width: 1000px;
+}
+.dm-notifications-automation-header {
+    margin-bottom: 16px;
+}
+.dm-notifications-automation-desc {
+    color: #8b7355;
+    margin-bottom: 20px;
     font-style: italic;
 }
 .dm-notifications-list .mini-card {
@@ -717,7 +759,52 @@ body {
 .player-inventory-item:last-child { margin-bottom: 0; }
 .rarity-badge { padding: 2px 8px; border-radius: 10px; font-size: 0.75em; text-transform: uppercase; }
 
-/* Tabla inventario (items agrupados, columna Cantidad) */
+/* Toolbar inventario */
+.player-inventory-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 16px;
+}
+.player-inventory-search-input {
+    flex: 1;
+    min-width: 180px;
+    padding: 10px 14px;
+    background: #1a1a1a;
+    border: 1px solid #4a3c31;
+    border-radius: 6px;
+    color: #d4c4a8;
+    font-size: 1em;
+}
+.player-inventory-search-input::placeholder { color: #8b7355; }
+.player-inventory-search-input:focus {
+    outline: none;
+    border-color: #8b5a2b;
+}
+.player-inventory-filter-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.player-inventory-filter-label {
+    color: #a89878;
+    font-size: 0.9em;
+    flex-shrink: 0;
+}
+.player-inventory-filter-select {
+    min-width: 160px;
+    padding: 10px 12px;
+    background: #1a1a1a;
+    border: 1px solid #4a3c31;
+    border-radius: 6px;
+    color: #d4c4a8;
+    font-size: 1em;
+    cursor: pointer;
+}
+.player-inventory-filter-select:focus { outline: none; border-color: #8b5a2b; }
+
+/* Tabla inventario (desktop) */
 .inventory-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 8px; border: 1px solid #4a3c31; }
 .inventory-table { width: 100%; min-width: 620px; border-collapse: collapse; font-size: 0.95em; }
 .inventory-table th, .inventory-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #4a3c31; vertical-align: middle; }
@@ -734,6 +821,49 @@ body {
     color: #d4c4a8; font-size: 0.9em;
 }
 .inventory-table .inv-sell-qty:focus { outline: none; border-color: #8b5a2b; }
+
+/* Cards inventario (móvil) */
+.inventory-cards-wrap { display: none; }
+.inventory-card {
+    background: rgba(0,0,0,0.25);
+    border: 1px solid #4a3c31;
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+}
+.inventory-card:last-child { margin-bottom: 0; }
+.inventory-card-header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; }
+.inventory-card-name { color: #d4c4a8; font-weight: 600; font-size: 1.05em; }
+.inventory-card-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 0.9em; color: #a89878; margin-bottom: 8px; }
+.inventory-card-effect { color: #8b7355; font-size: 0.9em; line-height: 1.4; margin-bottom: 12px; }
+.inventory-card-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.inventory-card-actions .btn { min-height: 44px; }
+.inventory-card-actions .inv-sell-qty {
+    width: 3.5em; padding: 8px 10px; min-height: 44px; font-size: 1em;
+    background: rgba(0,0,0,0.4); border: 1px solid #4a3c31; border-radius: 4px;
+    color: #d4c4a8; text-align: center;
+}
+.inventory-card-actions .inv-sell-qty:focus { outline: none; border-color: #8b5a2b; }
+
+@media (max-width: 768px) {
+    .player-inventory-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .player-inventory-search-input { min-width: 0; }
+    .player-inventory-filter-row {
+        width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 4px;
+    }
+    .player-inventory-filter-label { margin-bottom: 0; }
+    .player-inventory-filter-select { flex: 1; min-width: 0; width: 100%; }
+    .inventory-desktop { display: none !important; }
+    .inventory-cards-wrap { display: block !important; }
+    .player-inventario-card { padding: 12px; }
+}
+
 .player-map-section { margin-bottom: 24px; }
 .player-section-title { font-family: 'Cinzel', serif; color: #d4af37; font-size: 1.4em; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 2px; }
 .player-map-wrap { text-align: center; background: linear-gradient(180deg, rgba(42, 42, 62, 0.9) 0%, rgba(26, 26, 46, 0.95) 100%); border: 2px solid #c9a227; border-radius: 12px; padding: 20px; }

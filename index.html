@@ -110,6 +110,7 @@
             <div class="dm-notifications-subtabs">
                 <button type="button" class="dm-notifications-subtab active" data-dm-subtab="enviar" onclick="switchDMNotificationsSubtab('enviar')">📬 Enviar Notificación</button>
                 <button type="button" class="dm-notifications-subtab" data-dm-subtab="historial" onclick="switchDMNotificationsSubtab('historial')">📜 Historial de Notificaciones</button>
+                <button type="button" class="dm-notifications-subtab" data-dm-subtab="automation" onclick="switchDMNotificationsSubtab('automation')">🤖 Mensajes automáticos</button>
             </div>
             <div id="dm-notifications-container">
                 <div id="dm-notifications-enviar-panel" class="dm-notifications-subtab-content" style="display: block;">
@@ -138,6 +139,17 @@
                         <p class="dm-notifications-historial-desc">Notificaciones que has enviado a los jugadores.</p>
                         <div id="dm-notifications-list" class="dm-notifications-list">
                             <p style="color:#8b7355; text-align:center; padding:20px;">Cargando notificaciones...</p>
+                        </div>
+                    </div>
+                </div>
+                <div id="dm-notifications-automation-panel" class="dm-notifications-subtab-content" style="display: none;">
+                    <div class="dm-notifications-automation-wrap">
+                        <div class="dm-notifications-automation-header">
+                            <button type="button" class="btn" onclick="openAutomationRuleModal()">+ Nueva regla</button>
+                        </div>
+                        <p class="dm-notifications-automation-desc">Cuando un jugador compre un ítem en una tienda (o rente un cuarto en una posada), se puede enviar un mensaje automático a su correo y, si lo configuras, quitar ese ítem de la tienda.</p>
+                        <div id="automation-rules-list" class="mini-cards">
+                            <p style="color:#8b7355; text-align:center; padding:20px;">Cargando reglas...</p>
                         </div>
                     </div>
                 </div>
@@ -189,7 +201,7 @@
             <button class="nav-tab nav-tab-type-map active" data-tab="player-map">🗺️ Mapa</button>
             <button class="nav-tab nav-tab-type-cities" data-tab="player-ciudades">🏛️ Ciudades</button>
             <button class="nav-tab nav-tab-type-inventario" data-tab="player-inventario">🎒 Inventario</button>
-            <button class="nav-tab nav-tab-type-cdd" data-tab="player-notifications">🃏 CDD & Correo</button>
+            <button class="nav-tab nav-tab-type-cdd" data-tab="player-notifications">🃏 CDD & Correo<span class="nav-badge nav-badge-mail nav-badge--hidden" id="mail-unread-badge" aria-label="Correos sin leer"></span></button>
             <button class="nav-tab nav-tab-type-home" data-tab="player-home" title="Ver mi home">🏠 Home</button>
             <button class="nav-tab nav-tab-type-battle" type="button" onclick="window.open('battle-tracker.html', '_blank')" title="Abrir en nueva pestaña">⚔️ Battle Tracker</button>
             <button class="nav-tab nav-tab-logout" type="button" onclick="closeMobileNav('player'); logout();">🚪 Salir</button>
@@ -253,21 +265,23 @@
             <div class="section-header">
                 <h2>🎒 Inventario</h2>
             </div>
-            <div class="player-card">
-                <div id="player-inventory-toolbar" class="player-inventory-toolbar" style="display:none; flex-wrap:wrap; gap:10px; margin-bottom:16px; align-items:center;">
-                    <input type="text" id="player-inventory-search" class="form-group input" placeholder="🔍 Buscar por nombre o efecto..." style="flex:1; min-width:180px; padding:10px 14px; background:#1a1a1a; border:1px solid #4a3c31; border-radius:6px; color:#d4c4a8;">
-                    <label for="player-inventory-filter-shop" style="color:#a89878; font-size:0.9em;">Tienda:</label>
-                    <select id="player-inventory-filter-shop" class="form-group input" style="min-width:160px; padding:10px 12px; background:#1a1a1a; border:1px solid #4a3c31; border-radius:6px; color:#d4c4a8;">
-                        <option value="">Todas</option>
-                        <option value="pociones">Pociones</option>
-                        <option value="taberna">Taberna</option>
-                        <option value="herreria">Herrería</option>
-                        <option value="arqueria">Arquería</option>
-                        <option value="emporio">Emporio</option>
-                        <option value="biblioteca">Biblioteca</option>
-                        <option value="santuario">Santuario</option>
-                        <option value="dm">DM / Otros</option>
-                    </select>
+            <div class="player-card player-inventario-card">
+                <div id="player-inventory-toolbar" class="player-inventory-toolbar" style="display:none;">
+                    <input type="text" id="player-inventory-search" class="player-inventory-search-input" placeholder="🔍 Buscar por nombre o efecto...">
+                    <div class="player-inventory-filter-row">
+                        <label for="player-inventory-filter-shop" class="player-inventory-filter-label">Tienda:</label>
+                        <select id="player-inventory-filter-shop" class="player-inventory-filter-select">
+                            <option value="">Todas</option>
+                            <option value="pociones">Pociones</option>
+                            <option value="taberna">Taberna</option>
+                            <option value="herreria">Herrería</option>
+                            <option value="arqueria">Arquería</option>
+                            <option value="emporio">Emporio</option>
+                            <option value="biblioteca">Biblioteca</option>
+                            <option value="santuario">Santuario</option>
+                            <option value="dm">DM / Otros</option>
+                        </select>
+                    </div>
                 </div>
                 <div id="player-view-inventory"></div>
             </div>
@@ -280,7 +294,7 @@
             </div>
             <div class="player-notifications-subtabs">
                 <button type="button" class="player-notifications-subtab active" data-subtab="cartas-destino" onclick="switchPlayerNotificationsSubtab('cartas-destino')">🃏 Cartas del destino</button>
-                <button type="button" class="player-notifications-subtab" data-subtab="cartas" onclick="switchPlayerNotificationsSubtab('cartas')">📬 Correo</button>
+                <button type="button" class="player-notifications-subtab" data-subtab="cartas" onclick="switchPlayerNotificationsSubtab('cartas')">📬 Correo<span class="nav-badge nav-badge-mail nav-badge--hidden" id="mail-unread-badge-subtab" aria-label="Correos sin leer"></span></button>
                 <button type="button" class="player-notifications-subtab" data-subtab="historial" onclick="switchPlayerNotificationsSubtab('historial')">📜 Historial de correo</button>
             </div>
             <div id="player-notifications-container">
@@ -1340,6 +1354,42 @@
         </div>
     </div>
 
+    <!-- Modal Nueva regla (Mensajes automáticos) -->
+    <div class="modal-overlay" id="automation-rule-modal">
+        <div class="modal" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3>🤖 Nueva regla</h3>
+                <button class="modal-close" onclick="closeModal('automation-rule-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Tienda</label>
+                    <select id="automation-rule-shop">
+                        <option value="">— Elige una tienda —</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Ítem (al comprarse se enviará el mensaje)</label>
+                    <select id="automation-rule-item">
+                        <option value="">— Elige primero una tienda —</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Mensaje a enviar al jugador (correo)</label>
+                    <textarea id="automation-rule-message" rows="5" placeholder="Escribe el mensaje que recibirá el jugador cuando compre este ítem..."></textarea>
+                </div>
+                <div class="form-group" id="automation-rule-remove-wrap" style="display: flex; align-items: center; gap: 10px;">
+                    <input type="checkbox" id="automation-rule-remove" checked>
+                    <label for="automation-rule-remove" style="margin: 0; color: #a89878;">Quitar este ítem de la tienda cuando se compre (queda en manos del personaje)</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('automation-rule-modal')">Cancelar</button>
+                <button class="btn" onclick="saveAutomationRule()">✅ Guardar regla</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal de Notificación (Player) -->
     <div class="modal-overlay" id="notification-modal">
         <div class="modal" style="max-width: 700px;">
@@ -2245,5 +2295,6 @@
     <script src="js/inventory.js"></script>
     <script src="js/transactions.js"></script>
     <script src="js/notifications.js"></script>
+    <script src="js/automation.js"></script>
 </body>
 </html>

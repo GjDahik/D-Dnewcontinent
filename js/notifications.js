@@ -1,5 +1,44 @@
 // ==================== NOTIFICACIONES ====================
 
+let _unreadBadgeUnsubscribe = null;
+
+function _updateMailBadges(n) {
+    const ids = ['mail-unread-badge', 'mail-unread-badge-subtab'];
+    ids.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (n > 0) {
+            el.textContent = n > 99 ? '99+' : String(n);
+            el.classList.remove('nav-badge--hidden');
+        } else {
+            el.textContent = '';
+            el.classList.add('nav-badge--hidden');
+        }
+    });
+}
+
+/** Suscribe al conteo de correos no leídos y actualiza los badges (nav CDD & Correo y subtab Correo). */
+function startUnreadMailBadge() {
+    const user = getCurrentUser();
+    if (!user || !user.id || !isPlayer()) return;
+    if (!document.getElementById('mail-unread-badge')) return;
+
+    if (typeof _unreadBadgeUnsubscribe === 'function') {
+        _unreadBadgeUnsubscribe();
+        _unreadBadgeUnsubscribe = null;
+    }
+
+    _unreadBadgeUnsubscribe = db.collection('notifications')
+        .where('playerId', '==', user.id)
+        .where('leida', '==', false)
+        .onSnapshot(snap => {
+            _updateMailBadges(snap.size);
+        }, err => {
+            console.error('Unread badge:', err);
+            _updateMailBadges(0);
+        });
+}
+
 // Cargar lista de jugadores en el selector de destinatarios
 function loadNotificationRecipients() {
     const select = document.getElementById('notification-recipient');
@@ -597,3 +636,4 @@ window.openNotificationModal = openNotificationModal;
 window.markNotificationAsRead = markNotificationAsRead;
 window.deleteNotification = deleteNotification;
 window.deleteDMNotification = deleteDMNotification;
+window.startUnreadMailBadge = startUnreadMailBadge;

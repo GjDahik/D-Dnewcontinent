@@ -33,13 +33,14 @@ let playerPosadaCart = [];
 let playerBatallaShopId = null;
 let playerBatallaSelected = [];
 
-/** Cuartos de la Posada de Nebula (tipos fijos, sin inventario) */
+/** Cuartos de la Posada de Nebula (tipos fijos, sin inventario). Usado también por posadas de otras ciudades y por mensajes automáticos. */
 const POSADA_CUARTOS = [
     { id: 'guerrero', nombre: 'Cuarto del Guerrero Valiente', precio: 50, efecto: 'El aventurero recibe un aumento temporal en su salud. Al siguiente combate, su máximo de puntos de golpe aumenta en 10 durante 1 hora.' },
     { id: 'sabio', nombre: 'Cuarto del Sabio Estelar', precio: 75, efecto: 'El aventurero recibe un bono a sus tiradas de inteligencia en su próxima aventura. Al realizar un chequeo de habilidad que dependa de Inteligencia, el aventurero obtiene un +2 por 1 hora.' },
     { id: 'elementos', nombre: 'Cuarto de los Elementos', precio: 100, efecto: 'El aventurero puede elegir una resistencia elemental para su próxima aventura. Durante 1 hora, el aventurero obtiene ventaja en todas las tiradas de salvación contra un tipo de daño específico (fuego, frío, electricidad, ácido, etc.) que elija al momento de ingresar al cuarto.' },
     { id: 'viento', nombre: 'Cuarto del Enigma del Viento', precio: 120, efecto: 'Aumenta la velocidad de movimiento del aventurero. Durante 1 hora, su velocidad de movimiento se incrementa en 10 pies y obtiene ventaja en las tiradas de salvación contra efectos de control de movimiento (como estar paralizado, atado, etc.).' }
 ];
+if (typeof window !== 'undefined') window.POSADA_CUARTOS = POSADA_CUARTOS;
 
 /** Devuelve el texto de descripción/efecto de un ítem (lo que sube el DM desde el dashboard) */
 function getItemDesc(obj) {
@@ -378,14 +379,17 @@ function renderPlayerView(data) {
             (filterShop === 'dm' ? !st : st === filterShop);
         return matchText && matchShop;
     });
-    let rows;
+    const esc = s => String(s || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    let tableHtml = '';
+    let cardsHtml = '';
     if (filtered.length === 0) {
         const msg = searchTerm || filterShop
             ? 'No hay items que coincidan con los filtros.'
             : 'Sin items';
-        rows = `<tr><td colspan="7" style="color:#8b7355; text-align:center; padding:20px;">${msg}</td></tr>`;
+        tableHtml = `<div class="inventory-desktop inventory-table-wrap"><table class="inventory-table"><thead><tr><th>Item</th><th>Tipo</th><th>Efecto</th><th>Precio</th><th>Rareza</th><th>Cantidad</th><th>Acciones</th></tr></thead><tbody><tr><td colspan="7" style="color:#8b7355;text-align:center;padding:20px;">${esc(msg)}</td></tr></tbody></table></div>`;
+        cardsHtml = `<div class="inventory-cards-wrap"><div class="inventory-card" style="text-align:center;color:#8b7355;padding:24px;">${esc(msg)}</div></div>`;
     } else {
-        rows = filtered.map(g => {
+        const rows = filtered.map(g => {
             const it = g.item;
             const idxUse = g.indices[0];
             const idxStr = g.indices.join(',');
@@ -399,11 +403,11 @@ function renderPlayerView(data) {
                 ? `<button type="button" class="btn btn-secondary btn-small" onclick="playerSellItemStack('${idxStr}', this)" title="Vender las unidades indicadas (75% c/u)">Vender</button>`
                 : `<button type="button" class="btn btn-secondary btn-small" onclick="playerSellItemStack('${idxStr}', this)" title="Vender (75% del valor)">Vender</button>`;
             return `<tr class="player-inventory-row">
-                <td><span style="color:#d4c4a8; font-weight:600;">${it.name || 'Item'}</span></td>
-                <td><span class="inv-tipo">${tipoLabel}</span></td>
-                <td><span style="color:#8b7355; font-size:0.9em;">${it.effect || '—'}</span></td>
-                <td><span style="color:#f1c40f;">${it.price != null ? it.price + ' GP' : '—'}</span></td>
-                <td><span class="rarity-badge" style="background:${r}; color:#fff;">${it.rarity || 'común'}</span></td>
+                <td><span style="color:#d4c4a8; font-weight:600;">${esc(it.name || 'Item')}</span></td>
+                <td><span class="inv-tipo">${esc(tipoLabel)}</span></td>
+                <td><span style="color:#8b7355; font-size:0.9em;">${esc(it.effect || '—')}</span></td>
+                <td><span style="color:#f1c40f;">${it.price != null ? esc(it.price + ' GP') : '—'}</span></td>
+                <td><span class="rarity-badge" style="background:${r}; color:#fff;">${esc(it.rarity || 'común')}</span></td>
                 <td class="inv-qty">${g.count}</td>
                 <td class="inv-actions">
                     <button type="button" class="btn btn-small" onclick="playerUseItem(${idxUse})" title="Usar 1">Utilizar</button>
@@ -412,16 +416,41 @@ function renderPlayerView(data) {
                 </td>
             </tr>`;
         }).join('');
+        tableHtml = `<div class="inventory-desktop inventory-table-wrap"><table class="inventory-table"><thead><tr><th>Item</th><th>Tipo</th><th>Efecto</th><th>Precio</th><th>Rareza</th><th>Cantidad</th><th>Acciones</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+        cardsHtml = filtered.map(g => {
+            const it = g.item;
+            const idxUse = g.indices[0];
+            const idxStr = g.indices.join(',');
+            const r = rarityColors[it.rarity] || '#555';
+            const tipoLabel = getTipoLabel(it);
+            const isMultiple = g.count > 1;
+            const sellControl = isMultiple
+                ? `<input type="number" min="1" max="${g.count}" value="1" class="inv-sell-qty" data-indices="${idxStr}" data-max="${g.count}" aria-label="Unidades a vender" title="Unidades a vender">`
+                : '';
+            const sellBtn = isMultiple
+                ? `<button type="button" class="btn btn-secondary btn-small" onclick="playerSellItemStack('${idxStr}', this)" title="Vender las unidades indicadas (75% c/u)">Vender</button>`
+                : `<button type="button" class="btn btn-secondary btn-small" onclick="playerSellItemStack('${idxStr}', this)" title="Vender (75% del valor)">Vender</button>`;
+            return `<div class="inventory-card">
+                <div class="inventory-card-header">
+                    <span class="inventory-card-name">${esc(it.name || 'Item')}</span>
+                    <span class="rarity-badge" style="background:${r};color:#fff;">${esc(it.rarity || 'común')}</span>
+                </div>
+                <div class="inventory-card-meta">
+                    <span class="inv-tipo">${esc(tipoLabel)}</span>
+                    <span style="color:#f1c40f;">${it.price != null ? esc(it.price + ' GP') : '—'}</span>
+                    <span>× ${g.count}</span>
+                </div>
+                <div class="inventory-card-effect">${esc(it.effect || '—')}</div>
+                <div class="inventory-card-actions">
+                    <button type="button" class="btn btn-small" onclick="playerUseItem(${idxUse})" title="Usar 1">Utilizar</button>
+                    ${sellControl}
+                    ${sellBtn}
+                </div>
+            </div>`;
+        }).join('');
+        cardsHtml = `<div class="inventory-cards-wrap">${cardsHtml}</div>`;
     }
-    list.innerHTML = `
-        <div class="inventory-table-wrap">
-            <table class="inventory-table">
-                <thead><tr>
-                    <th>Item</th><th>Tipo</th><th>Efecto</th><th>Precio</th><th>Rareza</th><th>Cantidad</th><th>Acciones</th>
-                </tr></thead>
-                <tbody>${rows}</tbody>
-            </table>
-        </div>`;
+    list.innerHTML = tableHtml + cardsHtml;
 }
 
 async function playerUseItem(index) {
@@ -562,14 +591,10 @@ function showPlayerView() {
         if (sf) sf.addEventListener('change', onInvFilter);
     }
     loadPlayerWorld();
-    // Cargar notificaciones después de un pequeño delay para asegurar que los contenedores existan
+    // Cargar notificaciones y badge de correos sin leer
     setTimeout(() => {
-        if (typeof loadPlayerNotifications === 'function') {
-            console.log('Llamando loadPlayerNotifications desde showPlayerView');
-            loadPlayerNotifications();
-        } else {
-            console.error('loadPlayerNotifications no está definido');
-        }
+        if (typeof loadPlayerNotifications === 'function') loadPlayerNotifications();
+        if (typeof startUnreadMailBadge === 'function') startUnreadMailBadge();
     }, 500);
 }
 
@@ -1584,6 +1609,13 @@ window.checkoutPosada = async function() {
             });
         }
     }
+    const itemsBoughtPosada = playerPosadaCart.map(item => ({
+        item: { name: item.nombre, effect: item.efecto || '', price: item.precio },
+        qty: item.nights || 1
+    }));
+    if (itemsBoughtPosada.length && typeof runAutomationRules === 'function') {
+        await runAutomationRules(shopId, itemsBoughtPosada, user.id, user.nombre || 'Jugador');
+    }
     
     // Agregar descuento si aplica
     if (discount > 0) {
@@ -1819,7 +1851,13 @@ async function playerArtesaniasCheckout() {
             ...cityInfo
         });
     }
-    
+    const itemsBoughtArte = playerArtesaniasCart.map(e => {
+        const it = inventario[e.inventarioIndex];
+        return it ? { item: { name: it.name, effect: it.effect || it.desc, price: it.price }, qty: e.qty || 1 } : null;
+    }).filter(Boolean);
+    if (itemsBoughtArte.length && typeof runAutomationRules === 'function') {
+        await runAutomationRules(playerArtesaniasShopId, itemsBoughtArte, user.id, user.nombre || 'Jugador');
+    }
     playerArtesaniasCart = [];
     renderPlayerArtesaniasCart();
     document.getElementById('player-artesanias-oro-display').textContent = newOro.toLocaleString();
@@ -2011,7 +2049,13 @@ async function playerEmporioCheckout() {
             ...cityInfo
         });
     }
-    
+    const itemsBoughtEmporio = playerEmporioCart.map(e => {
+        const it = inventario[e.inventarioIndex];
+        return it ? { item: { name: it.name, effect: it.effect || it.desc, price: it.price }, qty: e.qty || 1 } : null;
+    }).filter(Boolean);
+    if (itemsBoughtEmporio.length && typeof runAutomationRules === 'function') {
+        await runAutomationRules(playerEmporioShopId, itemsBoughtEmporio, user.id, user.nombre || 'Jugador');
+    }
     playerEmporioCart = [];
     renderPlayerEmporioCart();
     document.getElementById('player-emporio-oro-display').textContent = newOro.toLocaleString();
@@ -2182,7 +2226,13 @@ async function playerBibliotecaCheckout() {
             ...cityInfo
         });
     }
-    
+    const itemsBoughtBiblio = playerBibliotecaCart.map(e => {
+        const it = inventario[e.inventarioIndex];
+        return it ? { item: { name: it.name || it.title, effect: it.effect || it.desc, price: it.price }, qty: 1 } : null;
+    }).filter(Boolean);
+    if (itemsBoughtBiblio.length && typeof runAutomationRules === 'function') {
+        await runAutomationRules(playerBibliotecaShopId, itemsBoughtBiblio, user.id, user.nombre || 'Jugador');
+    }
     const receiptItems = playerBibliotecaCart.map(e => {
         const it = inventario[e.inventarioIndex];
         return { title: it.name || it.title || 'Libro', deposito: it.price != null ? it.price : 0 };
@@ -2435,7 +2485,13 @@ async function playerForgeCheckout() {
             ...cityInfo
         });
     }
-    
+    const itemsBoughtForge = playerForgeCart.map(e => {
+        const it = inventario[e.inventarioIndex];
+        return it ? { item: { name: it.name, effect: it.effect || it.desc, price: it.price }, qty: e.qty || 1 } : null;
+    }).filter(Boolean);
+    if (itemsBoughtForge.length && typeof runAutomationRules === 'function') {
+        await runAutomationRules(playerForgeShopId, itemsBoughtForge, user.id, user.nombre || 'Jugador');
+    }
     playerForgeCart = [];
     renderPlayerForgeCart();
     document.getElementById('player-forge-oro-display').textContent = newOro.toLocaleString();
@@ -2694,6 +2750,13 @@ async function playerPotionCheckout() {
             fecha: firebase.firestore.FieldValue.serverTimestamp(),
             ...cityInfo
         });
+    }
+    const itemsBoughtPotion = playerPotionCart.map(item => {
+        const p = products[item.index];
+        return p ? { item: { name: p.name, effect: p.effect, price: p.price }, qty: item.qty || 1 } : null;
+    }).filter(Boolean);
+    if (itemsBoughtPotion.length && typeof runAutomationRules === 'function') {
+        await runAutomationRules(playerPotionShopId, itemsBoughtPotion, user.id, user.nombre || 'Jugador');
     }
     playerPotionCart = [];
     renderPlayerPotionCart();
@@ -3069,19 +3132,22 @@ function switchPlayerNotificationsSubtab(subtabId) {
     if (subtabId === 'cartas' && typeof loadPlayerNotifications === 'function') loadPlayerNotifications();
 }
 
-// Sub-tabs de Notificaciones (DM): Enviar | Historial
+// Sub-tabs de Notificaciones (DM): Enviar | Historial | Mensajes automáticos
 function switchDMNotificationsSubtab(subtabId) {
     const section = document.getElementById('notifications');
     if (!section) return;
     const subtabs = section.querySelectorAll('.dm-notifications-subtab');
     const enviarPanel = document.getElementById('dm-notifications-enviar-panel');
     const historialPanel = document.getElementById('dm-notifications-historial-panel');
-    if (!subtabs.length || !enviarPanel || !historialPanel) return;
+    const automationPanel = document.getElementById('dm-notifications-automation-panel');
+    if (!subtabs.length || !enviarPanel || !historialPanel || !automationPanel) return;
     subtabs.forEach(t => {
         t.classList.toggle('active', t.getAttribute('data-dm-subtab') === subtabId);
     });
     enviarPanel.style.display = subtabId === 'enviar' ? 'block' : 'none';
     historialPanel.style.display = subtabId === 'historial' ? 'block' : 'none';
+    automationPanel.style.display = subtabId === 'automation' ? 'block' : 'none';
+    if (subtabId === 'automation' && typeof loadAutomationRulesList === 'function') loadAutomationRulesList();
 }
 
 // ==================== NAVIGATION ====================
