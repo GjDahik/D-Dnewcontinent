@@ -10,27 +10,33 @@
 <body>
     <div class="container" id="main-container" style="display: none;">
         <header class="header">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <h1>D&D Companion</h1>
-                    <p>Panel de Control del Dungeon Master</p>
+            <div class="header-inner">
+                <div class="dm-plaque metal-plaque">
+                    <span class="screw-bottom-left"></span>
+                    <span class="screw-bottom-right"></span>
+                    <div class="metal-plaque-content">
+                        <h1 id="dm-header-name" class="dm-plaque-name">—</h1>
+                        <p class="dm-plaque-subtitle metal-plaque-subtitle">Dungeon Master</p>
+                    </div>
                 </div>
-                <div>
-                    <span id="current-user-name" style="color: #d4af37; margin-right: 15px;"></span>
-                    <button class="btn btn-secondary btn-small" onclick="logout()">🚪 Salir</button>
+                <div class="header-actions">
+                    <button type="button" class="hamburger-btn" id="dm-hamburger-btn" onclick="toggleMobileNav('dm')" aria-label="Abrir menú">☰</button>
                 </div>
             </div>
         </header>
 
+        <div class="nav-overlay" id="dm-nav-overlay" onclick="closeMobileNav('dm')" aria-hidden="true"></div>
+        <div class="nav-wrapper" id="dm-nav-wrapper">
         <nav class="nav-tabs">
             <button class="nav-tab active" data-tab="map">🗺️ Mapa</button>
-            <button class="nav-tab" id="create-dm-nav-btn" onclick="showCreateDMModal()">👑 + DM</button>
             <button class="nav-tab" data-tab="players">👥 Jugadores</button>
             <button class="nav-tab" data-tab="cities">🏘️ Ciudades/Pueblos</button>
             <button class="nav-tab" data-tab="notifications">📮 Notificaciones</button>
             <button class="nav-tab" data-tab="transactions">📜 Historial</button>
             <button class="nav-tab" type="button" onclick="window.open('battle-tracker.html', '_blank')" title="Abrir en nueva pestaña">⚔️ Battle Tracker</button>
+            <button class="nav-tab nav-tab-logout" type="button" onclick="closeMobileNav('dm'); logout();">🚪 Salir</button>
         </nav>
+        </div>
 
         <!-- MAPA -->
         <section id="map" class="tab-content active">
@@ -72,7 +78,8 @@
                     </div>
                 </div>
                 <div class="city-actions">
-                    <button class="btn btn-small" onclick="event.stopPropagation(); openPlayerModal()">+ Nuevo Jugador</button>
+                    <button type="button" class="btn btn-small" onclick="event.stopPropagation(); openPlayerModal()">+ Nuevo Jugador</button>
+                    <button type="button" class="btn btn-small" id="create-dm-nav-btn" onclick="event.stopPropagation(); showCreateDMModal()" title="Crear nuevo Dungeon Master">👑 + DM</button>
                 </div>
                 <div class="city-content">
                     <div class="subsection">
@@ -94,32 +101,45 @@
             <div id="cities-container"></div>
         </section>
 
-        <!-- HISTORIAL -->
+        <!-- NOTIFICACIONES (misma estructura que Cartas del jugador) -->
         <section id="notifications" class="tab-content">
             <div class="section-header">
-                <h2>📮 Enviar Notificaciones</h2>
+                <h2>📮 Notificaciones</h2>
             </div>
-            <div style="background: linear-gradient(180deg, rgba(61, 42, 30, 0.95) 0%, rgba(42, 28, 20, 0.98) 100%); border: 2px solid #5c4023; border-radius: 12px; padding: 24px; max-width: 800px; margin-bottom: 30px;">
-                <div class="form-group">
-                    <label style="color: #d4af37; font-weight: 600; margin-bottom: 8px; display: block; font-family: 'Cinzel', serif;">Destinatario</label>
-                    <select id="notification-recipient" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.4); border: 1px solid #4a3c31; border-radius: 6px; color: #d4c4a8; font-size: 1em;">
-                        <option value="all">📢 Todos los Jugadores</option>
-                    </select>
-                </div>
-                <div class="form-group" style="margin-top: 20px;">
-                    <label style="color: #d4af37; font-weight: 600; margin-bottom: 8px; display: block; font-family: 'Cinzel', serif;">Mensaje</label>
-                    <textarea id="notification-message" placeholder="Escribe tu mensaje aquí..." style="width: 100%; min-height: 150px; padding: 12px; background: rgba(0,0,0,0.4); border: 1px solid #4a3c31; border-radius: 6px; color: #d4c4a8; font-size: 1em; font-family: inherit; resize: vertical;"></textarea>
-                </div>
-                <div style="margin-top: 20px; display: flex; gap: 12px;">
-                    <button class="btn" onclick="sendNotification()" style="flex: 1;">📮 Enviar Notificación</button>
-                </div>
+            <div class="dm-notifications-subtabs">
+                <button type="button" class="dm-notifications-subtab active" data-dm-subtab="enviar" onclick="switchDMNotificationsSubtab('enviar')">📬 Enviar Notificación</button>
+                <button type="button" class="dm-notifications-subtab" data-dm-subtab="historial" onclick="switchDMNotificationsSubtab('historial')">📜 Historial de Notificaciones</button>
             </div>
-            
-            <div class="section-header" style="margin-top: 30px;">
-                <h2>📜 Historial de Notificaciones Enviadas</h2>
-            </div>
-            <div id="dm-notifications-list" style="max-width: 1000px;">
-                <p style="color:#8b7355; text-align:center; padding:20px;">Cargando notificaciones...</p>
+            <div id="dm-notifications-container">
+                <div id="dm-notifications-enviar-panel" class="dm-notifications-subtab-content" style="display: block;">
+                    <div class="dm-notifications-card">
+                        <div class="dm-notifications-card-header">
+                            <h3>📮 Nueva notificación</h3>
+                            <p class="dm-notifications-card-desc">Envía una carta o aviso a uno o todos los jugadores.</p>
+                        </div>
+                        <div class="form-group">
+                            <label>Destinatario</label>
+                            <select id="notification-recipient">
+                                <option value="all">📢 Todos los Jugadores</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Mensaje</label>
+                            <textarea id="notification-message" placeholder="Escribe tu mensaje aquí..." rows="6"></textarea>
+                        </div>
+                        <div class="dm-notifications-card-actions">
+                            <button type="button" class="btn" onclick="sendNotification()">📮 Enviar Notificación</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="dm-notifications-historial-panel" class="dm-notifications-subtab-content" style="display: none;">
+                    <div class="dm-notifications-historial-wrap">
+                        <p class="dm-notifications-historial-desc">Notificaciones que has enviado a los jugadores.</p>
+                        <div id="dm-notifications-list" class="dm-notifications-list">
+                            <p style="color:#8b7355; text-align:center; padding:20px;">Cargando notificaciones...</p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </section>
 
@@ -127,30 +147,53 @@
             <div class="section-header">
                 <h2>📜 Historial de Transacciones</h2>
             </div>
+            <div class="transactions-toolbar" style="margin-bottom: 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px;">
+                <input type="search" id="transactions-search" class="searchbar" placeholder="Buscar por ítem..." style="max-width: 240px;">
+                <label style="color: #8b7355; font-size: 0.9em;">Aventurero:</label>
+                <select id="transactions-filter-player" class="searchbar" style="max-width: 200px; padding: 10px 12px; cursor: pointer;">
+                    <option value="">Todos</option>
+                </select>
+                <label style="color: #8b7355; font-size: 0.9em;">Tienda:</label>
+                <select id="transactions-filter-shop" class="searchbar" style="max-width: 200px; padding: 10px 12px; cursor: pointer;">
+                    <option value="">Todas</option>
+                </select>
+            </div>
             <div id="transactions-list"></div>
+            <div id="transactions-pagination" class="pagination-bar" style="margin-top: 16px; display: none;"></div>
         </section>
     </div>
 
     <!-- Vista Personaje (mismo login, otro rol) -->
     <div class="container" id="player-view-container" style="display: none;">
         <header class="header">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                <div>
-                    <h1 id="player-header-name">—</h1>
-                    <p class="player-header-sub" id="player-header-class-level">—</p>
-                    <p class="player-header-sub" id="player-header-oro" style="margin-top:6px;">💰 0 GP</p>
+            <div class="header-inner">
+                <div class="player-plaque metal-plaque">
+                    <span class="screw-bottom-left"></span>
+                    <span class="screw-bottom-right"></span>
+                    <div class="metal-plaque-content">
+                        <h1 id="player-header-name" class="player-plaque-name">—</h1>
+                        <p class="player-header-sub metal-plaque-subtitle" id="player-header-class-level">—</p>
+                        <p class="player-plaque-oro" id="player-header-oro">💰 0 GP</p>
+                    </div>
                 </div>
-                <button class="btn btn-secondary btn-small" onclick="logout()">🚪 Salir</button>
+                <div class="header-actions">
+                    <button type="button" class="hamburger-btn" id="player-hamburger-btn" onclick="toggleMobileNav('player')" aria-label="Abrir menú">☰</button>
+                </div>
             </div>
         </header>
+
+        <div class="nav-overlay" id="player-nav-overlay" onclick="closeMobileNav('player')" aria-hidden="true"></div>
+        <div class="nav-wrapper" id="player-nav-wrapper">
         <nav class="nav-tabs" id="player-nav-tabs">
             <button class="nav-tab active" data-tab="player-map">🗺️ Mapa</button>
             <button class="nav-tab" data-tab="player-ciudades">🏛️ Ciudades</button>
             <button class="nav-tab" data-tab="player-inventario">🎒 Inventario</button>
-            <button class="nav-tab" data-tab="player-notifications">📮 Cartas</button>
-            <button class="nav-tab" type="button" onclick="openMiCasaModal()" title="Ver mi home">🏠 Home</button>
+            <button class="nav-tab" data-tab="player-notifications">🃏 CDD & Correo</button>
+            <button class="nav-tab" data-tab="player-home" title="Ver mi home">🏠 Home</button>
             <button class="nav-tab" type="button" onclick="window.open('battle-tracker.html', '_blank')" title="Abrir en nueva pestaña">⚔️ Battle Tracker</button>
+            <button class="nav-tab nav-tab-logout" type="button" onclick="closeMobileNav('player'); logout();">🚪 Salir</button>
         </nav>
+        </div>
         <section id="player-map" class="tab-content active">
             <div class="section-header">
                 <h2 id="map-title-player">🗺️ Mapa</h2>
@@ -214,16 +257,75 @@
             </div>
         </section>
 
+        <!-- CDD & Correo: Cartas del destino + Correo + Historial -->
         <section id="player-notifications" class="tab-content">
             <div class="section-header">
-                <h2>📮 Cartas y Notificaciones</h2>
+                <h2>🃏 Cartas Del Destino & Correo</h2>
+            </div>
+            <div class="player-notifications-subtabs">
+                <button type="button" class="player-notifications-subtab active" data-subtab="cartas-destino" onclick="switchPlayerNotificationsSubtab('cartas-destino')">🃏 Cartas del destino</button>
+                <button type="button" class="player-notifications-subtab" data-subtab="cartas" onclick="switchPlayerNotificationsSubtab('cartas')">📬 Correo</button>
+                <button type="button" class="player-notifications-subtab" data-subtab="historial" onclick="switchPlayerNotificationsSubtab('historial')">📜 Historial de correo</button>
             </div>
             <div id="player-notifications-container">
-                <div id="player-notifications-unread" style="margin-bottom: 30px;"></div>
-                <div id="player-notifications-read" style="margin-top: 30px;">
-                    <h3 style="font-family: 'Cinzel', serif; color: #8b7355; font-size: 1.2em; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 2px; border-bottom: 1px solid #4a3c31; padding-bottom: 10px;">📜 Historial de Cartas</h3>
-                    <div id="player-notifications-read-list"></div>
+                <div id="player-notifications-cartas-destino-panel" class="player-notifications-subtab-content" style="display: block;">
+                    <p class="player-cartas-destino-desc">Cartas que el DM ha asignado a tu personaje.</p>
+                    <div class="player-cartas-destino-layout">
+                        <div id="player-cartas-destino-list" class="player-cartas-destino-grid"></div>
+                        <div id="player-cartas-destino-mensaje" class="player-cartas-destino-mensaje-general"></div>
+                    </div>
                 </div>
+                <div id="player-notifications-cartas-panel" class="player-notifications-subtab-content" style="display: none;">
+                    <div id="player-notifications-unread"></div>
+                </div>
+                <div id="player-notifications-historial-panel" class="player-notifications-subtab-content" style="display: none;">
+                    <div id="player-notifications-read">
+                        <div id="player-notifications-read-list"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Home (Mi Casa) - misma pestaña que el resto -->
+        <section id="player-home" class="tab-content">
+            <div class="section-header">
+                <h2>🏠 Home</h2>
+            </div>
+            <div class="mi-casa-main-block" style="background: linear-gradient(180deg, rgba(26, 26, 26, 0.98) 0%, rgba(20, 20, 20, 0.98) 100%); border: 2px solid #8b5a2b; margin: 0 0 24px 0; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.6);">
+                <div style="padding: 20px 24px; border-bottom: 2px solid #8b5a2b; background: linear-gradient(135deg, rgba(139, 90, 43, 0.15) 0%, rgba(107, 74, 27, 0.1) 100%);">
+                    <h2 style="font-family:'Cinzel', serif; color:#d4af37; font-size: 1.6em; margin: 0; text-transform: uppercase; letter-spacing: 3px; display: flex; align-items: center; gap: 12px; text-shadow: 2px 2px 4px rgba(0,0,0,0.8);">
+                        <span style="font-size: 1.2em;">🏠</span>
+                        <span id="mi-casa-nombre-display">Home</span>
+                    </h2>
+                </div>
+                <div id="mi-casa-imagen-container" style="width:100%; min-height:450px; max-height:650px; overflow:hidden; background:linear-gradient(135deg, #1a1a1a 0%, #2a231c 100%); display:flex; align-items:center; justify-content:center; position:relative; border-bottom: 2px solid #4a3c31;">
+                    <div id="mi-casa-imagen-placeholder" style="padding:100px; color:#8b7355; font-size:5em; text-align:center;">
+                        <div style="font-size:0.25em; margin-top:30px; color:#6b5d4a; font-family:'Crimson Text', serif; font-style:italic;">El DM aún no ha agregado una imagen</div>
+                    </div>
+                </div>
+                <div style="padding:28px; border-top: 1px solid #4a3c31; background: rgba(0,0,0,0.1);">
+                    <p id="mi-casa-descripcion-display" style="color:#d4c4a8; font-size:1.1em; line-height:1.9; margin:0; text-align:justify; white-space:pre-wrap; font-family:'Crimson Text', serif; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">El DM aún no ha agregado una descripción para tu casa.</p>
+                </div>
+                <div style="padding:24px 28px; border-top: 2px solid #4a3c31; background: linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.2) 100%); display:grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap:24px;">
+                    <div style="padding:16px; background: rgba(0,0,0,0.2); border-radius: 8px; border-left: 3px solid #8b5a2b;">
+                        <div style="color:#8b7355; font-size:0.9em; text-transform:uppercase; margin-bottom:8px; letter-spacing:1.5px; font-family:'Cinzel', serif;">📍 Ubicación</div>
+                        <div id="mi-casa-ubicacion-display" style="color:#d4c4a8; font-size:1.05em; font-family:'Crimson Text', serif;">No especificada</div>
+                    </div>
+                    <div style="padding:16px; background: rgba(0,0,0,0.2); border-radius: 8px; border-left: 3px solid #8b5a2b;">
+                        <div style="color:#8b7355; font-size:0.9em; text-transform:uppercase; margin-bottom:8px; letter-spacing:1.5px; font-family:'Cinzel', serif;">📝 Notas del DM</div>
+                        <div id="mi-casa-notas-dm-display" style="color:#a89878; font-size:1em; line-height:1.6; white-space:pre-wrap; font-family:'Crimson Text', serif;">No hay notas del DM.</div>
+                    </div>
+                </div>
+            </div>
+            <div class="mi-casa-notes-block" style="background: linear-gradient(180deg, rgba(26, 26, 26, 0.98) 0%, rgba(20, 20, 20, 0.98) 100%); border: 2px solid #8b5a2b; border-radius: 12px; padding: 24px; box-shadow: 0 4px 16px rgba(0,0,0,0.4);">
+                <h3 style="font-family:'Cinzel', serif; color:#d4af37; font-size:1.3em; margin-bottom:16px; text-transform:uppercase; letter-spacing:2px; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); display: flex; align-items: center; gap: 8px;">
+                    <span>📔</span>
+                    <span>Mis Notas Personales</span>
+                </h3>
+                <textarea id="mi-casa-notas-personales" rows="7" placeholder="Escribe tus notas personales sobre tu casa, objetos importantes, secretos, recuerdos, etc..." style="width:100%; background:#1a1a1a; border:2px solid #4a3c31; color:#d4c4a8; padding:16px; border-radius:8px; font-family:'Crimson Text', serif; font-size:1em; resize:vertical; line-height:1.7; transition: all 0.3s ease;"></textarea>
+            </div>
+            <div style="margin-top: 20px; display: flex; gap: 12px; flex-wrap: wrap;">
+                <button class="btn" onclick="saveMiCasaNotas()">💾 Guardar Mis Notas</button>
             </div>
         </section>
     </div>
@@ -256,66 +358,6 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeModal('player-habitantes-modal')">Cerrar</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal Mi Casa -->
-    <div class="modal-overlay" id="mi-casa-modal">
-        <div class="modal" style="max-width: 1100px; width: 95%;">
-            <div class="modal-header" style="border-bottom: 2px solid #8b5a2b; padding: 20px;">
-                <button class="btn btn-secondary btn-small" onclick="closeModal('mi-casa-modal')" style="margin-right: auto;">← Volver</button>
-                <h3 id="mi-casa-titulo" style="margin: 0 auto; font-family:'Cinzel', serif; color:#d4af37; text-transform: uppercase; letter-spacing: 3px; font-size: 1.5em; text-shadow: 2px 2px 4px rgba(0,0,0,0.8);">🏠 Home</h3>
-                <button class="modal-close" onclick="closeModal('mi-casa-modal')" style="margin-left: auto;">&times;</button>
-            </div>
-            <div class="modal-body" style="padding:0;">
-                <!-- Bloque principal de la casa -->
-                <div class="mi-casa-main-block" style="background: linear-gradient(180deg, rgba(26, 26, 26, 0.98) 0%, rgba(20, 20, 20, 0.98) 100%); border: 2px solid #8b5a2b; margin: 24px; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.6);">
-                    <!-- Título del módulo -->
-                    <div style="padding: 20px 24px; border-bottom: 2px solid #8b5a2b; background: linear-gradient(135deg, rgba(139, 90, 43, 0.15) 0%, rgba(107, 74, 27, 0.1) 100%);">
-                        <h2 style="font-family:'Cinzel', serif; color:#d4af37; font-size: 1.6em; margin: 0; text-transform: uppercase; letter-spacing: 3px; display: flex; align-items: center; gap: 12px; text-shadow: 2px 2px 4px rgba(0,0,0,0.8);">
-                            <span style="font-size: 1.2em;">🏠</span>
-                            <span id="mi-casa-nombre-display">Home</span>
-                        </h2>
-                    </div>
-                    
-                    <!-- Imagen de la casa -->
-                    <div id="mi-casa-imagen-container" style="width:100%; min-height:450px; max-height:650px; overflow:hidden; background:linear-gradient(135deg, #1a1a1a 0%, #2a231c 100%); display:flex; align-items:center; justify-content:center; position:relative; border-bottom: 2px solid #4a3c31;">
-                        <div id="mi-casa-imagen-placeholder" style="padding:100px; color:#8b7355; font-size:5em; text-align:center;">
-                            <div style="font-size:0.25em; margin-top:30px; color:#6b5d4a; font-family:'Crimson Text', serif; font-style:italic;">El DM aún no ha agregado una imagen</div>
-                        </div>
-                    </div>
-                    
-                    <!-- Descripción de la casa -->
-                    <div style="padding:28px; border-top: 1px solid #4a3c31; background: rgba(0,0,0,0.1);">
-                        <p id="mi-casa-descripcion-display" style="color:#d4c4a8; font-size:1.1em; line-height:1.9; margin:0; text-align:justify; white-space:pre-wrap; font-family:'Crimson Text', serif; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">El DM aún no ha agregado una descripción para tu casa.</p>
-                    </div>
-                    
-                    <!-- Información adicional -->
-                    <div style="padding:24px 28px; border-top: 2px solid #4a3c31; background: linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.2) 100%); display:grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap:24px;">
-                        <div style="padding:16px; background: rgba(0,0,0,0.2); border-radius: 8px; border-left: 3px solid #8b5a2b;">
-                            <div style="color:#8b7355; font-size:0.9em; text-transform:uppercase; margin-bottom:8px; letter-spacing:1.5px; font-family:'Cinzel', serif;">📍 Ubicación</div>
-                            <div id="mi-casa-ubicacion-display" style="color:#d4c4a8; font-size:1.05em; font-family:'Crimson Text', serif;">No especificada</div>
-                        </div>
-                        <div style="padding:16px; background: rgba(0,0,0,0.2); border-radius: 8px; border-left: 3px solid #8b5a2b;">
-                            <div style="color:#8b7355; font-size:0.9em; text-transform:uppercase; margin-bottom:8px; letter-spacing:1.5px; font-family:'Cinzel', serif;">📝 Notas del DM</div>
-                            <div id="mi-casa-notas-dm-display" style="color:#a89878; font-size:1em; line-height:1.6; white-space:pre-wrap; font-family:'Crimson Text', serif;">No hay notas del DM.</div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Sección de notas personales -->
-                <div class="mi-casa-notes-block" style="background: linear-gradient(180deg, rgba(26, 26, 26, 0.98) 0%, rgba(20, 20, 20, 0.98) 100%); border: 2px solid #8b5a2b; margin: 0 24px 24px 24px; border-radius: 12px; padding: 24px; box-shadow: 0 4px 16px rgba(0,0,0,0.4);">
-                    <h3 style="font-family:'Cinzel', serif; color:#d4af37; font-size:1.3em; margin-bottom:16px; text-transform:uppercase; letter-spacing:2px; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); display: flex; align-items: center; gap: 8px;">
-                        <span>📔</span>
-                        <span>Mis Notas Personales</span>
-                    </h3>
-                    <textarea id="mi-casa-notas-personales" rows="7" placeholder="Escribe tus notas personales sobre tu casa, objetos importantes, secretos, recuerdos, etc..." style="width:100%; background:#1a1a1a; border:2px solid #4a3c31; color:#d4c4a8; padding:16px; border-radius:8px; font-family:'Crimson Text', serif; font-size:1em; resize:vertical; line-height:1.7; transition: all 0.3s ease;"></textarea>
-                </div>
-            </div>
-            <div class="modal-footer" style="border-top: 2px solid #4a3c31; padding: 16px 24px;">
-                <button class="btn btn-secondary" onclick="closeModal('mi-casa-modal')">Cerrar</button>
-                <button class="btn" onclick="saveMiCasaNotas()">💾 Guardar Mis Notas</button>
             </div>
         </div>
     </div>
@@ -911,6 +953,44 @@
         </div>
     </div>
 
+    <!-- Modal Cartas del destino (DM asigna cartas a un jugador) -->
+    <div class="modal-overlay" id="cartas-destino-modal">
+        <div class="modal" style="max-width: 560px;">
+            <div class="modal-header">
+                <h3>🃏 Cartas del destino</h3>
+                <button class="modal-close" onclick="closeModal('cartas-destino-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="cartas-destino-player-id">
+                <input type="hidden" id="cartas-destino-edit-index" value="-1">
+                <p style="margin-bottom: 16px; color: #8b7355;">Jugador: <span id="cartas-destino-player-name" style="color: #d4af37;"></span></p>
+                <div style="background: rgba(0,0,0,0.3); padding: 16px; border-radius: 8px; border: 1px solid #4a3c31; margin-bottom: 20px;">
+                    <h4 id="cartas-destino-form-title" style="color: #d4af37; margin-bottom: 12px; font-family: 'Cinzel', serif;">➕ Asignar nueva carta</h4>
+                    <div class="form-group">
+                        <label>URL de la imagen</label>
+                        <input type="url" id="cartas-destino-imagen-url" placeholder="https://...">
+                    </div>
+                    <div class="form-group">
+                        <label>Título (opcional)</label>
+                        <input type="text" id="cartas-destino-titulo" placeholder="Ej: La profecía">
+                    </div>
+                    <button type="button" class="btn" id="cartas-destino-save-btn" onclick="saveCartasDestinoCard()">🃏 Asignar carta</button>
+                </div>
+                <h4 style="color: #8b7355; margin-bottom: 10px; font-size: 0.95em;">Cartas asignadas</h4>
+                <div id="cartas-destino-list" class="cartas-destino-list-modal"></div>
+                <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid #4a3c31;">
+                    <h4 style="color: #d4af37; margin-bottom: 10px; font-family: 'Cinzel', serif;">📜 Mensaje general para el jugador</h4>
+                    <p style="color: #8b7355; font-size: 0.9em; margin-bottom: 8px;">Este texto se mostrará debajo de las cartas en la app del aventurero.</p>
+                    <textarea id="cartas-destino-mensaje-general" placeholder="Escribe un mensaje para el jugador..." rows="3" style="resize: vertical; width: 100%; margin-bottom: 10px;"></textarea>
+                    <button type="button" class="btn btn-secondary" onclick="saveMensajeGeneralCartasDestino()">💾 Guardar mensaje</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('cartas-destino-modal')">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal Ciudad -->
     <div class="modal-overlay" id="city-modal">
         <div class="modal">
@@ -1248,7 +1328,7 @@
     <div class="modal-overlay" id="notification-modal">
         <div class="modal" style="max-width: 700px;">
             <div class="modal-header">
-                <h3>📮 Carta</h3>
+                <h3>📬 Correo</h3>
                 <button class="modal-close" onclick="closeModal('notification-modal')">&times;</button>
             </div>
             <div class="modal-body">

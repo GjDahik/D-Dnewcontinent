@@ -72,8 +72,10 @@ function loadWorld() {
                 console.log('Ciudad mapeada:', data.nombre);
                 return data;
             });
+            window.citiesData = citiesData;
             console.log('Total ciudades en citiesData:', citiesData.length);
             console.log('Ciudades:', citiesData.map(c => c.nombre));
+            if (typeof populateTransactionsFilters === 'function') populateTransactionsFilters();
             
             // Forzar renderizado inmediatamente y también después de un delay
             renderCities();
@@ -83,6 +85,8 @@ function loadWorld() {
         } else {
             console.warn('No hay documentos en el snapshot o snap está vacío');
             citiesData = [];
+            window.citiesData = citiesData;
+            if (typeof populateTransactionsFilters === 'function') populateTransactionsFilters();
             renderCities();
         }
     }, error => {
@@ -175,8 +179,8 @@ function renderCities() {
         let htmlContent = '';
         cities.forEach((city, index) => {
             console.log(`Procesando ciudad ${index + 1}:`, city.nombre);
-            const cityNpcs = npcs.filter(n => n.ciudadId === city.id);
-            const cityShops = shops.filter(s => s.ciudadId === city.id);
+            const cityNpcs = npcs.filter(n => n.ciudadId === city.id).slice().sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es'));
+            const cityShops = shops.filter(s => s.ciudadId === city.id).slice().sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es'));
         const nivelColor = city.nivel <= 2 ? '🟢' : city.nivel <= 4 ? '🟡' : city.nivel <= 5 ? '🟠' : '🔴';
         const tipoEmoji = { herreria: '⚔️', pociones: '🧪', taberna: '🍺', biblioteca: '📚', arqueria: '🏹', emporio: '🛒', batalla: '🥊', santuario: '🪞', banco: '🏦', posada: '🏨' };
         const actitudEmoji = { amigable: '😊', neutral: '😐', hostil: '😠' };
@@ -218,14 +222,15 @@ function renderCities() {
                         <div class="subsection-header">
                             <h4>🎭 NPCs (${cityNpcs.length})</h4>
                         </div>
-                        <div class="mini-cards">
+                        <input type="search" class="searchbar city-section-search" placeholder="Buscar NPCs..." data-city-id="${city.id}" data-section="npcs" oninput="filterCitySection(this)" style="margin-bottom:10px;">
+                        <div id="city-${city.id}-npcs-cards" class="mini-cards">
                             ${cityNpcs.length ? cityNpcs.map(n => `
                                 <div class="mini-card">
                                     <div class="mini-card-title">${n.nombre}</div>
                                     <div class="mini-card-info">${n.rol} • ${actitudEmoji[n.actitud] || ''} ${n.actitud}</div>
                                     <div class="mini-card-actions">
                                         <button class="btn btn-small btn-secondary" onclick="editNpc('${n.id}')">✏️</button>
-                                        <button class="btn btn-small btn-danger" onclick="deleteNpc('${n.id}', '${n.nombre}')">🗑️</button>
+                                        <button class="btn btn-small btn-danger" onclick="deleteNpc('${n.id}', '${(n.nombre || '').replace(/'/g, "\\'")}')">🗑️</button>
                                     </div>
                                 </div>
                             `).join('') : '<p style="color:#a89a8c;padding:10px;">Sin NPCs</p>'}
@@ -235,7 +240,8 @@ function renderCities() {
                         <div class="subsection-header">
                             <h4>🛒 Tiendas (${cityShops.length})</h4>
                         </div>
-                        <div class="mini-cards">
+                        <input type="search" class="searchbar city-section-search" placeholder="Buscar tiendas..." data-city-id="${city.id}" data-section="shops" oninput="filterCitySection(this)" style="margin-bottom:10px;">
+                        <div id="city-${city.id}-shops-cards" class="mini-cards">
                             ${cityShops.length ? cityShops.map(s => {
                                 const owner = npcs.find(n => n.id === s.npcDueno);
                                 const shopTipo = (s.tipo || '').toLowerCase();
@@ -243,8 +249,8 @@ function renderCities() {
                                 const isBanco = shopTipo === 'banco';
                                 const isPosada = shopTipo === 'posada';
                                 const isBatalla = shopTipo === 'batalla';
-                                // En estos tipos NO se venden ítems / no hay inventario editable
                                 const sinInventario = isSantuario || isBanco || isPosada || isBatalla;
+                                const nombreEsc = (s.nombre || '').replace(/'/g, "\\'");
                                 return `
                                 <div class="mini-card">
                                     <div class="mini-card-title">${tipoEmoji[s.tipo] || '🏪'} ${s.nombre}</div>
@@ -253,7 +259,7 @@ function renderCities() {
                                     ${s.tipo === 'batalla' ? `<button class="btn btn-small" onclick="openBatallaConfigModal('${s.id}')" title="Configurar enemigos de esta tienda">🥊</button>` : ''}
                                     ${!sinInventario ? `<button class="btn btn-small" onclick="manageInventory('${s.id}')">📦</button>` : ''}
                                         <button class="btn btn-small btn-secondary" onclick="editShop('${s.id}')">✏️</button>
-                                        <button class="btn btn-small btn-danger" onclick="deleteShop('${s.id}', '${s.nombre}')">🗑️</button>
+                                        <button class="btn btn-small btn-danger" onclick="deleteShop('${s.id}', '${nombreEsc}')">🗑️</button>
                                     </div>
                                 </div>`;
                             }).join('') : '<p style="color:#a89a8c;padding:10px;">Sin tiendas</p>'}
@@ -279,6 +285,56 @@ function renderCities() {
 // Hacer funciones globalmente accesibles
 window.renderCities = renderCities;
 window.loadWorld = loadWorld;
+
+// Filtro por búsqueda dentro de cada ciudad (NPCs o Tiendas)
+function filterCitySection(inputEl) {
+    const q = (inputEl.value || '').trim().toLowerCase();
+    const cityId = inputEl.dataset.cityId;
+    const section = inputEl.dataset.section;
+    const container = document.getElementById('city-' + cityId + '-' + section + '-cards');
+    if (!container) return;
+    const npcsAll = window.npcsData || npcsData || [];
+    const shopsAll = window.shopsData || shopsData || [];
+    const cityNpcs = npcsAll.filter(n => n.ciudadId === cityId);
+    const cityShops = shopsAll.filter(s => s.ciudadId === cityId);
+    const actitudEmoji = { amigable: '😊', neutral: '😐', hostil: '😠' };
+    const tipoEmoji = { herreria: '⚔️', pociones: '🧪', taberna: '🍺', biblioteca: '📚', arqueria: '🏹', emporio: '🛒', batalla: '🥊', santuario: '🪞', banco: '🏦', posada: '🏨' };
+
+    if (section === 'npcs') {
+        let list = cityNpcs.slice().sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es'));
+        if (q) list = list.filter(n => (n.nombre || '').toLowerCase().includes(q));
+        container.innerHTML = list.length ? list.map(n => `
+            <div class="mini-card">
+                <div class="mini-card-title">${n.nombre}</div>
+                <div class="mini-card-info">${n.rol} • ${actitudEmoji[n.actitud] || ''} ${n.actitud}</div>
+                <div class="mini-card-actions">
+                    <button class="btn btn-small btn-secondary" onclick="editNpc('${n.id}')">✏️</button>
+                    <button class="btn btn-small btn-danger" onclick="deleteNpc('${n.id}', '${(n.nombre || '').replace(/'/g, "\\'")}')">🗑️</button>
+                </div>
+            </div>`).join('') : '<p style="color:#a89a8c;padding:10px;">Sin NPCs' + (q ? ' que coincidan' : '') + '</p>';
+    } else {
+        let list = cityShops.slice().sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es'));
+        if (q) list = list.filter(s => (s.nombre || '').toLowerCase().includes(q));
+        container.innerHTML = list.length ? list.map(s => {
+            const owner = cityNpcs.find(n => n.id === s.npcDueno) || npcsAll.find(n => n.id === s.npcDueno);
+            const shopTipo = (s.tipo || '').toLowerCase();
+            const sinInventario = ['santuario', 'banco', 'posada', 'batalla'].includes(shopTipo);
+            const nombreEsc = (s.nombre || '').replace(/'/g, "\\'");
+            return `
+            <div class="mini-card">
+                <div class="mini-card-title">${tipoEmoji[s.tipo] || '🏪'} ${s.nombre}</div>
+                <div class="mini-card-info">${s.tipo} ${owner ? '• ' + owner.nombre : ''}${sinInventario ? ' <span style="color:#8b7355; font-size:0.85em;">(sin inventario)</span>' : ''}</div>
+                <div class="mini-card-actions">
+                ${s.tipo === 'batalla' ? `<button class="btn btn-small" onclick="openBatallaConfigModal('${s.id}')" title="Configurar enemigos de esta tienda">🥊</button>` : ''}
+                ${!sinInventario ? `<button class="btn btn-small" onclick="manageInventory('${s.id}')">📦</button>` : ''}
+                    <button class="btn btn-small btn-secondary" onclick="editShop('${s.id}')">✏️</button>
+                    <button class="btn btn-small btn-danger" onclick="deleteShop('${s.id}', '${nombreEsc}')">🗑️</button>
+                </div>
+            </div>`;
+        }).join('') : '<p style="color:#a89a8c;padding:10px;">Sin tiendas' + (q ? ' que coincidan' : '') + '</p>';
+    }
+}
+window.filterCitySection = filterCitySection;
 
 // Función de diagnóstico que se puede llamar desde la consola
 window.debugCities = function() {

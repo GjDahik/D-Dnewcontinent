@@ -16,11 +16,16 @@ function renderPlayers() {
         return;
     }
     container.innerHTML = '';
-    playersData.forEach(p => {
+    const sorted = playersData.slice().sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es'));
+    sorted.forEach(p => {
         const bancoBalance = (p.bancoBalance != null ? p.bancoBalance : 0);
+        const nombreEsc = (p.nombre || '').replace(/'/g, "\\'");
         container.innerHTML += `
             <div class="mini-card">
-                <div class="mini-card-title">⚔️ ${p.nombre}</div>
+                <div class="mini-card-header-row">
+                    <div class="mini-card-title">⚔️ ${p.nombre}</div>
+                    <button type="button" class="btn btn-small btn-danger mini-card-delete-btn" onclick="deletePlayer('${p.id}', '${nombreEsc}')" title="Eliminar jugador">🗑️</button>
+                </div>
                 <div class="mini-card-info">${p.clase} • Nivel ${p.nivel}</div>
                 <div class="mini-card-info gold-value">💰 ${p.oro.toLocaleString()} GP</div>
                 <div class="mini-card-info gold-value" style="color:#5a8a5a;">🏦 ${bancoBalance.toLocaleString()} GP</div>
@@ -30,9 +35,9 @@ function renderPlayers() {
                 <div class="mini-card-actions" style="margin-top:10px;">
                     <button class="btn btn-small" onclick="openGoldModal('${p.id}', '${p.nombre}', ${p.oro})">💰</button>
                     <button class="btn btn-small" onclick="openBancoModal('${p.id}', '${p.nombre}', ${bancoBalance})" style="background:linear-gradient(180deg, #5a8a5a 0%, #4a7a4a 100%);">🏦</button>
-                    <button class="btn btn-small" onclick="openPlayerCasaModal('${p.id}', '${(p.nombre || '').replace(/'/g, "\\'")}')" style="background:linear-gradient(180deg, #8b5a2b 0%, #6b4a1b 100%);">🏠</button>
+                    <button class="btn btn-small" onclick="openCartasDestinoModal('${p.id}', '${nombreEsc}')" style="background:linear-gradient(180deg, #6b4a6b 0%, #4a3a4a 100%);" title="Cartas del destino">🃏</button>
+                    <button class="btn btn-small" onclick="openPlayerCasaModal('${p.id}', '${nombreEsc}')" style="background:linear-gradient(180deg, #8b5a2b 0%, #6b4a1b 100%);">🏠</button>
                     <button class="btn btn-small btn-secondary" onclick="editPlayer('${p.id}')">✏️</button>
-                    <button class="btn btn-small btn-danger" onclick="deletePlayer('${p.id}', '${p.nombre}')">🗑️</button>
                 </div>
             </div>`;
     });
@@ -133,6 +138,122 @@ function adjustBanco() {
         else b = amt;
         return db.collection('players').doc(id).update({ bancoBalance: b });
     }).then(() => { showToast('Balance del banco actualizado'); closeModal('banco-modal'); });
+}
+
+// ==================== CARTAS DEL DESTINO (DM asigna a cada jugador) ====================
+function openCartasDestinoModal(playerId, playerNombre) {
+    document.getElementById('cartas-destino-player-id').value = playerId;
+    document.getElementById('cartas-destino-player-name').textContent = playerNombre || 'Jugador';
+    document.getElementById('cartas-destino-edit-index').value = '-1';
+    document.getElementById('cartas-destino-imagen-url').value = '';
+    document.getElementById('cartas-destino-titulo').value = '';
+    setCartasDestinoFormMode(false);
+    db.collection('players').doc(playerId).get().then(doc => {
+        const data = doc.exists ? doc.data() : {};
+        const cartas = Array.isArray(data.cartasDestino) ? data.cartasDestino : [];
+        const mensaje = data.mensajeGeneralCartasDestino || '';
+        document.getElementById('cartas-destino-mensaje-general').value = mensaje;
+        renderCartasDestinoListModal(playerId, cartas);
+    });
+    openModal('cartas-destino-modal');
+}
+
+function setCartasDestinoFormMode(editing) {
+    const titleEl = document.getElementById('cartas-destino-form-title');
+    const btnEl = document.getElementById('cartas-destino-save-btn');
+    if (titleEl) titleEl.textContent = editing ? '✏️ Editar carta' : '➕ Asignar nueva carta';
+    if (btnEl) btnEl.textContent = editing ? '💾 Guardar cambios' : '🃏 Asignar carta';
+}
+
+function editCartasDestinoCard(playerId, index) {
+    db.collection('players').doc(playerId).get().then(doc => {
+        const cartas = (doc.exists && doc.data().cartasDestino) ? doc.data().cartasDestino : [];
+        const c = cartas[index];
+        if (!c) return;
+        document.getElementById('cartas-destino-edit-index').value = String(index);
+        document.getElementById('cartas-destino-imagen-url').value = c.imagenUrl || '';
+        document.getElementById('cartas-destino-titulo').value = c.titulo || '';
+        setCartasDestinoFormMode(true);
+    }).catch(e => showToast('Error: ' + e.message, true));
+}
+
+function renderCartasDestinoListModal(playerId, cartas) {
+    const list = document.getElementById('cartas-destino-list');
+    if (!list) return;
+    if (!cartas || cartas.length === 0) {
+        list.innerHTML = '<p style="color:#8b7355; font-style:italic; padding:10px 0;">Sin cartas asignadas.</p>';
+        return;
+    }
+    list.innerHTML = cartas.map((c, i) => {
+        const titulo = (c.titulo || 'Carta ' + (i + 1)).replace(/"/g, '&quot;');
+        const img = c.imagenUrl ? `<img src="${c.imagenUrl.replace(/"/g, '&quot;')}" alt="${titulo}" style="width:100%; height:120px; object-fit:cover; border-radius:6px;" onerror="this.style.display='none'">` : '<div style="height:80px; background:#2a2522; border-radius:6px; display:flex; align-items:center; justify-content:center; color:#8b7355;">🃏</div>';
+        return `<div class="cartas-destino-item-modal" style="display:flex; gap:12px; align-items:flex-start; padding:10px; background:rgba(0,0,0,0.2); border-radius:8px; margin-bottom:8px; border:1px solid #4a3c31;">
+            <div style="width:100px; flex-shrink:0;">${img}</div>
+            <div style="flex:1; min-width:0;">
+                <div style="color:#d4af37; font-weight:600; margin-bottom:4px;">${titulo}</div>
+            </div>
+            <div style="display:flex; gap:6px; flex-shrink:0;">
+                <button type="button" class="btn btn-small" onclick="editCartasDestinoCard('${playerId}', ${i})" title="Editar carta">✏️</button>
+                <button type="button" class="btn btn-small btn-danger" onclick="deleteCartasDestinoCard('${playerId}', ${i})" title="Quitar carta">🗑️</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function saveCartasDestinoCard() {
+    const playerId = document.getElementById('cartas-destino-player-id').value;
+    const editIndex = parseInt(document.getElementById('cartas-destino-edit-index').value, 10);
+    const imagenUrl = document.getElementById('cartas-destino-imagen-url').value.trim();
+    const titulo = document.getElementById('cartas-destino-titulo').value.trim();
+    if (!imagenUrl) {
+        showToast('La URL de la imagen es obligatoria', true);
+        return;
+    }
+    db.collection('players').doc(playerId).get().then(doc => {
+        const data = doc.exists ? doc.data() : {};
+        const cartas = Array.isArray(data.cartasDestino) ? data.cartasDestino.slice() : [];
+        const carta = { imagenUrl };
+        if (titulo) carta.titulo = titulo;
+        if (editIndex >= 0 && editIndex < cartas.length) {
+            cartas[editIndex] = carta;
+        } else {
+            cartas.push(carta);
+        }
+        return db.collection('players').doc(playerId).update({ cartasDestino: cartas });
+    }).then(() => {
+        showToast(editIndex >= 0 ? 'Carta actualizada' : 'Carta asignada');
+        document.getElementById('cartas-destino-edit-index').value = '-1';
+        document.getElementById('cartas-destino-imagen-url').value = '';
+        document.getElementById('cartas-destino-titulo').value = '';
+        setCartasDestinoFormMode(false);
+        db.collection('players').doc(playerId).get().then(doc => {
+            const cartas = (doc.exists && doc.data().cartasDestino) ? doc.data().cartasDestino : [];
+            renderCartasDestinoListModal(playerId, cartas);
+        });
+    }).catch(e => showToast('Error: ' + e.message, true));
+}
+
+function saveMensajeGeneralCartasDestino() {
+    const playerId = document.getElementById('cartas-destino-player-id').value;
+    const mensaje = document.getElementById('cartas-destino-mensaje-general').value.trim();
+    db.collection('players').doc(playerId).update({ mensajeGeneralCartasDestino: mensaje }).then(() => {
+        showToast('Mensaje guardado');
+    }).catch(e => showToast('Error: ' + e.message, true));
+}
+
+function deleteCartasDestinoCard(playerId, index) {
+    db.collection('players').doc(playerId).get().then(doc => {
+        const data = doc.data();
+        const cartas = Array.isArray(data.cartasDestino) ? data.cartasDestino.slice() : [];
+        cartas.splice(index, 1);
+        return db.collection('players').doc(playerId).update({ cartasDestino: cartas });
+    }).then(() => {
+        showToast('Carta quitada');
+        db.collection('players').doc(playerId).get().then(doc => {
+            const cartas = (doc.exists && doc.data().cartasDestino) ? doc.data().cartasDestino : [];
+            renderCartasDestinoListModal(playerId, cartas);
+        });
+    }).catch(e => showToast('Error: ' + e.message, true));
 }
 
 // ==================== PLAYER INVENTORY ====================

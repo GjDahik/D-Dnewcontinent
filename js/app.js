@@ -13,6 +13,13 @@ const db = firebase.firestore();
 // ==================== GLOBAL DATA ====================
 var citiesData = [], npcsData = [], shopsData = [], playersData = [];
 var playerCitiesData = [], playerShopsData = [], playerNpcsData = [];
+
+function getCityInfoForShop(shop) {
+    if (!shop || !shop.ciudadId) return { cityId: '', cityName: '' };
+    const city = playerCitiesData.find(c => c.id === shop.ciudadId);
+    return { cityId: shop.ciudadId || '', cityName: city ? (city.nombre || '') : '' };
+}
+
 let playerPotionCart = [], playerPotionShopId = null, playerPotionProducts = [], playerPotionFilter = 'all', playerPotionSearchTerm = '';
 let playerTavernShopId = null, playerTavernCart = [];
 let playerForgeShopId = null, playerForgeCart = [], playerForgeLevel = 1, playerForgeTab = 'forge-shop';
@@ -924,6 +931,7 @@ async function performPlayerSanctuaryOffering() {
         // Guardar transacción
         const shop = playerShopsData.find(s => s.id === playerSanctuaryShopId);
         const shopName = shop ? (shop.nombre || 'Santuario') : 'Santuario';
+        const cityInfo = getCityInfoForShop(shop);
         await db.collection('transactions').add({
             tipo: 'compra',
             itemName: success ? 'Donación al Santuario (Moneda de Héroe obtenida)' : 'Donación al Santuario',
@@ -931,7 +939,8 @@ async function performPlayerSanctuaryOffering() {
             playerName: user.nombre || 'Jugador',
             shopName: shopName,
             precio: gp,
-            fecha: firebase.firestore.FieldValue.serverTimestamp()
+            fecha: firebase.firestore.FieldValue.serverTimestamp(),
+            ...cityInfo
         });
         
         document.getElementById('player-santuario-oro-display').textContent = newOro.toLocaleString();
@@ -1393,6 +1402,7 @@ async function processBatallaPayment() {
         line: 'Incluido'
     }));
     
+    const cityInfo = getCityInfoForShop(shop);
     await db.collection('transactions').add({
         tipo: 'batalla',
         itemName: 'Batalla contra ' + playerBatallaSelected.map(i => i.nombre).join(', '),
@@ -1400,7 +1410,8 @@ async function processBatallaPayment() {
         playerName: user.nombre || 'Jugador',
         shopName,
         precio: total,
-        fecha: firebase.firestore.FieldValue.serverTimestamp()
+        fecha: firebase.firestore.FieldValue.serverTimestamp(),
+        ...cityInfo
     });
     
     // Mostrar recibo
@@ -1507,6 +1518,7 @@ window.checkoutPosada = async function() {
         });
         
         // Crear transacción individual por cada noche
+        const cityInfo = getCityInfoForShop(shop);
         for (let i = 0; i < item.nights; i++) {
             await db.collection('transactions').add({
                 tipo: 'hospedaje',
@@ -1515,7 +1527,8 @@ window.checkoutPosada = async function() {
                 playerName: user.nombre || 'Jugador',
                 shopName,
                 precio: item.precio,
-                fecha: firebase.firestore.FieldValue.serverTimestamp()
+                fecha: firebase.firestore.FieldValue.serverTimestamp(),
+                ...cityInfo
             });
         }
     }
@@ -1742,6 +1755,7 @@ async function playerArtesaniasCheckout() {
         if (!it) continue;
         const itemName = it.name || 'Item';
         const itemPrice = (it.price != null ? it.price : 0) * (e.qty || 1);
+        const cityInfo = getCityInfoForShop(shop);
         await db.collection('transactions').add({
             tipo: 'compra',
             itemName: (e.qty > 1 ? e.qty + '× ' : '') + itemName,
@@ -1749,7 +1763,8 @@ async function playerArtesaniasCheckout() {
             playerName: user.nombre || 'Jugador',
             shopName: shop.nombre || 'Artesanías',
             precio: itemPrice,
-            fecha: firebase.firestore.FieldValue.serverTimestamp()
+            fecha: firebase.firestore.FieldValue.serverTimestamp(),
+            ...cityInfo
         });
     }
     
@@ -1932,6 +1947,7 @@ async function playerEmporioCheckout() {
         if (!it) continue;
         const itemName = it.name || 'Item';
         const itemPrice = (it.price != null ? it.price : 0) * (e.qty || 1);
+        const cityInfo = getCityInfoForShop(shop);
         await db.collection('transactions').add({
             tipo: 'compra',
             itemName: (e.qty > 1 ? e.qty + '× ' : '') + itemName,
@@ -1939,7 +1955,8 @@ async function playerEmporioCheckout() {
             playerName: user.nombre || 'Jugador',
             shopName: shop.nombre || 'Emporio',
             precio: itemPrice,
-            fecha: firebase.firestore.FieldValue.serverTimestamp()
+            fecha: firebase.firestore.FieldValue.serverTimestamp(),
+            ...cityInfo
         });
     }
     
@@ -2101,6 +2118,7 @@ async function playerBibliotecaCheckout() {
         if (!it) continue;
         const itemName = it.name || it.title || 'Libro';
         const itemPrice = it.price != null ? it.price : 0;
+        const cityInfo = getCityInfoForShop(shop);
         await db.collection('transactions').add({
             tipo: 'compra',
             itemName: itemName,
@@ -2108,7 +2126,8 @@ async function playerBibliotecaCheckout() {
             playerName: user.nombre || 'Jugador',
             shopName: shop.nombre || 'Biblioteca',
             precio: itemPrice,
-            fecha: firebase.firestore.FieldValue.serverTimestamp()
+            fecha: firebase.firestore.FieldValue.serverTimestamp(),
+            ...cityInfo
         });
     }
     
@@ -2352,6 +2371,7 @@ async function playerForgeCheckout() {
         if (!it) continue;
         const itemName = it.name || 'Item';
         const itemPrice = (it.price != null ? it.price : 0) * (e.qty || 1);
+        const cityInfo = getCityInfoForShop(shop);
         await db.collection('transactions').add({
             tipo: 'compra',
             itemName: (e.qty > 1 ? e.qty + '× ' : '') + itemName,
@@ -2359,7 +2379,8 @@ async function playerForgeCheckout() {
             playerName: user.nombre || 'Jugador',
             shopName: shop.nombre || 'Forja',
             precio: itemPrice,
-            fecha: firebase.firestore.FieldValue.serverTimestamp()
+            fecha: firebase.firestore.FieldValue.serverTimestamp(),
+            ...cityInfo
         });
     }
     
@@ -2610,6 +2631,7 @@ async function playerPotionCheckout() {
         if (!p) continue;
         const itemName = p.name || 'Item';
         const itemPrice = (p.price != null ? p.price : 0) * (item.qty || 1);
+        const cityInfo = getCityInfoForShop(shop);
         await db.collection('transactions').add({
             tipo: 'compra',
             itemName: (item.qty > 1 ? item.qty + '× ' : '') + itemName,
@@ -2617,7 +2639,8 @@ async function playerPotionCheckout() {
             playerName: user.nombre || 'Jugador',
             shopName: shop.nombre || 'Tienda de Pociones',
             precio: itemPrice,
-            fecha: firebase.firestore.FieldValue.serverTimestamp()
+            fecha: firebase.firestore.FieldValue.serverTimestamp(),
+            ...cityInfo
         });
     }
     playerPotionCart = [];
@@ -2868,6 +2891,7 @@ async function playerTavernCheckout() {
         if (!it) continue;
         const itemName = it.name || 'Item';
         const itemPrice = (it.price != null ? it.price : 0) * (row.qty || 1);
+        const cityInfo = getCityInfoForShop(shop);
         await db.collection('transactions').add({
             tipo: 'compra',
             itemName: (row.qty > 1 ? row.qty + '× ' : '') + itemName,
@@ -2875,7 +2899,8 @@ async function playerTavernCheckout() {
             playerName: user.nombre || 'Jugador',
             shopName: shop.nombre || 'Taberna',
             precio: itemPrice,
-            fecha: firebase.firestore.FieldValue.serverTimestamp()
+            fecha: firebase.firestore.FieldValue.serverTimestamp(),
+            ...cityInfo
         });
     }
     
@@ -2907,7 +2932,8 @@ async function showDashboard() {
         document.getElementById('player-view-container').style.display = 'none';
         document.getElementById('main-container').style.display = 'block';
         document.getElementById('login-modal').classList.remove('active');
-        document.getElementById('current-user-name').textContent = '👑 ' + user.nombre;
+        const dmNameEl = document.getElementById('dm-header-name');
+        if (dmNameEl) dmNameEl.textContent = user.nombre || '—';
         if (typeof loadPlayers === 'function') loadPlayers();
         if (typeof loadWorld === 'function') {
             console.log('Llamando loadWorld desde showDashboard');
@@ -2943,10 +2969,78 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+// ==================== MENÚ HAMBURGUESA (MÓVIL) ====================
+function toggleMobileNav(view) {
+    const prefix = view === 'dm' ? 'dm' : 'player';
+    const overlay = document.getElementById(prefix + '-nav-overlay');
+    const wrapper = document.getElementById(prefix + '-nav-wrapper');
+    if (!overlay || !wrapper) return;
+    const isOpen = wrapper.classList.contains('open');
+    if (isOpen) {
+        closeMobileNav(view);
+    } else {
+        overlay.classList.add('open');
+        wrapper.classList.add('open');
+        overlay.setAttribute('aria-hidden', 'false');
+        if (window.innerWidth <= 768) document.body.style.overflow = 'hidden';
+    }
+}
+
+function closeMobileNav(view) {
+    const prefix = view === 'dm' ? 'dm' : 'player';
+    const overlay = document.getElementById(prefix + '-nav-overlay');
+    const wrapper = document.getElementById(prefix + '-nav-wrapper');
+    if (overlay) {
+        overlay.classList.remove('open');
+        overlay.setAttribute('aria-hidden', 'true');
+    }
+    if (wrapper) wrapper.classList.remove('open');
+    document.body.style.overflow = '';
+}
+
+// ==================== SUB-TABS CARTAS (JUGADOR) ====================
+function switchPlayerNotificationsSubtab(subtabId) {
+    const section = document.getElementById('player-notifications');
+    if (!section) return;
+    const subtabs = section.querySelectorAll('.player-notifications-subtab');
+    const cartasDestinoPanel = document.getElementById('player-notifications-cartas-destino-panel');
+    const cartasPanel = document.getElementById('player-notifications-cartas-panel');
+    const historialPanel = document.getElementById('player-notifications-historial-panel');
+    if (!subtabs.length) return;
+    subtabs.forEach(t => {
+        t.classList.toggle('active', t.getAttribute('data-subtab') === subtabId);
+    });
+    if (cartasDestinoPanel) cartasDestinoPanel.style.display = subtabId === 'cartas-destino' ? 'block' : 'none';
+    if (cartasPanel) cartasPanel.style.display = subtabId === 'cartas' ? 'block' : 'none';
+    if (historialPanel) historialPanel.style.display = subtabId === 'historial' ? 'block' : 'none';
+    if (subtabId === 'cartas-destino' && typeof loadPlayerCartasDestino === 'function') loadPlayerCartasDestino();
+    if (subtabId === 'cartas' && typeof loadPlayerNotifications === 'function') loadPlayerNotifications();
+}
+
+// Sub-tabs de Notificaciones (DM): Enviar | Historial
+function switchDMNotificationsSubtab(subtabId) {
+    const section = document.getElementById('notifications');
+    if (!section) return;
+    const subtabs = section.querySelectorAll('.dm-notifications-subtab');
+    const enviarPanel = document.getElementById('dm-notifications-enviar-panel');
+    const historialPanel = document.getElementById('dm-notifications-historial-panel');
+    if (!subtabs.length || !enviarPanel || !historialPanel) return;
+    subtabs.forEach(t => {
+        t.classList.toggle('active', t.getAttribute('data-dm-subtab') === subtabId);
+    });
+    enviarPanel.style.display = subtabId === 'enviar' ? 'block' : 'none';
+    historialPanel.style.display = subtabId === 'historial' ? 'block' : 'none';
+}
+
 // ==================== NAVIGATION ====================
 // Tabs por contenedor: solo se activan los del mismo panel (DM o Personaje)
 document.querySelectorAll('.nav-tab').forEach(tab => {
     tab.addEventListener('click', (e) => {
+        const container = tab.closest('#main-container') || tab.closest('#player-view-container');
+        // En móvil, cerrar menú hamburguesa al tocar cualquier opción
+        if (window.innerWidth <= 768 && container) {
+            closeMobileNav(container.id === 'main-container' ? 'dm' : 'player');
+        }
         // Si se hace clic en el tab de ciudades, forzar renderizado
         const tabName = tab.getAttribute('data-tab');
         if (tabName === 'cities' && typeof renderCities === 'function') {
@@ -2955,8 +3049,7 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
                 renderCities();
             }, 100);
         }
-        if (!tab.dataset.tab) return; // ej. botón "+ DM"
-        const container = tab.closest('#main-container') || tab.closest('#player-view-container');
+        if (!tab.dataset.tab) return; // ej. botón "+ DM", Home, Battle Tracker
         if (!container) return;
         const nav = container.querySelector('.nav-tabs');
         const targetSection = document.getElementById(tab.dataset.tab);
@@ -2974,9 +3067,14 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
             }, 200);
         }
         
-        // Si se hace clic en el tab de notificaciones del player, cargar notificaciones
-        if (tab.dataset.tab === 'player-notifications' && typeof loadPlayerNotifications === 'function') {
-            loadPlayerNotifications();
+        // Si se hace clic en el tab CDD & Correo, cargar Cartas del destino (panel por defecto) y notificaciones
+        if (tab.dataset.tab === 'player-notifications') {
+            if (typeof loadPlayerCartasDestino === 'function') loadPlayerCartasDestino();
+            if (typeof loadPlayerNotifications === 'function') loadPlayerNotifications();
+        }
+        // Si se hace clic en el tab Home, cargar contenido de Mi Casa
+        if (tab.dataset.tab === 'player-home' && typeof loadMiCasaContent === 'function') {
+            loadMiCasaContent();
         }
         
         // Si se hace clic en el tab de notificaciones del DM, cargar destinatarios y historial
@@ -3011,66 +3109,106 @@ function closeModal(id) {
     }
 }
 
-window.openMiCasaModal = function() {
+// Cargar Cartas del destino del jugador (cartas que el DM le asignó) y mensaje general
+function loadPlayerCartasDestino() {
+    const user = getCurrentUser();
+    if (!user || !user.id || !isPlayer()) return;
+    const list = document.getElementById('player-cartas-destino-list');
+    const mensajeEl = document.getElementById('player-cartas-destino-mensaje');
+    if (!list) return;
+    list.innerHTML = '<p style="color:#8b7355; text-align:center; padding:20px;">Cargando cartas...</p>';
+    if (mensajeEl) mensajeEl.innerHTML = '';
+    db.collection('players').doc(user.id).get().then(doc => {
+        const data = doc.exists ? doc.data() : {};
+        const cartas = Array.isArray(data.cartasDestino) ? data.cartasDestino : [];
+        const mensaje = (data.mensajeGeneralCartasDestino || '').trim();
+        if (mensajeEl) {
+            if (mensaje) {
+                const escaped = mensaje.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                mensajeEl.innerHTML = '<div class="player-cartas-destino-mensaje-general-content">' + escaped.replace(/\n/g, '<br>') + '</div>';
+                mensajeEl.style.display = 'block';
+            } else {
+                mensajeEl.innerHTML = '';
+                mensajeEl.style.display = 'none';
+            }
+        }
+        if (!cartas.length) {
+            list.innerHTML = '<p style="color:#8b7355; text-align:center; padding:40px 20px; font-style:italic;">El DM aún no te ha asignado cartas del destino.</p>';
+            return;
+        }
+        list.innerHTML = cartas.map((c, i) => {
+            const titulo = c.titulo || ('Carta ' + (i + 1));
+            let imgHtml;
+            if (c.imagenUrl) {
+                const q = c.imagenUrl.replace(/"/g, '&quot;');
+                imgHtml = `<img src="${q}" alt="" class="player-carta-destino-img" onerror="this.style.display='none'; var ph=this.parentElement.querySelector('.player-carta-destino-placeholder'); if(ph) ph.style.display='flex';"><div class="player-carta-destino-placeholder" style="display:none;">🃏</div>`;
+            } else {
+                imgHtml = '<div class="player-carta-destino-placeholder">🃏</div>';
+            }
+            return `<div class="player-carta-destino-card">
+                <div class="player-carta-destino-img-wrap">${imgHtml}</div>
+                <div class="player-carta-destino-info">
+                    <h4 class="player-carta-destino-titulo">${titulo.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</h4>
+                </div>
+            </div>`;
+        }).join('');
+    }).catch(() => {
+        list.innerHTML = '<p style="color:#8b7355; text-align:center; padding:20px;">Error al cargar cartas.</p>';
+        if (mensajeEl) mensajeEl.innerHTML = '';
+    });
+}
+
+// Carga el contenido de Mi Casa (usado al abrir la pestaña Home o desde el directorio)
+function loadMiCasaContent() {
     const user = getCurrentUser();
     if (!user || !user.id || !isPlayer()) {
         showToast('Debes estar logueado como aventurero', true);
-        return;
+        return Promise.reject();
     }
-    
-    // Cargar información de la casa del jugador
-    db.collection('players').doc(user.id).get().then(doc => {
+    return db.collection('players').doc(user.id).get().then(doc => {
         const playerData = doc.exists ? doc.data() : {};
         const casaInfo = playerData.casa || {};
-        
-        // Mostrar imagen si existe
         const imagenContainer = document.getElementById('mi-casa-imagen-container');
-        if (!imagenContainer) {
-            console.error('Error: mi-casa-imagen-container no encontrado');
-            showToast('Error: Elementos del modal no encontrados', true);
-            return;
-        }
-        
+        if (!imagenContainer) return;
         if (casaInfo.imagenUrl) {
             imagenContainer.innerHTML = `<img src="${casaInfo.imagenUrl.replace(/"/g, '&quot;')}" alt="${(casaInfo.nombre || 'Home').replace(/"/g, '&quot;')}" style="width:100%; height:auto; max-height:600px; object-fit:cover; display:block;" onerror="this.style.display='none'; this.parentElement.innerHTML='<div id=\\'mi-casa-imagen-placeholder\\' style=\\'padding:80px; color:#8b7355; font-size:4em; text-align:center;\\'><div style=\\'font-size:0.3em; margin-top:20px; color:#6b5d4a;\\'>Error al cargar la imagen</div></div>';"><div id="mi-casa-imagen-placeholder" style="display:none;"></div>`;
         } else {
             imagenContainer.innerHTML = '<div id="mi-casa-imagen-placeholder" style="padding:80px; color:#8b7355; font-size:4em; text-align:center;"><div style="font-size:0.3em; margin-top:20px; color:#6b5d4a;">El DM aún no ha agregado una imagen</div></div>';
         }
-        
-        // Mostrar nombre de la casa en el título
         const nombreEl = document.getElementById('mi-casa-nombre-display');
-        if (nombreEl) {
-            nombreEl.textContent = casaInfo.nombre || 'Home';
-        }
-        
-        // Mostrar descripción
+        if (nombreEl) nombreEl.textContent = casaInfo.nombre || 'Home';
         const descEl = document.getElementById('mi-casa-descripcion-display');
-        if (descEl) {
-            descEl.textContent = casaInfo.descripcion || 'El DM aún no ha agregado una descripción para tu casa.';
-        }
-        
-        // Mostrar información adicional
+        if (descEl) descEl.textContent = casaInfo.descripcion || 'El DM aún no ha agregado una descripción para tu casa.';
         const ubicacionEl = document.getElementById('mi-casa-ubicacion-display');
-        if (ubicacionEl) {
-            ubicacionEl.textContent = casaInfo.ubicacion || 'No especificada';
-        }
-        
+        if (ubicacionEl) ubicacionEl.textContent = casaInfo.ubicacion || 'No especificada';
         const notasDmEl = document.getElementById('mi-casa-notas-dm-display');
-        if (notasDmEl) {
-            notasDmEl.textContent = casaInfo.notas || 'No hay notas del DM.';
-        }
-        
-        // Cargar notas personales del jugador
+        if (notasDmEl) notasDmEl.textContent = casaInfo.notas || 'No hay notas del DM.';
         const notasPersonalesEl = document.getElementById('mi-casa-notas-personales');
-        if (notasPersonalesEl) {
-            notasPersonalesEl.value = casaInfo.notasPersonales || '';
-        }
-        
-        openModal('mi-casa-modal');
+        if (notasPersonalesEl) notasPersonalesEl.value = casaInfo.notasPersonales || '';
     }).catch(err => {
         console.error('Error cargando información de la casa:', err);
         showToast('Error al cargar información de tu casa', true);
     });
+}
+
+// Ir a la pestaña Home y cargar contenido (desde directorio u otro lugar)
+window.openMiCasaModal = function() {
+    if (!getCurrentUser() || !isPlayer()) {
+        showToast('Debes estar logueado como aventurero', true);
+        return;
+    }
+    const container = document.getElementById('player-view-container');
+    if (!container) return;
+    const nav = container.querySelector('.nav-tabs');
+    const homeTab = container.querySelector('.nav-tab[data-tab="player-home"]');
+    const homeSection = document.getElementById('player-home');
+    if (nav && homeTab && homeSection) {
+        nav.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+        container.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        homeTab.classList.add('active');
+        homeSection.classList.add('active');
+        loadMiCasaContent();
+    }
 }
 
 window.saveMiCasaNotas = function() {
@@ -3098,7 +3236,6 @@ window.saveMiCasaNotas = function() {
         });
     }).then(() => {
         showToast('Tus notas personales guardadas');
-        closeModal('mi-casa-modal');
     }).catch(err => {
         console.error('Error guardando notas:', err);
         showToast('Error al guardar tus notas', true);

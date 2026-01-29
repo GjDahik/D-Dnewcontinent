@@ -8,8 +8,51 @@ body {
     min-height: 100vh;
     color: #d4c4a8;
     padding: 20px;
+    overflow-x: hidden; /* evita scroll horizontal en móvil */
 }
-.container { max-width: 1400px; margin: 0 auto; }
+.container { max-width: 1400px; margin: 0 auto; width: 100%; }
+
+/* Searchbar (DM dashboard) */
+.searchbar {
+    width: 100%;
+    padding: 10px 14px;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid #4a3c31;
+    border-radius: 6px;
+    color: #d4c4a8;
+    font-size: 1em;
+}
+.searchbar::placeholder { color: #8b7355; }
+.searchbar:focus {
+    outline: none;
+    border-color: #8b5a2b;
+    box-shadow: 0 0 0 2px rgba(139, 90, 43, 0.2);
+}
+
+/* Pagination (DM dashboard) */
+.pagination-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.pagination-bar .pagination-info { color: #8b7355; font-size: 0.9em; }
+.pagination-bar .btn-pagination {
+    padding: 8px 14px;
+    background: rgba(139, 90, 43, 0.3);
+    border: 1px solid #4a3c31;
+    color: #d4c4a8;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+.pagination-bar .btn-pagination:hover:not(:disabled) {
+    border-color: #8b5a2b;
+    background: rgba(139, 90, 43, 0.5);
+}
+.pagination-bar .btn-pagination:disabled { opacity: 0.5; cursor: not-allowed; }
+
 .header {
     text-align: center;
     padding: 30px 20px;
@@ -23,6 +66,27 @@ body {
     letter-spacing: 4px;
 }
 .header p { color: #8b7355; font-style: italic; font-size: 1.1em; letter-spacing: 2px; }
+
+.header-inner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    position: relative;
+}
+.header-title-wrap {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+.nav-tab-logout {
+    border-color: rgba(139, 90, 43, 0.6);
+    color: #c9a227;
+}
+.nav-tab-logout:hover {
+    border-color: #8b5a2b;
+    color: #d4af37;
+}
 
 .nav-tabs {
     display: flex; justify-content: center; gap: 10px;
@@ -45,14 +109,355 @@ body {
     border-color: #8b5a2b; color: #d4af37;
     box-shadow: 0 0 10px rgba(139, 90, 43, 0.3);
 }
+
+/* Menú hamburguesa: solo visible en móvil */
+.hamburger-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+    background: linear-gradient(180deg, #2a2522 0%, #1e1b18 100%);
+    border: 1px solid #4a3c31;
+    color: #d4af37;
+    font-size: 1.4em;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+.hamburger-btn:hover {
+    border-color: #8b5a2b;
+    background: linear-gradient(180deg, #352f2a 0%, #2a2522 100%);
+}
+
+/* Overlay del menú móvil (oculto por defecto) */
+.nav-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    pointer-events: none;
+}
+.nav-overlay.open {
+    display: block;
+    opacity: 1;
+    pointer-events: auto;
+}
+
 .tab-content { display: none; }
 .tab-content.active { display: block; }
 
-.section-header {
-    display: flex; justify-content: space-between; align-items: center;
-    margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #4a3c31;
+/* Sub-tabs en área Cartas (vista jugador) - responsive por defecto */
+.player-notifications-subtabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
 }
-.section-header h2 { font-family: 'Cinzel', serif; color: #d4af37; font-size: 1.8em; text-transform: uppercase; letter-spacing: 3px; }
+.player-notifications-subtab {
+    background: linear-gradient(180deg, #2a2522 0%, #1e1b18 100%);
+    border: 1px solid #4a3c31;
+    color: #8b7355;
+    padding: 10px 18px;
+    font-family: 'Cinzel', serif;
+    font-size: 0.95em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    min-height: 44px; /* touch target mínimo en móvil */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+.player-notifications-subtab:hover {
+    border-color: #8b5a2b;
+    color: #d4af37;
+}
+.player-notifications-subtab.active {
+    background: linear-gradient(180deg, #352f2a 0%, #2a2522 100%);
+    border-color: #8b5a2b;
+    color: #d4af37;
+    box-shadow: 0 0 10px rgba(139, 90, 43, 0.3);
+}
+.player-notifications-subtab-content {
+    display: none;
+}
+#player-notifications-container {
+    overflow-x: hidden;
+    width: 100%;
+}
+
+/* Notificaciones DM: misma estructura que Cartas del jugador */
+.dm-notifications-subtabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+.dm-notifications-subtab {
+    background: linear-gradient(180deg, #2a2522 0%, #1e1b18 100%);
+    border: 1px solid #4a3c31;
+    color: #8b7355;
+    padding: 10px 18px;
+    font-family: 'Cinzel', serif;
+    font-size: 0.95em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+.dm-notifications-subtab:hover {
+    border-color: #8b5a2b;
+    color: #d4af37;
+}
+.dm-notifications-subtab.active {
+    background: linear-gradient(180deg, #352f2a 0%, #2a2522 100%);
+    border-color: #8b5a2b;
+    color: #d4af37;
+    box-shadow: 0 0 10px rgba(139, 90, 43, 0.3);
+}
+.dm-notifications-subtab-content {
+    display: none;
+}
+#dm-notifications-container {
+    overflow-x: hidden;
+    width: 100%;
+}
+.dm-notifications-card {
+    background: linear-gradient(180deg, rgba(61, 42, 30, 0.95) 0%, rgba(42, 28, 20, 0.98) 100%);
+    border: 2px solid #5c4023;
+    border-radius: 12px;
+    padding: 24px;
+    width: 100%;
+    max-width: 100%;
+}
+.dm-notifications-card-header {
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #4a3c31;
+}
+.dm-notifications-card-header h3 {
+    font-family: 'Cinzel', serif;
+    color: #d4af37;
+    font-size: 1.3em;
+    margin: 0 0 8px 0;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+.dm-notifications-card-desc {
+    color: #8b7355;
+    font-size: 0.95em;
+    margin: 0;
+    font-style: italic;
+}
+.dm-notifications-card .form-group {
+    margin-bottom: 20px;
+}
+.dm-notifications-card .form-group label {
+    display: block;
+    color: #d4af37;
+    font-weight: 600;
+    margin-bottom: 8px;
+    font-family: 'Cinzel', serif;
+    font-size: 0.95em;
+}
+.dm-notifications-card select,
+.dm-notifications-card textarea {
+    width: 100%;
+    padding: 12px 14px;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid #4a3c31;
+    border-radius: 8px;
+    color: #d4c4a8;
+    font-size: 1em;
+    font-family: inherit;
+}
+.dm-notifications-card textarea {
+    min-height: 140px;
+    resize: vertical;
+}
+.dm-notifications-card-actions {
+    margin-top: 24px;
+}
+.dm-notifications-historial-wrap {
+    max-width: 1000px;
+}
+.dm-notifications-historial-desc {
+    color: #8b7355;
+    margin-bottom: 16px;
+    font-style: italic;
+}
+.dm-notifications-list .mini-card {
+    margin-bottom: 16px;
+    border: 1px solid #4a3c31;
+    border-radius: 8px;
+    padding: 16px;
+}
+
+/* Cartas del destino (vista jugador) */
+.player-cartas-destino-desc {
+    color: #8b7355;
+    margin-bottom: 20px;
+    font-style: italic;
+}
+/* Layout: cartas a la izquierda, mensaje a la derecha (hasta 4 cartas) */
+.player-cartas-destino-layout {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+.player-cartas-destino-layout .player-cartas-destino-grid {
+    flex: 0 0 auto;
+    max-width: 900px;
+}
+.player-cartas-destino-layout .player-cartas-destino-mensaje-general {
+    flex: 1 1 280px;
+    min-width: 0;
+    margin-top: 0;
+}
+.player-cartas-destino-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    align-items: stretch;
+}
+.player-carta-destino-card {
+    background: linear-gradient(180deg, rgba(61, 42, 30, 0.95) 0%, rgba(42, 28, 20, 0.98) 100%);
+    border: 2px solid #5c4023;
+    border-radius: 8px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    min-height: 260px;
+}
+.player-carta-destino-card:hover {
+    border-color: #8b5a2b;
+    box-shadow: 0 5px 14px rgba(0,0,0,0.4);
+}
+.player-carta-destino-img-wrap {
+    width: 100%;
+    height: 160px;
+    min-height: 160px;
+    background: #2a231c;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    border-radius: 6px 6px 0 0;
+    flex-shrink: 0;
+}
+.player-carta-destino-img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: contain;
+    object-position: center;
+}
+.player-carta-destino-placeholder {
+    width: 100%;
+    height: 160px;
+    min-height: 160px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3em;
+    color: #4a3c31;
+}
+.player-carta-destino-info {
+    padding: 11px;
+    border-radius: 0 0 6px 6px;
+    flex: 1 1 auto;
+    min-height: 72px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.player-carta-destino-titulo {
+    font-family: 'Cinzel', serif;
+    color: #e5ddd4;
+    font-size: 0.9em;
+    margin: 0;
+    padding: 8px 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    word-wrap: break-word;
+    text-align: center;
+    line-height: 1.3;
+    background: rgba(30, 26, 22, 0.85);
+    border-radius: 0 0 4px 4px;
+}
+.player-carta-destino-info .player-carta-destino-desc {
+    color: #8b7355;
+    font-size: 0.85em;
+    line-height: 1.5;
+    margin: 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+/* Mensaje general a la derecha de las cartas (app jugador) */
+.player-cartas-destino-mensaje-general {
+    margin-top: 0;
+    padding: 20px;
+    background: rgba(35, 30, 26, 0.9);
+    border: 1px solid #4a3c31;
+    border-radius: 8px;
+}
+.player-cartas-destino-mensaje-general-content {
+    color: #e8e2d8;
+    font-size: 1.08em;
+    line-height: 1.75;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    letter-spacing: 0.02em;
+    max-width: 52ch;
+}
+.cartas-destino-list-modal {
+    max-height: 280px;
+    overflow-y: auto;
+}
+
+.section-header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #4a3c31;
+    text-align: center;
+}
+.section-header h2 {
+    font-family: 'Cinzel', serif;
+    color: #d4af37;
+    font-size: 1.8em;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    text-align: center;
+    margin: 0;
+}
+.section-header .btn {
+    position: absolute;
+    right: 0;
+}
 
 .btn {
     background: linear-gradient(180deg, #8b5a2b 0%, #6b4423 100%);
@@ -99,6 +504,30 @@ body {
 .card-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .card-actions .btn { flex: 1; min-width: 80px; padding: 8px 12px; font-size: 0.9em; }
 
+/* Tarjetas de ciudad (vista jugador): contenido centrado en PC y móvil */
+#player-cities-container .card .card-header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+#player-cities-container .card .card-title {
+    text-align: center;
+}
+#player-cities-container .card .card-body {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+#player-cities-container .card .card-body p {
+    width: 100%;
+    max-width: 100%;
+}
+#player-cities-container .card .card-body .btn {
+    align-self: center;
+}
+
 /* City Expandable */
 .city-card {
     background: linear-gradient(180deg, #252220 0%, #1e1b18 100%);
@@ -124,10 +553,28 @@ body {
 
 .subsection { margin-top: 20px; }
 .subsection-header {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 10px 0; border-bottom: 1px solid #4a3c31; margin-bottom: 15px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    padding: 10px 0;
+    border-bottom: 1px solid #4a3c31;
+    margin-bottom: 15px;
+    text-align: center;
 }
-.subsection-header h4 { font-family: 'Cinzel', serif; color: #8b7355; font-size: 1.1em; text-transform: uppercase; letter-spacing: 1px; }
+.subsection-header h4 {
+    font-family: 'Cinzel', serif;
+    color: #8b7355;
+    font-size: 1.1em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    text-align: center;
+    margin: 0;
+}
+.subsection-header .btn {
+    position: absolute;
+    right: 0;
+}
 .mini-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; }
 .mini-card {
     background: linear-gradient(180deg, #2a2522 0%, #1e1b18 100%); 
@@ -139,9 +586,25 @@ body {
     box-shadow: 0 2px 8px rgba(139, 90, 43, 0.2);
     transform: translateY(-1px);
 }
+.mini-card-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+.mini-card-header-row .mini-card-title {
+    margin-bottom: 0;
+    flex: 1;
+    min-width: 0;
+}
+.mini-card-delete-btn {
+    flex-shrink: 0;
+    padding: 6px 10px;
+}
 .mini-card-title { font-family: 'Cinzel', serif; color: #d4af37; margin-bottom: 8px; }
 .mini-card-info { color: #8b7355; font-size: 0.9em; margin-bottom: 10px; }
-.mini-card-actions { display: flex; gap: 8px; }
+.mini-card-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
 /* Modal */
 .modal-overlay {
@@ -538,14 +1001,127 @@ body {
 /* RESPONSIVE */
 @media (max-width: 768px) {
     body { padding: 10px; }
-    
+
     .header { padding: 20px 10px; }
     .header h1 { font-size: 1.6em; }
     .header p { font-size: 0.95em; }
     .header::before, .header::after { display: none; }
-    
+
+    /* Menú hamburguesa: mostrar botón y convertir nav en drawer */
+    .hamburger-btn {
+        display: inline-flex;
+    }
+    .nav-wrapper {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: min(300px, 85vw);
+        max-width: 300px;
+        background: linear-gradient(180deg, #1e1b18 0%, #1a1815 100%);
+        border-left: 2px solid #4a3c31;
+        box-shadow: -4px 0 20px rgba(0, 0, 0, 0.5);
+        z-index: 1001;
+        transform: translateX(100%);
+        transition: transform 0.3s ease;
+        overflow-y: auto;
+        padding: 20px 12px;
+        margin-bottom: 0;
+    }
+    .nav-wrapper.open {
+        transform: translateX(0);
+    }
+    .nav-wrapper .nav-tabs {
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 0;
+        align-items: stretch;
+    }
+    .nav-wrapper .nav-tab {
+        width: 100%;
+        justify-content: center;
+        padding: 14px 16px;
+        font-size: 0.9em;
+        min-height: 48px;
+    }
+
+    /* Hamburguesa siempre arriba a la derecha en celulares */
+    .header {
+        position: relative;
+    }
+    .header-actions {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 15;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .header-title-wrap,
+    .player-plaque,
+    .dm-plaque {
+        padding-right: 56px;
+        min-width: 0;
+    }
+    #player-view-container .header-inner .player-plaque,
+    #main-container .header-inner .dm-plaque {
+        width: 100%;
+        max-width: 100%;
+    }
+    .player-plaque,
+    .dm-plaque {
+        width: 100%;
+        max-width: 100%;
+    }
+    .dm-plaque-name {
+        font-size: 1.35em;
+    }
+    .player-plaque-name {
+        font-size: 1.35em;
+    }
+    .player-plaque-oro {
+        font-size: 1.05em;
+        padding: 10px 16px;
+    }
+
+    /* Footer "Powered by" más pequeño en móvil */
+    .metal-plaque-footer {
+        margin-top: 36px;
+        padding: 20px 12px;
+    }
+    .metal-plaque-footer .metal-plaque {
+        padding: 12px 20px;
+        border-width: 2px;
+        border-radius: 6px;
+    }
+    .metal-plaque-footer .metal-plaque::before,
+    .metal-plaque-footer .metal-plaque::after {
+        width: 10px;
+        height: 10px;
+        top: 5px;
+        border-width: 1px;
+    }
+    .metal-plaque-footer .metal-plaque::before { left: 5px; }
+    .metal-plaque-footer .metal-plaque::after { right: 5px; }
+    .metal-plaque-footer .metal-plaque .screw-bottom-left,
+    .metal-plaque-footer .metal-plaque .screw-bottom-right {
+        width: 10px;
+        height: 10px;
+        bottom: 5px;
+        border-width: 1px;
+    }
+    .metal-plaque-footer .metal-plaque .screw-bottom-left { left: 5px; }
+    .metal-plaque-footer .metal-plaque .screw-bottom-right { right: 5px; }
+    .metal-plaque-footer .metal-plaque-text {
+        font-size: 0.7em;
+    }
+    .metal-plaque-footer .metal-plaque-subtitle {
+        font-size: 0.6em;
+    }
+
     .nav-tabs { gap: 6px; }
-    .nav-tab { 
+    .nav-tab {
         padding: 10px 12px; 
         font-size: 0.85em; 
         flex: 1 1 auto;
@@ -555,12 +1131,30 @@ body {
     .section-header { 
         flex-direction: column; 
         gap: 15px; 
-        align-items: flex-start; 
+        align-items: center;
+        text-align: center;
     }
-    .section-header h2 { font-size: 1.4em; }
-    .section-header .btn { width: 100%; }
-    
-    .city-header { 
+    .section-header h2 { 
+        font-size: 1.4em; 
+        text-align: center;
+        width: 100%;
+    }
+    .section-header .btn {
+        position: static;
+        width: 100%;
+    }
+
+    .subsection-header {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+    .subsection-header h4 {
+        text-align: center;
+        width: 100%;
+    }
+
+    .city-header {
         flex-direction: column; 
         align-items: flex-start; 
         gap: 10px; 
@@ -626,6 +1220,46 @@ body {
         right: 10px;
         bottom: 10px;
         text-align: center;
+    }
+
+    /* Sub-tabs Cartas: en tablet/móvil, botones más grandes y reparto equitativo */
+    .player-notifications-subtabs {
+        gap: 8px;
+        margin-bottom: 16px;
+    }
+    .player-notifications-subtab {
+        flex: 1 1 calc(50% - 4px);
+        min-width: 0;
+        padding: 12px 10px;
+        font-size: 0.85em;
+        min-height: 48px;
+    }
+    /* Cartas del destino: en móvil, cartas arriba y mensaje abajo */
+    .player-cartas-destino-layout {
+        flex-direction: column;
+    }
+    .player-cartas-destino-layout .player-cartas-destino-grid {
+        max-width: none;
+    }
+    .player-cartas-destino-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .player-cartas-destino-layout .player-cartas-destino-mensaje-general {
+        margin-top: 20px;
+    }
+    .dm-notifications-subtabs {
+        gap: 8px;
+        margin-bottom: 16px;
+    }
+    .dm-notifications-subtab {
+        flex: 1 1 calc(50% - 4px);
+        min-width: 0;
+        padding: 12px 10px;
+        font-size: 0.85em;
+        min-height: 48px;
+    }
+    .dm-notifications-card {
+        padding: 18px;
     }
 }
 
@@ -756,16 +1390,131 @@ body {
     letter-spacing: 0.5px;
 }
 
+/* Placa metálica del jugador (nombre, clase, oro) */
+.player-plaque {
+    padding: 16px 28px;
+    min-width: 0;
+    flex: 1 1 auto;
+    max-width: 100%;
+}
+.player-plaque .metal-plaque-content {
+    gap: 6px;
+    align-items: center;
+    text-align: center;
+}
+.player-plaque-name {
+    margin: 0;
+    font-family: 'Cinzel', serif;
+    font-size: 1.5em;
+    color: #d4af37;
+    text-shadow: 
+        1px 1px 0 rgba(0,0,0,0.8),
+        -1px -1px 0 rgba(255,255,255,0.08);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    line-height: 1.2;
+}
+.player-plaque .metal-plaque-subtitle {
+    margin: 0;
+    font-size: 0.8em;
+    text-transform: none;
+    font-style: normal;
+}
+.player-plaque-oro {
+    margin: 0;
+    margin-top: 8px !important;
+    padding: 8px 14px;
+    background: linear-gradient(135deg, rgba(212, 175, 55, 0.25) 0%, rgba(139, 90, 43, 0.35) 100%);
+    border: 1px solid rgba(212, 175, 55, 0.5);
+    border-radius: 6px;
+    color: #f4e4a6;
+    font-family: 'Cinzel', serif;
+    font-size: 1.15em;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-shadow: 
+        0 0 10px rgba(212, 175, 55, 0.4),
+        1px 1px 0 rgba(0,0,0,0.8);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.15), 0 2px 6px rgba(0,0,0,0.3);
+}
+.player-plaque-oro:hover {
+    background: linear-gradient(135deg, rgba(212, 175, 55, 0.35) 0%, rgba(139, 90, 43, 0.45) 100%);
+}
+
+/* Placa metálica del DM (nombre, igual que jugadores) */
+.dm-plaque {
+    padding: 16px 28px;
+    min-width: 0;
+    flex: 1 1 auto;
+    max-width: 100%;
+}
+.dm-plaque .metal-plaque-content {
+    gap: 4px;
+    align-items: center;
+    text-align: center;
+}
+.dm-plaque-name {
+    margin: 0;
+    font-family: 'Cinzel', serif;
+    font-size: 1.5em;
+    color: #d4af37;
+    text-shadow: 
+        1px 1px 0 rgba(0,0,0,0.8),
+        -1px -1px 0 rgba(255,255,255,0.08);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    line-height: 1.2;
+}
+.dm-plaque-subtitle {
+    margin: 0;
+    font-size: 0.8em;
+    text-transform: none;
+    font-style: normal;
+}
+
 @media (max-width: 480px) {
     .nav-tabs {
         flex-direction: column;
     }
     .nav-tab {
         width: 100%;
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
     }
-    
+
     .city-actions .btn {
         flex: 1 1 100%;
+    }
+
+    /* Sub-tabs Cartas: en móvil estrecho, una pestaña por fila (más fácil de tocar) */
+    .player-notifications-subtab {
+        flex: 1 1 100%;
+        width: 100%;
+        padding: 14px 12px;
+        font-size: 0.9em;
+    }
+    .dm-notifications-subtab {
+        flex: 1 1 100%;
+        width: 100%;
+        padding: 14px 12px;
+        font-size: 0.9em;
+    }
+
+    /* Footer "Powered by" aún más pequeño en móvil estrecho */
+    .metal-plaque-footer {
+        margin-top: 24px;
+        padding: 14px 10px;
+    }
+    .metal-plaque-footer .metal-plaque {
+        padding: 10px 14px;
+    }
+    .metal-plaque-footer .metal-plaque-text {
+        font-size: 0.6em;
+    }
+    .metal-plaque-footer .metal-plaque-subtitle {
+        font-size: 0.55em;
     }
 }
 
