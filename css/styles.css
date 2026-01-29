@@ -131,10 +131,14 @@ body {
 .mini-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; }
 .mini-card {
     background: linear-gradient(180deg, #2a2522 0%, #1e1b18 100%); 
-    border: 1px solid #4a3c31; border-radius: 4px; padding: 15px;
+    border: 1px solid #4a3c31; border-radius: 6px; padding: 15px;
     transition: all 0.3s ease;
 }
-.mini-card:hover { border-color: #8b5a2b; }
+.mini-card:hover { 
+    border-color: #8b5a2b; 
+    box-shadow: 0 2px 8px rgba(139, 90, 43, 0.2);
+    transform: translateY(-1px);
+}
 .mini-card-title { font-family: 'Cinzel', serif; color: #d4af37; margin-bottom: 8px; }
 .mini-card-info { color: #8b7355; font-size: 0.9em; margin-bottom: 10px; }
 .mini-card-actions { display: flex; gap: 8px; }
@@ -623,6 +627,22 @@ body {
         bottom: 10px;
         text-align: center;
     }
+}
+
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #4a3c31;
+    border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #8b5a2b;
 }
 
 /* Footer Placa Metálica */

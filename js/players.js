@@ -154,7 +154,13 @@ function renderPlayerInventory(player) {
     const items = player.inventario || [];
 
     if (items.length === 0) {
-        list.innerHTML = '<p style="color:#8b7355; text-align:center; padding:30px;">El inventario está vacío</p>';
+        list.innerHTML = `
+            <div style="text-align:center; padding:40px 20px; color:#8b7355;">
+                <div style="font-size:3em; margin-bottom:12px;">🎒</div>
+                <p style="font-size:1.1em; margin-bottom:8px;">El inventario está vacío</p>
+                <p style="font-size:0.9em; color:#6b5a4a;">Usa "Dar Item" o "Importar CSV" para agregar items</p>
+            </div>
+        `;
         return;
     }
 
@@ -165,18 +171,27 @@ function renderPlayerInventory(player) {
         'legendaria': '#e74c3c'
     };
 
+    const rarityLabels = {
+        'común': '🟢 Común',
+        'infrecuente': '🔵 Infrecuente',
+        'rara': '🟣 Rara',
+        'legendaria': '🔥 Legendaria'
+    };
+
     list.innerHTML = items.map((item, index) => `
-        <div class="mini-card" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <div style="flex:1;">
-                <div class="mini-card-title" style="display:flex; align-items:center; gap:10px;">
-                    ${item.name}
-                    <span style="background:${rarityColors[item.rarity] || '#888'}; padding:2px 8px; border-radius:10px; font-size:0.7em; text-transform:uppercase;">${item.rarity || 'común'}</span>
+        <div class="mini-card" style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; padding:16px; transition:all 0.2s ease;">
+            <div style="flex:1; min-width:0;">
+                <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap;">
+                    <div class="mini-card-title" style="font-size:1.05em; font-weight:600;">${item.name}</div>
+                    <span style="background:${rarityColors[item.rarity] || '#888'}; color:#fff; padding:3px 10px; border-radius:12px; font-size:0.75em; font-weight:600; text-transform:uppercase; white-space:nowrap;">
+                        ${rarityLabels[item.rarity] || 'Común'}
+                    </span>
                 </div>
-                <div class="mini-card-info">${item.effect || 'Sin descripción'}</div>
-                ${item.price ? `<div style="color:#f1c40f; font-size:0.85em;">Valor: ${item.price} GP</div>` : ''}
+                ${item.effect ? `<div class="mini-card-info" style="color:#d4c4a8; margin-bottom:6px; line-height:1.4;">${item.effect}</div>` : ''}
+                ${item.price ? `<div style="color:#f1c40f; font-size:0.9em; font-weight:500; margin-top:4px;">💰 Valor: ${item.price.toLocaleString()} GP</div>` : ''}
             </div>
-            <div class="mini-card-actions">
-                <button class="btn btn-small btn-danger" onclick="removeItemFromPlayer(${index})" title="Quitar Item">🗑️</button>
+            <div class="mini-card-actions" style="margin-left:12px; flex-shrink:0;">
+                <button class="btn btn-small btn-danger" onclick="removeItemFromPlayer(${index})" title="Quitar Item" style="padding:8px 12px;">🗑️</button>
             </div>
         </div>
     `).join('');
@@ -190,7 +205,7 @@ function openGiveItemModal() {
     openModal('give-item-modal');
 }
 
-function giveItemToPlayer() {
+async function giveItemToPlayer() {
     const playerId = document.getElementById('player-inventory-id').value;
     const item = {
         name: document.getElementById('give-item-name').value,
@@ -208,14 +223,23 @@ function giveItemToPlayer() {
     let inventario = player.inventario || [];
     inventario.push(item);
 
-    db.collection('players').doc(playerId).update({ inventario })
-        .then(() => {
-            showToast('Item entregado a ' + player.nombre);
-            closeModal('give-item-modal');
-            player.inventario = inventario;
-            renderPlayerInventory(player);
-        })
-        .catch(e => showToast('Error: ' + e.message, true));
+    await db.collection('players').doc(playerId).update({ inventario });
+    
+    // Guardar transacción
+    await db.collection('transactions').add({
+        tipo: 'compra',
+        itemName: item.name,
+        playerId: playerId,
+        playerName: player.nombre || 'Jugador',
+        shopName: 'DM - Entrega Directa',
+        precio: 0, // Items dados por DM no tienen costo
+        fecha: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    
+    showToast('Item entregado a ' + player.nombre);
+    closeModal('give-item-modal');
+    player.inventario = inventario;
+    renderPlayerInventory(player);
 }
 
 function removeItemFromPlayer(index) {
@@ -235,6 +259,139 @@ function removeItemFromPlayer(index) {
         })
         .catch(e => showToast('Error: ' + e.message, true));
 }
+
+// ==================== IMPORTAR ITEMS DESDE CSV/EXCEL ====================
+function importPlayerItemsCSV(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const playerId = document.getElementById('player-inventory-id').value;
+    if (!playerId) {
+        showToast('Error: ID de jugador no encontrado', true);
+        return;
+    }
+
+    const player = playersData.find(p => p.id === playerId);
+    if (!player) {
+        showToast('Jugador no encontrado', true);
+        return;
+    }
+
+    // Usar la función readFileAsText de cities.js
+    if (typeof readFileAsText !== 'function') {
+        showToast('Error: función readFileAsText no disponible', true);
+        return;
+    }
+    
+    readFileAsText(file, function(text) {
+        try {
+            const lines = text.split('\n').filter(function(line) { return line.trim(); });
+            
+            if (lines.length < 2) {
+                showToast('El archivo está vacío o solo tiene encabezados', true);
+                return;
+            }
+
+            var separator = lines[0].indexOf(';') !== -1 ? ';' : ',';
+            var header = lines[0].split(separator).map(function(h) { return h.trim().toLowerCase(); });
+            var nameIdx = header.indexOf('name');
+            var priceIdx = header.indexOf('price');
+            var effectIdx = header.indexOf('effect');
+            var rarityIdx = header.indexOf('rarity');
+
+            if (nameIdx === -1) {
+                showToast('El CSV debe tener al menos la columna "name"', true);
+                return;
+            }
+
+            const validRarities = ['común', 'infrecuente', 'rara', 'legendaria'];
+            let inventario = Array.isArray(player.inventario) ? player.inventario.slice() : [];
+            let count = 0;
+            let errors = [];
+
+            for (var i = 1; i < lines.length; i++) {
+                var values = lines[i].split(separator).map(function(v) { return v.trim().replace(/^"|"$/g, ''); });
+                
+                var name = values[nameIdx];
+                if (!name || name.length === 0) {
+                    errors.push('Línea ' + (i + 1) + ': nombre vacío');
+                    continue;
+                }
+
+                var price = priceIdx !== -1 ? (parseInt(values[priceIdx]) || 0) : 0;
+                var effect = effectIdx !== -1 ? (values[effectIdx] || '') : '';
+                var rarity = rarityIdx !== -1 ? (values[rarityIdx] || 'común').toLowerCase().trim() : 'común';
+                
+                if (validRarities.indexOf(rarity) === -1) rarity = 'común';
+
+                var item = {
+                    name: name,
+                    price: price,
+                    effect: effect,
+                    rarity: rarity
+                };
+
+                inventario.push(item);
+                count++;
+            }
+
+            if (count === 0) {
+                showToast('No se encontraron items válidos en el archivo', true);
+                if (errors.length > 0) {
+                    console.error('Errores:', errors);
+                }
+                return;
+            }
+
+            // Guardar en Firestore
+            db.collection('players').doc(playerId).update({ inventario })
+                .then(async function() {
+                    // Guardar transacciones para cada item agregado
+                    const batch = db.batch();
+                    for (let j = inventario.length - count; j < inventario.length; j++) {
+                        const item = inventario[j];
+                        const transactionRef = db.collection('transactions').doc();
+                        batch.set(transactionRef, {
+                            tipo: 'compra',
+                            itemName: item.name,
+                            playerId: playerId,
+                            playerName: player.nombre || 'Jugador',
+                            shopName: 'DM - Importación CSV',
+                            precio: 0, // Items dados por DM no tienen costo
+                            fecha: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    }
+                    await batch.commit();
+                    
+                    showToast(count + ' items importados exitosamente' + (errors.length > 0 ? ' (con ' + errors.length + ' errores)' : ''));
+                    player.inventario = inventario;
+                    renderPlayerInventory(player);
+                    
+                    // Resetear el input
+                    document.getElementById('player-inventory-csv-input').value = '';
+                    
+                    if (errors.length > 0) {
+                        console.warn('Errores durante la importación:', errors);
+                    }
+                })
+                .catch(function(e) {
+                    showToast('Error al guardar: ' + e.message, true);
+                    console.error(e);
+                });
+
+        } catch (error) {
+            showToast('Error al procesar el archivo: ' + error.message, true);
+            console.error(error);
+        }
+    });
+    
+    event.target.value = '';
+}
+
+// Exponer funciones globalmente
+window.giveItemToPlayer = giveItemToPlayer;
+window.importPlayerItemsCSV = importPlayerItemsCSV;
+window.downloadPlayerItemsTemplate = downloadPlayerItemsTemplate;
 
 function openPlayerCasaModal(playerId, playerNombre) {
     document.getElementById('dm-casa-player-id').value = playerId;

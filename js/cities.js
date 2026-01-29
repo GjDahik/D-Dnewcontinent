@@ -1070,6 +1070,7 @@ function saveBatallaConfig() {
 }
 
 // Hacer función disponible globalmente
+window.readFileAsText = readFileAsText;
 window.toggleShopPosadaConfig = toggleShopPosadaConfig;
 window.deleteAllShopsFromCity = deleteAllShopsFromCity;
 window.openBatallaConfigModal = openBatallaConfigModal;

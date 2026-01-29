@@ -496,6 +496,17 @@ Trampas del Explorador,40,trampas,Trampa de lazo restringe,3 DL,,Enseña a const
 Alquimia del Iniciado,40,alquimia,Poción Curación 2d4+2,3 DL,,Permite fabricar
 Atlas del Territorio Cercano,20,mapas,Ruta segura,2 DL,,Otorga
 `
+    },
+    jugadores: {
+        filename: '07_items_jugadores.csv',
+        content: `name,price,effect,rarity
+Espada Larga +1,350,+1 a ataques y daño,infrecuente
+Armadura de Cuero Mágica,200,+1 a CA,infrecuente
+Poción de Curación Superior,150,Recupera 4d4+4 HP,infrecuente
+Anillo de Protección,5000,+1 a CA y tiradas de salvación,legendaria
+Capa Élfica,2500,Ventaja en tiradas de Sigilo,rara
+Pergamino de Fuego,100,Conjuro: Fireball (1 uso),rara
+`
     }
 };
 
@@ -509,6 +520,11 @@ function downloadCSVTemplate(key) {
     a.click();
     URL.revokeObjectURL(a.href);
     if (typeof showToast === 'function') showToast('Descargado: ' + t.filename);
+}
+
+// Función para descargar plantilla de items de jugadores
+function downloadPlayerItemsTemplate() {
+    downloadCSVTemplate('jugadores');
 }
 
 function toggleTemplateSection() {

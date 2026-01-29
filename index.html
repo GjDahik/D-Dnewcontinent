@@ -27,6 +27,7 @@
             <button class="nav-tab" id="create-dm-nav-btn" onclick="showCreateDMModal()">👑 + DM</button>
             <button class="nav-tab" data-tab="players">👥 Jugadores</button>
             <button class="nav-tab" data-tab="cities">🏘️ Ciudades/Pueblos</button>
+            <button class="nav-tab" data-tab="notifications">📮 Notificaciones</button>
             <button class="nav-tab" data-tab="transactions">📜 Historial</button>
             <button class="nav-tab" type="button" onclick="window.open('battle-tracker.html', '_blank')" title="Abrir en nueva pestaña">⚔️ Battle Tracker</button>
         </nav>
@@ -94,6 +95,34 @@
         </section>
 
         <!-- HISTORIAL -->
+        <section id="notifications" class="tab-content">
+            <div class="section-header">
+                <h2>📮 Enviar Notificaciones</h2>
+            </div>
+            <div style="background: linear-gradient(180deg, rgba(61, 42, 30, 0.95) 0%, rgba(42, 28, 20, 0.98) 100%); border: 2px solid #5c4023; border-radius: 12px; padding: 24px; max-width: 800px; margin-bottom: 30px;">
+                <div class="form-group">
+                    <label style="color: #d4af37; font-weight: 600; margin-bottom: 8px; display: block; font-family: 'Cinzel', serif;">Destinatario</label>
+                    <select id="notification-recipient" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.4); border: 1px solid #4a3c31; border-radius: 6px; color: #d4c4a8; font-size: 1em;">
+                        <option value="all">📢 Todos los Jugadores</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-top: 20px;">
+                    <label style="color: #d4af37; font-weight: 600; margin-bottom: 8px; display: block; font-family: 'Cinzel', serif;">Mensaje</label>
+                    <textarea id="notification-message" placeholder="Escribe tu mensaje aquí..." style="width: 100%; min-height: 150px; padding: 12px; background: rgba(0,0,0,0.4); border: 1px solid #4a3c31; border-radius: 6px; color: #d4c4a8; font-size: 1em; font-family: inherit; resize: vertical;"></textarea>
+                </div>
+                <div style="margin-top: 20px; display: flex; gap: 12px;">
+                    <button class="btn" onclick="sendNotification()" style="flex: 1;">📮 Enviar Notificación</button>
+                </div>
+            </div>
+            
+            <div class="section-header" style="margin-top: 30px;">
+                <h2>📜 Historial de Notificaciones Enviadas</h2>
+            </div>
+            <div id="dm-notifications-list" style="max-width: 1000px;">
+                <p style="color:#8b7355; text-align:center; padding:20px;">Cargando notificaciones...</p>
+            </div>
+        </section>
+
         <section id="transactions" class="tab-content">
             <div class="section-header">
                 <h2>📜 Historial de Transacciones</h2>
@@ -118,6 +147,7 @@
             <button class="nav-tab active" data-tab="player-map">🗺️ Mapa</button>
             <button class="nav-tab" data-tab="player-ciudades">🏛️ Ciudades</button>
             <button class="nav-tab" data-tab="player-inventario">🎒 Inventario</button>
+            <button class="nav-tab" data-tab="player-notifications">📮 Cartas</button>
             <button class="nav-tab" type="button" onclick="openMiCasaModal()" title="Ver mi home">🏠 Home</button>
             <button class="nav-tab" type="button" onclick="window.open('battle-tracker.html', '_blank')" title="Abrir en nueva pestaña">⚔️ Battle Tracker</button>
         </nav>
@@ -181,6 +211,19 @@
             </div>
             <div class="player-card">
                 <div id="player-view-inventory"></div>
+            </div>
+        </section>
+
+        <section id="player-notifications" class="tab-content">
+            <div class="section-header">
+                <h2>📮 Cartas y Notificaciones</h2>
+            </div>
+            <div id="player-notifications-container">
+                <div id="player-notifications-unread" style="margin-bottom: 30px;"></div>
+                <div id="player-notifications-read" style="margin-top: 30px;">
+                    <h3 style="font-family: 'Cinzel', serif; color: #8b7355; font-size: 1.2em; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 2px; border-bottom: 1px solid #4a3c31; padding-bottom: 10px;">📜 Historial de Cartas</h3>
+                    <div id="player-notifications-read-list"></div>
+                </div>
             </div>
         </section>
     </div>
@@ -1119,21 +1162,42 @@
 
     <!-- Modal Ver/Gestionar Inventario Jugador -->
     <div class="modal-overlay" id="player-inventory-modal">
-        <div class="modal" style="max-width: 700px;">
+        <div class="modal" style="max-width: 800px;">
             <div class="modal-header">
                 <h3 id="player-inventory-title">🎒 Inventario</h3>
                 <button class="modal-close" onclick="closeModal('player-inventory-modal')">&times;</button>
             </div>
             <div class="modal-body">
                 <input type="hidden" id="player-inventory-id">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <div>
-                        <span id="player-inventory-name" style="color: #d4af37; font-family: 'Cinzel', serif; font-size: 1.2em;"></span>
-                        <div id="player-inventory-gold" style="color: #f1c40f; margin-top: 5px;"></div>
+                
+                <!-- Información del Jugador -->
+                <div style="background: linear-gradient(180deg, rgba(139, 90, 43, 0.15) 0%, rgba(139, 90, 43, 0.05) 100%); border: 1px solid #4a3c31; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                        <div>
+                            <div id="player-inventory-name" style="color: #d4af37; font-family: 'Cinzel', serif; font-size: 1.3em; font-weight: 600; margin-bottom: 6px;"></div>
+                            <div id="player-inventory-gold" style="color: #f1c40f; font-size: 1em; font-weight: 500;"></div>
+                        </div>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            <button class="btn btn-small" onclick="openGiveItemModal()" style="min-width: 120px;">🎁 Dar Item</button>
+                            <button class="btn btn-small btn-secondary" onclick="downloadPlayerItemsTemplate()" style="min-width: 140px;">📥 Plantilla CSV</button>
+                            <button class="btn btn-small btn-secondary" onclick="document.getElementById('player-inventory-csv-input').click();" style="min-width: 140px;">📤 Importar CSV</button>
+                            <input type="file" id="player-inventory-csv-input" accept=".csv,.txt,.xlsx,.xls" style="display: none;" onchange="importPlayerItemsCSV(event)">
+                        </div>
                     </div>
-                    <button class="btn btn-small" onclick="openGiveItemModal()">🎁 Dar Item</button>
                 </div>
-                <div id="player-inventory-list" style="max-height: 350px; overflow-y: auto;"></div>
+
+                <!-- Instrucciones CSV -->
+                <div style="background: rgba(0,0,0,0.2); border-left: 3px solid #8b5a2b; border-radius: 4px; padding: 12px; margin-bottom: 16px;">
+                    <p style="color: #8b7355; font-size: 0.85em; margin: 0; line-height: 1.5;">
+                        <strong style="color: #d4af37;">📋 Formato CSV:</strong> <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px; color: #d4c4a8;">name</code>, <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px; color: #d4c4a8;">price</code>, <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px; color: #d4c4a8;">effect</code>, <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px; color: #d4c4a8;">rarity</code> 
+                        <span style="color: #a89878;">(común, infrecuente, rara, legendaria)</span>
+                    </p>
+                </div>
+
+                <!-- Lista de Items -->
+                <div style="border-top: 1px solid #4a3c31; padding-top: 16px;">
+                    <div id="player-inventory-list" style="max-height: 400px; overflow-y: auto; padding-right: 8px;" class="custom-scrollbar"></div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeModal('player-inventory-modal')">Cerrar</button>
@@ -1143,24 +1207,24 @@
 
     <!-- Modal Dar Item a Jugador -->
     <div class="modal-overlay" id="give-item-modal">
-        <div class="modal">
+        <div class="modal" style="max-width: 600px;">
             <div class="modal-header">
                 <h3>🎁 Dar Item</h3>
                 <button class="modal-close" onclick="closeModal('give-item-modal')">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
-                    <label>Nombre del Item</label>
-                    <input type="text" id="give-item-name" placeholder="Ej: Espada Larga +1">
+                    <label style="color: #d4af37; font-weight: 600; margin-bottom: 6px; display: block;">Nombre del Item</label>
+                    <input type="text" id="give-item-name" placeholder="Ej: Espada Larga +1" style="width: 100%;">
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Valor (GP)</label>
-                        <input type="number" id="give-item-price" min="0" value="0">
+                        <label style="color: #d4af37; font-weight: 600; margin-bottom: 6px; display: block;">Valor (GP)</label>
+                        <input type="number" id="give-item-price" min="0" value="0" style="width: 100%;">
                     </div>
                     <div class="form-group">
-                        <label>Rareza</label>
-                        <select id="give-item-rarity">
+                        <label style="color: #d4af37; font-weight: 600; margin-bottom: 6px; display: block;">Rareza</label>
+                        <select id="give-item-rarity" style="width: 100%;">
                             <option value="común">🟢 Común</option>
                             <option value="infrecuente">🔵 Infrecuente</option>
                             <option value="rara">🟣 Rara</option>
@@ -1169,13 +1233,26 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label>Descripción / Efecto</label>
-                    <input type="text" id="give-item-effect" placeholder="Ej: +1 a ataques y daño">
+                    <label style="color: #d4af37; font-weight: 600; margin-bottom: 6px; display: block;">Descripción / Efecto</label>
+                    <textarea id="give-item-effect" placeholder="Ej: +1 a ataques y daño" style="width: 100%; min-height: 80px; resize: vertical; font-family: inherit;"></textarea>
                 </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeModal('give-item-modal')">Cancelar</button>
-                <button class="btn" onclick="giveItemToPlayer()">🎁 Dar Item</button>
+                <button class="btn" onclick="giveItemToPlayer()">✅ Entregar Item</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Notificación (Player) -->
+    <div class="modal-overlay" id="notification-modal">
+        <div class="modal" style="max-width: 700px;">
+            <div class="modal-header">
+                <h3>📮 Carta</h3>
+                <button class="modal-close" onclick="closeModal('notification-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="notification-modal-content"></div>
             </div>
         </div>
     </div>
@@ -2071,5 +2148,6 @@
     <script src="js/cities.js"></script>
     <script src="js/inventory.js"></script>
     <script src="js/transactions.js"></script>
+    <script src="js/notifications.js"></script>
 </body>
 </html>

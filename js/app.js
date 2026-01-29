@@ -503,6 +503,15 @@ function showPlayerView() {
         if (doc.exists) renderPlayerView(doc.data());
     });
     loadPlayerWorld();
+    // Cargar notificaciones después de un pequeño delay para asegurar que los contenedores existan
+    setTimeout(() => {
+        if (typeof loadPlayerNotifications === 'function') {
+            console.log('Llamando loadPlayerNotifications desde showPlayerView');
+            loadPlayerNotifications();
+        } else {
+            console.error('loadPlayerNotifications no está definido');
+        }
+    }, 500);
 }
 
 function loadPlayerWorld() {
@@ -2914,6 +2923,8 @@ async function showDashboard() {
             console.error('loadWorld no está definido');
         }
         if (typeof loadTransactions === 'function') loadTransactions();
+        if (typeof loadNotificationRecipients === 'function') loadNotificationRecipients();
+        if (typeof loadDMNotifications === 'function') loadDMNotifications();
         loadMapImage();
     } else {
         showLoginModal();
@@ -2961,6 +2972,17 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
             setTimeout(function() {
                 renderCities();
             }, 200);
+        }
+        
+        // Si se hace clic en el tab de notificaciones del player, cargar notificaciones
+        if (tab.dataset.tab === 'player-notifications' && typeof loadPlayerNotifications === 'function') {
+            loadPlayerNotifications();
+        }
+        
+        // Si se hace clic en el tab de notificaciones del DM, cargar destinatarios y historial
+        if (tab.dataset.tab === 'notifications') {
+            if (typeof loadNotificationRecipients === 'function') loadNotificationRecipients();
+            if (typeof loadDMNotifications === 'function') loadDMNotifications();
         }
     });
 });
