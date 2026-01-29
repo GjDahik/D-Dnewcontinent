@@ -1,6 +1,9 @@
 // ==================== MENSAJES AUTOMÁTICOS (REGLAS POR COMPRA) ====================
 // Reglas: al comprar un ítem en una tienda, enviar mensaje al jugador y opcionalmente quitar el ítem de la tienda.
 
+let _editingRuleId = null;
+let _editingRule = null;
+
 function automationItemSignature(it) {
     const n = (it.name || it.title || '').trim();
     const e = (it.effect || it.desc || it.description || '').trim();
@@ -95,6 +98,19 @@ async function createAutomationRule(shopId, item, message, removeFromShop) {
     });
 }
 
+/** Actualiza una regla existente. */
+async function updateAutomationRule(ruleId, shopId, item, message, removeFromShop) {
+    await db.collection('automation_rules').doc(ruleId).update({
+        shopId,
+        itemName: (item.name || item.title || '').trim(),
+        itemEffect: (item.effect || item.desc || '').trim(),
+        itemPrice: item.price != null ? Number(item.price) : null,
+        message: (message || '').trim(),
+        removeFromShop: !!removeFromShop,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+}
+
 /** Elimina una regla. */
 async function deleteAutomationRule(ruleId) {
     await db.collection('automation_rules').doc(ruleId).delete();
@@ -165,7 +181,10 @@ function loadAutomationRulesList() {
                     <div style="color:#8b7355; font-size:0.9em; margin-bottom:6px;">${esc(shopName(r.shopId))}${isPosada ? ' <span style="color:#6b5d4a;">· Posada</span>' : ''}${remove}</div>
                     <div style="color:#a89878; font-size:0.9em; white-space:pre-wrap; line-height:1.4;">${esc(preview)}</div>
                 </div>
-                <button type="button" class="btn btn-small btn-danger" onclick="deleteAutomationRuleThenReload('${r.id}')" title="Eliminar regla">🗑️</button>
+                <div style="display:flex; gap:8px; flex-shrink:0;">
+                    <button type="button" class="btn btn-small" onclick="editAutomationRule('${String(r.id).replace(/'/g, "\\'")}')" title="Editar regla">✏️</button>
+                    <button type="button" class="btn btn-small btn-danger" onclick="deleteAutomationRuleThenReload('${String(r.id).replace(/'/g, "\\'")}')" title="Eliminar regla">🗑️</button>
+                </div>
             </div>`;
         }).join('');
     }).catch(e => {
@@ -174,49 +193,93 @@ function loadAutomationRulesList() {
     });
 }
 
-function openAutomationRuleModal() {
+function _populateAutomationItemsForShop(shopSel, itemSel, removeWrap, shops) {
+    const id = shopSel.value;
+    itemSel.innerHTML = '<option value="">— Elige un ítem o cuarto —</option>';
+    if (!id) { if (removeWrap) removeWrap.style.display = 'flex'; return; }
+    const s = shops.find(x => x.id === id);
+    const isPosada = (s && (s.tipo || '').toLowerCase()) === 'posada';
+    if (removeWrap) removeWrap.style.display = isPosada ? 'none' : 'flex';
+    if (isPosada) {
+        const rooms = getPosadaRooms(s);
+        rooms.forEach((c, i) => {
+            const name = (c.nombre || '?').replace(/"/g, '&quot;');
+            const price = c.precio != null ? c.precio + ' GP/noche' : '';
+            const lab = price ? `${name} — ${price}` : name;
+            itemSel.appendChild(new Option(lab, String(i)));
+        });
+    } else {
+        const inv = (s && s.inventario) || [];
+        inv.forEach((it, i) => {
+            const name = (it.name || it.title || '?').replace(/"/g, '&quot;');
+            const price = it.price != null ? it.price + ' GP' : '';
+            const lab = price ? `${name} — ${price}` : name;
+            itemSel.appendChild(new Option(lab, String(i)));
+        });
+    }
+}
+
+function openAutomationRuleModal(ruleForEdit) {
     const shopSel = document.getElementById('automation-rule-shop');
     const itemSel = document.getElementById('automation-rule-item');
     const msgEl = document.getElementById('automation-rule-message');
     const removeEl = document.getElementById('automation-rule-remove');
     const removeWrap = document.getElementById('automation-rule-remove-wrap');
+    const titleEl = document.getElementById('automation-rule-modal-title');
     if (!shopSel || !itemSel || !msgEl || !removeEl) return;
-    msgEl.value = '';
-    removeEl.checked = true;
+
     const shops = automationShopsForRules();
+    const isEdit = !!ruleForEdit;
+    _editingRuleId = isEdit ? ruleForEdit.id : null;
+    _editingRule = isEdit ? ruleForEdit : null;
+
+    if (titleEl) titleEl.textContent = isEdit ? '✏️ Editar regla' : '🤖 Nueva regla';
+
     shopSel.innerHTML = '<option value="">— Elige una tienda —</option>' + shops.map(s => {
         const n = (s.nombre || 'Sin nombre').replace(/"/g, '&quot;');
         const posada = (s.tipo || '').toLowerCase() === 'posada';
         return `<option value="${s.id}">${n}${posada ? ' 🏨' : ''}</option>`;
     }).join('');
-    itemSel.innerHTML = '<option value="">— Elige un ítem o cuarto —</option>';
-    if (removeWrap) removeWrap.style.display = 'flex';
-    shopSel.onchange = () => {
-        const id = shopSel.value;
-        itemSel.innerHTML = '<option value="">— Elige un ítem o cuarto —</option>';
-        if (!id) { if (removeWrap) removeWrap.style.display = 'flex'; return; }
-        const s = shops.find(x => x.id === id);
-        const isPosada = (s && (s.tipo || '').toLowerCase()) === 'posada';
-        if (removeWrap) removeWrap.style.display = isPosada ? 'none' : 'flex';
-        if (isPosada) {
-            const rooms = getPosadaRooms(s);
-            rooms.forEach((c, i) => {
-                const name = (c.nombre || '?').replace(/"/g, '&quot;');
-                const price = c.precio != null ? c.precio + ' GP/noche' : '';
-                const lab = price ? `${name} — ${price}` : name;
-                itemSel.appendChild(new Option(lab, String(i)));
-            });
-        } else {
-            const inv = (s && s.inventario) || [];
-            inv.forEach((it, i) => {
-                const name = (it.name || it.title || '?').replace(/"/g, '&quot;');
-                const price = it.price != null ? it.price + ' GP' : '';
-                const lab = price ? `${name} — ${price}` : name;
-                itemSel.appendChild(new Option(lab, String(i)));
-            });
+
+    shopSel.onchange = () => _populateAutomationItemsForShop(shopSel, itemSel, removeWrap, shops);
+
+    if (isEdit) {
+        shopSel.value = ruleForEdit.shopId || '';
+        _populateAutomationItemsForShop(shopSel, itemSel, removeWrap, shops);
+        const sig = automationItemSignature({ name: ruleForEdit.itemName, effect: ruleForEdit.itemEffect, price: ruleForEdit.itemPrice });
+        let found = false;
+        const shop = shops.find(x => x.id === ruleForEdit.shopId);
+        const isPosada = shop && (shop.tipo || '').toLowerCase() === 'posada';
+        const items = isPosada ? getPosadaRooms(shop) : (shop && shop.inventario) || [];
+        for (let i = 0; i < items.length; i++) {
+            const it = items[i];
+            const s = isPosada ? { name: it.nombre, effect: it.efecto || '', price: it.precio } : it;
+            if (automationItemSignature(s) === sig) { itemSel.value = String(i); found = true; break; }
         }
-    };
+        if (!found) {
+            const lab = (ruleForEdit.itemName || '?') + (ruleForEdit.itemPrice != null ? ' — ' + ruleForEdit.itemPrice + ' GP' + (isPosada ? '/noche' : '') : '') + ' (actual)';
+            itemSel.appendChild(new Option(lab, 'current'));
+            itemSel.value = 'current';
+        }
+        msgEl.value = (ruleForEdit.message || '').trim();
+        removeEl.checked = !!ruleForEdit.removeFromShop;
+    } else {
+        itemSel.innerHTML = '<option value="">— Elige un ítem o cuarto —</option>';
+        if (removeWrap) removeWrap.style.display = 'flex';
+        msgEl.value = '';
+        removeEl.checked = true;
+    }
+
     openModal('automation-rule-modal');
+}
+
+async function editAutomationRule(ruleId) {
+    const snap = await db.collection('automation_rules').doc(ruleId).get();
+    if (!snap.exists) {
+        showToast('Regla no encontrada', true);
+        return;
+    }
+    openAutomationRuleModal({ id: snap.id, ...snap.data() });
 }
 
 function saveAutomationRule() {
@@ -228,26 +291,42 @@ function saveAutomationRule() {
     const shopId = (shopSel.value || '').trim();
     const message = (msgEl.value || '').trim();
     if (!shopId) { showToast('Elige una tienda', true); return; }
-    const idx = parseInt(itemSel.value, 10);
-    if (isNaN(idx) || idx < 0) { showToast('Elige un ítem o cuarto', true); return; }
+    const rawVal = itemSel.value;
+    if (rawVal === '' || rawVal === null) { showToast('Elige un ítem o cuarto', true); return; }
     if (!message) { showToast('Escribe el mensaje a enviar', true); return; }
     const shops = automationShopsForRules();
     const shop = shops.find(s => s.id === shopId);
-    const isPosada = shop && (shop.tipo || '').toLowerCase() === 'posada';
+    if (!shop) {
+        showToast('Tienda no encontrada. Elige otra o elimina la regla.', true);
+        return;
+    }
+    const isPosada = (shop.tipo || '').toLowerCase() === 'posada';
     let item;
-    if (isPosada) {
-        const rooms = getPosadaRooms(shop);
-        const c = rooms[idx];
-        if (!c) { showToast('Cuarto no encontrado', true); return; }
-        item = { name: c.nombre, effect: c.efecto || '', price: c.precio };
+    if (rawVal === 'current' && _editingRule) {
+        item = { name: _editingRule.itemName, effect: _editingRule.itemEffect || '', price: _editingRule.itemPrice };
     } else {
-        const inv = (shop && shop.inventario) || [];
-        item = inv[idx];
-        if (!item) { showToast('Ítem no encontrado', true); return; }
+        const idx = parseInt(rawVal, 10);
+        if (isNaN(idx) || idx < 0) { showToast('Elige un ítem o cuarto', true); return; }
+        if (isPosada) {
+            const rooms = getPosadaRooms(shop);
+            const c = rooms[idx];
+            if (!c) { showToast('Cuarto no encontrado', true); return; }
+            item = { name: c.nombre, effect: c.efecto || '', price: c.precio };
+        } else {
+            const inv = (shop && shop.inventario) || [];
+            item = inv[idx];
+            if (!item) { showToast('Ítem no encontrado', true); return; }
+        }
     }
     const removeFromShop = isPosada ? false : !!removeEl.checked;
-    createAutomationRule(shopId, item, message, removeFromShop).then(() => {
-        showToast('Regla guardada');
+    const updating = !!_editingRuleId;
+    const promise = updating
+        ? updateAutomationRule(_editingRuleId, shopId, item, message, removeFromShop)
+        : createAutomationRule(shopId, item, message, removeFromShop);
+    promise.then(() => {
+        showToast(updating ? 'Regla actualizada' : 'Regla guardada');
+        _editingRuleId = null;
+        _editingRule = null;
         closeModal('automation-rule-modal');
         loadAutomationRulesList();
     }).catch(e => {
@@ -257,6 +336,7 @@ function saveAutomationRule() {
 
 window.openAutomationRuleModal = openAutomationRuleModal;
 window.saveAutomationRule = saveAutomationRule;
+window.editAutomationRule = editAutomationRule;
 window.loadAutomationRulesList = loadAutomationRulesList;
 window.deleteAutomationRule = deleteAutomationRule;
 window.deleteAutomationRuleThenReload = deleteAutomationRuleThenReload;
