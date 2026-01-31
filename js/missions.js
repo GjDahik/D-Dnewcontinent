@@ -1,0 +1,926 @@
+// ==================== MISIONES ====================
+// DM: crear, editar, hacer visibles, marcar completadas, reabrir. Solo el DM marca completada.
+// Aventureros: ver misiones visibles, aceptar/en curso (no pueden marcar completada). Historial = misiones que el DM marcó completadas.
+
+const MISSION_STATUS = { draft: 'draft', visible: 'visible', completed: 'completed', archived: 'archived' };
+const PLAYER_PROGRESS_STATUS = { accepted: 'accepted', in_progress: 'in_progress', rejected: 'rejected' };
+
+let missionsData = [];
+
+// ---------- DM ----------
+
+function switchDMMissionsSubtab(subtabId) {
+    const section = document.getElementById('missions');
+    if (!section) return;
+    const subtabs = section.querySelectorAll('.dm-missions-subtab');
+    const activasPanel = document.getElementById('dm-missions-activas-panel');
+    const rechazadasPanel = document.getElementById('dm-missions-rechazadas-panel');
+    const historialPanel = document.getElementById('dm-missions-historial-panel');
+    const leyendaPanel = document.getElementById('dm-missions-leyenda-panel');
+    if (!subtabs.length || !activasPanel || !rechazadasPanel || !historialPanel || !leyendaPanel) return;
+    subtabs.forEach(t => {
+        t.classList.toggle('active', t.getAttribute('data-dm-missions-subtab') === subtabId);
+    });
+    activasPanel.style.display = subtabId === 'activas' ? 'block' : 'none';
+    rechazadasPanel.style.display = subtabId === 'rechazadas' ? 'block' : 'none';
+    historialPanel.style.display = subtabId === 'historial' ? 'block' : 'none';
+    leyendaPanel.style.display = subtabId === 'leyenda' ? 'block' : 'none';
+    if (subtabId === 'activas') renderDMMissionsList('activas');
+    if (subtabId === 'rechazadas') renderDMMissionsList('rechazadas');
+    if (subtabId === 'historial') renderDMMissionsList('historial');
+    if (subtabId === 'leyenda') loadLegendTracks();
+}
+
+function loadDMMissions() {
+    db.collection('missions')
+        .orderBy('createdAt', 'desc')
+        .onSnapshot(snap => {
+            missionsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            const activasOn = document.getElementById('dm-missions-activas-panel')?.style.display !== 'none';
+            const rechazadasOn = document.getElementById('dm-missions-rechazadas-panel')?.style.display !== 'none';
+            const historialOn = document.getElementById('dm-missions-historial-panel')?.style.display !== 'none';
+            const filter = activasOn ? 'activas' : (rechazadasOn ? 'rechazadas' : (historialOn ? 'historial' : null));
+            if (filter) renderDMMissionsList(filter);
+        }, err => {
+            console.error('Missions load:', err);
+            missionsData = [];
+            renderDMMissionsList('activas');
+        });
+}
+
+function renderDMMissionsList(filter) {
+    const activasContainer = document.getElementById('dm-missions-activas-list');
+    const rechazadasContainer = document.getElementById('dm-missions-rechazadas-list');
+    const historialContainer = document.getElementById('dm-missions-historial-list');
+    if (!activasContainer || !rechazadasContainer || !historialContainer) return;
+
+    const hasRejections = (m) => {
+        if (!m.playerProgress || typeof m.playerProgress !== 'object') return false;
+        return Object.keys(m.playerProgress).some(pid => m.playerProgress[pid] && m.playerProgress[pid].status === PLAYER_PROGRESS_STATUS.rejected);
+    };
+
+    const activas = missionsData.filter(m => m.status === MISSION_STATUS.draft || m.status === MISSION_STATUS.visible);
+    const rechazadas = missionsData.filter(m => m.status === MISSION_STATUS.visible && hasRejections(m));
+    const historial = missionsData.filter(m => m.status === MISSION_STATUS.completed || m.status === MISSION_STATUS.archived);
+
+    const esc = s => String(s || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    const players = window.playersData || [];
+    const getPlayerName = (playerId) => {
+        const p = players.find(x => x.id === playerId);
+        return p ? (p.nombre || playerId) : playerId;
+    };
+
+    activasContainer.innerHTML = activas.length === 0
+        ? '<p style="color:#8b7355; text-align:center; padding:30px;">No hay misiones activas. Crea una con "+ Nueva misión".</p>'
+        : activas.map(m => {
+            const statusLabel = m.status === MISSION_STATUS.visible ? 'Visible' : 'Borrador';
+            const visibleToLabel = (m.visibleTo === 'player' && Array.isArray(m.assignedPlayerIds) && m.assignedPlayerIds.length)
+                ? `${m.assignedPlayerIds.length} jugador(es)` : (m.visibleTo === 'all' ? 'Todos' : '—');
+            const nivelLabel = m.nivel != null && m.nivel !== '' ? `Nivel ${m.nivel}` : '';
+            const desc = (m.description || '').trim();
+            const pp = m.playerProgress || {};
+            const acceptedIds = Object.keys(pp).filter(pid => pp[pid] && pp[pid].status === PLAYER_PROGRESS_STATUS.accepted);
+            const inProgressIds = Object.keys(pp).filter(pid => pp[pid] && pp[pid].status === PLAYER_PROGRESS_STATUS.in_progress);
+            const acceptedLabel = acceptedIds.length ? 'Aceptada por: ' + acceptedIds.map(pid => esc(getPlayerName(pid))).join(', ') : '';
+            const inProgressLabel = inProgressIds.length ? 'En curso: ' + inProgressIds.map(pid => esc(getPlayerName(pid))).join(', ') : '';
+            return `
+                <div class="mission-card" data-mission-id="${esc(m.id)}">
+                    <div class="mission-card-header">
+                        <h3 class="mission-card-title">${esc(m.title || 'Sin título')}</h3>
+                        <span class="mission-card-meta">${statusLabel}${nivelLabel ? ' · ' + esc(nivelLabel) : ''}</span>
+                    </div>
+                    ${desc ? `<p class="mission-card-desc">${esc(desc)}</p>` : ''}
+                    <p class="mission-card-extra">Visibilidad: ${esc(visibleToLabel)}</p>
+                    ${acceptedLabel ? `<p class="mission-card-extra" style="color:#8fbc8f;">✓ ${acceptedLabel}</p>` : ''}
+                    ${inProgressLabel ? `<p class="mission-card-extra" style="color:#d4af37;">▶ ${inProgressLabel}</p>` : ''}
+                    <div class="mission-card-actions">
+                        <button type="button" class="btn btn-small" onclick="openMissionModal('${esc(m.id)}')">Editar</button>
+                        ${m.status === MISSION_STATUS.draft ? `<button type="button" class="btn btn-small" onclick="setMissionStatus('${esc(m.id)}', 'visible')">Hacer visible</button>` : ''}
+                        ${m.status === MISSION_STATUS.visible ? `<button type="button" class="btn btn-small" onclick="setMissionStatus('${esc(m.id)}', 'completed')">Marcar completada</button>` : ''}
+                        <button type="button" class="btn btn-small btn-secondary mini-card-delete-btn" onclick="deleteMission('${esc(m.id)}')" title="Eliminar">🗑️</button>
+                    </div>
+                </div>`;
+        }).join('');
+
+    rechazadasContainer.innerHTML = rechazadas.length === 0
+        ? '<p style="color:#8b7355; text-align:center; padding:30px;">No hay misiones rechazadas.</p>'
+        : rechazadas.map(m => {
+            const rejectedPlayerIds = Object.keys(m.playerProgress || {}).filter(pid => m.playerProgress[pid] && m.playerProgress[pid].status === PLAYER_PROGRESS_STATUS.rejected);
+            const rejectedLabel = 'Rechazada por: ' + rejectedPlayerIds.map(pid => esc(getPlayerName(pid))).join(', ');
+            const visibleToLabel = (m.visibleTo === 'player' && Array.isArray(m.assignedPlayerIds) && m.assignedPlayerIds.length)
+                ? `${m.assignedPlayerIds.length} jugador(es)` : (m.visibleTo === 'all' ? 'Todos' : '—');
+            const nivelLabel = m.nivel != null && m.nivel !== '' ? ` · Nivel ${m.nivel}` : '';
+            const desc = (m.description || '').trim();
+            return `
+                <div class="mission-card" data-mission-id="${esc(m.id)}" style="border-color: #8b5a2b;">
+                    <div class="mission-card-header">
+                        <h3 class="mission-card-title">${esc(m.title || 'Sin título')}</h3>
+                        <span class="mission-card-meta">Visible${esc(nivelLabel)}</span>
+                    </div>
+                    ${desc ? `<p class="mission-card-desc">${esc(desc)}</p>` : ''}
+                    <p class="mission-card-extra">Visibilidad: ${esc(visibleToLabel)}</p>
+                    <p class="mission-card-extra" style="color:#b87333;">❌ ${rejectedLabel}</p>
+                    <div class="mission-card-actions">
+                        <button type="button" class="btn btn-small" onclick="openMissionModal('${esc(m.id)}')">Editar</button>
+                        <button type="button" class="btn btn-small" onclick="clearMissionRejections('${esc(m.id)}')" title="Quitar rechazos para que los jugadores puedan aceptarla de nuevo">Volver a asignar</button>
+                        <button type="button" class="btn btn-small" onclick="setMissionStatus('${esc(m.id)}', 'completed')">Marcar completada</button>
+                        <button type="button" class="btn btn-small btn-secondary mini-card-delete-btn" onclick="deleteMission('${esc(m.id)}')" title="Eliminar">🗑️</button>
+                    </div>
+                </div>`;
+        }).join('');
+
+    historialContainer.innerHTML = historial.length === 0
+        ? '<p style="color:#8b7355; text-align:center; padding:30px;">No hay misiones en el historial.</p>'
+        : historial.map(m => {
+            const statusLabel = m.status === MISSION_STATUS.completed ? 'Completada' : 'Archivada';
+            const completedStr = m.completedAt && m.completedAt.toDate ? m.completedAt.toDate().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+            const nivelLabel = m.nivel != null && m.nivel !== '' ? ` · Nivel ${m.nivel}` : '';
+            const desc = (m.description || '').trim();
+            return `
+                <div class="mission-card" data-mission-id="${esc(m.id)}" style="opacity: 0.92;">
+                    <div class="mission-card-header">
+                        <h3 class="mission-card-title">${esc(m.title || 'Sin título')}</h3>
+                        <span class="mission-card-meta">${statusLabel} · ${completedStr}${esc(nivelLabel)}</span>
+                    </div>
+                    ${desc ? `<p class="mission-card-desc">${esc(desc)}</p>` : ''}
+                    <div class="mission-card-actions">
+                        <button type="button" class="btn btn-small" onclick="openMissionModal('${esc(m.id)}')">Ver / Editar</button>
+                        <button type="button" class="btn btn-small" onclick="setMissionStatus('${esc(m.id)}', 'visible')" title="Volver a poner visible para jugadores">Reabrir</button>
+                        ${m.status === MISSION_STATUS.completed ? `<button type="button" class="btn btn-small btn-secondary" onclick="setMissionStatus('${esc(m.id)}', 'archived')">Archivar</button>` : ''}
+                        <button type="button" class="btn btn-small btn-secondary mini-card-delete-btn" onclick="deleteMission('${esc(m.id)}')" title="Eliminar">🗑️</button>
+                    </div>
+                </div>`;
+        }).join('');
+}
+
+function openMissionModal(missionId) {
+    const modal = document.getElementById('mission-modal');
+    const titleEl = document.getElementById('mission-modal-title');
+    const titleInput = document.getElementById('mission-title');
+    const descInput = document.getElementById('mission-description');
+    const statusSelect = document.getElementById('mission-status');
+    const visibleToSelect = document.getElementById('mission-visible-to');
+    const assignedPlayersWrap = document.getElementById('mission-assigned-players-wrap');
+    const rewardInput = document.getElementById('mission-reward');
+    const nivelInput = document.getElementById('mission-nivel');
+    if (!modal || !titleInput || !descInput) return;
+
+    if (titleEl) titleEl.textContent = missionId ? '📋 Editar misión' : '📋 Nueva misión';
+
+    if (missionId) {
+        const m = missionsData.find(x => x.id === missionId);
+        if (!m) return;
+        titleInput.value = m.title || '';
+        descInput.value = m.description || '';
+        if (rewardInput) rewardInput.value = m.reward || '';
+        if (nivelInput) nivelInput.value = m.nivel != null && m.nivel !== '' ? m.nivel : '';
+        if (statusSelect) statusSelect.value = m.status || MISSION_STATUS.draft;
+        if (visibleToSelect) visibleToSelect.value = m.visibleTo || 'all';
+        if (assignedPlayersWrap) {
+            assignedPlayersWrap.innerHTML = '';
+            const players = window.playersData || [];
+            const assigned = Array.isArray(m.assignedPlayerIds) ? m.assignedPlayerIds : [];
+            players.forEach(p => {
+                const label = document.createElement('label');
+                label.style.display = 'block';
+                label.style.marginBottom = '6px';
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.value = p.id;
+                cb.checked = assigned.includes(p.id);
+                cb.style.marginRight = '8px';
+                label.appendChild(cb);
+                label.appendChild(document.createTextNode(p.nombre || p.id));
+                assignedPlayersWrap.appendChild(label);
+            });
+        }
+        modal.dataset.missionId = missionId;
+    } else {
+        titleInput.value = '';
+        descInput.value = '';
+        if (rewardInput) rewardInput.value = '';
+        if (nivelInput) nivelInput.value = '';
+        if (statusSelect) statusSelect.value = MISSION_STATUS.draft;
+        if (visibleToSelect) visibleToSelect.value = 'all';
+        if (assignedPlayersWrap) {
+            assignedPlayersWrap.innerHTML = '';
+            (window.playersData || []).forEach(p => {
+                const label = document.createElement('label');
+                label.style.display = 'block';
+                label.style.marginBottom = '6px';
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.value = p.id;
+                cb.checked = false;
+                cb.style.marginRight = '8px';
+                label.appendChild(cb);
+                label.appendChild(document.createTextNode(p.nombre || p.id));
+                assignedPlayersWrap.appendChild(label);
+            });
+        }
+        delete modal.dataset.missionId;
+    }
+    openModal('mission-modal');
+}
+
+function saveMission() {
+    const titleInput = document.getElementById('mission-title');
+    const descInput = document.getElementById('mission-description');
+    const statusSelect = document.getElementById('mission-status');
+    const visibleToSelect = document.getElementById('mission-visible-to');
+    const assignedPlayersWrap = document.getElementById('mission-assigned-players-wrap');
+    const rewardInput = document.getElementById('mission-reward');
+    const nivelInput = document.getElementById('mission-nivel');
+    const modal = document.getElementById('mission-modal');
+    if (!titleInput || !descInput || !modal) return;
+
+    const title = (titleInput.value || '').trim();
+    if (!title) {
+        showToast('Escribe un título para la misión', true);
+        return;
+    }
+
+    const assignedPlayerIds = [];
+    if (assignedPlayersWrap) {
+        assignedPlayersWrap.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => assignedPlayerIds.push(cb.value));
+    }
+
+    const user = getCurrentUser();
+    const payload = {
+        title,
+        description: (descInput.value || '').trim(),
+        status: (statusSelect && statusSelect.value) || MISSION_STATUS.draft,
+        visibleTo: (visibleToSelect && visibleToSelect.value) || 'all',
+        assignedPlayerIds,
+        reward: (rewardInput && rewardInput.value) ? rewardInput.value.trim() : '',
+        nivel: (nivelInput && nivelInput.value !== undefined && nivelInput.value !== '') ? (isNaN(Number(nivelInput.value)) ? nivelInput.value.trim() : Number(nivelInput.value)) : null,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    const missionId = modal.dataset.missionId;
+    if (missionId) {
+        db.collection('missions').doc(missionId).update(payload).then(() => {
+            showToast('Misión actualizada');
+            closeModal('mission-modal');
+            renderDMMissionsList(document.getElementById('dm-missions-historial-panel')?.style.display === 'block' ? 'historial' : 'activas');
+        }).catch(e => {
+            showToast('Error: ' + e.message, true);
+        });
+    } else {
+        payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+        payload.createdBy = user && user.id ? user.id : '';
+        db.collection('missions').add(payload).then(() => {
+            showToast('Misión creada');
+            closeModal('mission-modal');
+            renderDMMissionsList('activas');
+        }).catch(e => {
+            showToast('Error: ' + e.message, true);
+        });
+    }
+}
+
+function setMissionStatus(missionId, status) {
+    if (!missionId) return;
+    const updates = { status, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+    if (status === MISSION_STATUS.completed) {
+        updates.completedAt = firebase.firestore.FieldValue.serverTimestamp();
+    }
+    if (status === MISSION_STATUS.visible && typeof firebase.firestore.FieldValue.delete === 'function') {
+        updates.completedAt = firebase.firestore.FieldValue.delete();
+    }
+    db.collection('missions').doc(missionId).update(updates).then(() => {
+        const msg = status === MISSION_STATUS.visible ? 'Misión reabierta (visible para jugadores)' : status === MISSION_STATUS.completed ? 'Misión marcada como completada (se actualizará en la app del jugador)' : 'Misión archivada';
+        showToast(msg);
+        renderDMMissionsList(document.getElementById('dm-missions-historial-panel')?.style.display === 'block' ? 'historial' : 'activas');
+    }).catch(e => showToast('Error: ' + e.message, true));
+}
+
+function deleteMission(missionId) {
+    if (!missionId || !confirm('¿Eliminar esta misión?')) return;
+    db.collection('missions').doc(missionId).delete().then(() => {
+        showToast('Misión eliminada');
+        const rechazadasOn = document.getElementById('dm-missions-rechazadas-panel')?.style.display !== 'none';
+        const historialOn = document.getElementById('dm-missions-historial-panel')?.style.display !== 'none';
+        renderDMMissionsList(rechazadasOn ? 'rechazadas' : (historialOn ? 'historial' : 'activas'));
+    }).catch(e => showToast('Error: ' + e.message, true));
+}
+
+function clearMissionRejections(missionId) {
+    if (!missionId) return;
+    const ref = db.collection('missions').doc(missionId);
+    ref.get().then(doc => {
+        if (!doc.exists) return;
+        const data = doc.data();
+        const playerProgress = data.playerProgress || {};
+        const rejectedPlayerIds = Object.keys(playerProgress).filter(pid =>
+            playerProgress[pid] && playerProgress[pid].status === PLAYER_PROGRESS_STATUS.rejected
+        );
+        if (!rejectedPlayerIds.length) {
+            showToast('No hay rechazos que limpiar');
+            return;
+        }
+        const updates = { updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+        if (typeof firebase.firestore.FieldValue.delete === 'function') {
+            rejectedPlayerIds.forEach(pid => {
+                updates['playerProgress.' + pid] = firebase.firestore.FieldValue.delete();
+            });
+        } else {
+            const newProgress = { ...playerProgress };
+            rejectedPlayerIds.forEach(pid => delete newProgress[pid]);
+            updates.playerProgress = newProgress;
+        }
+        ref.update(updates).then(() => {
+            showToast('Misión vuelta a asignar. Los jugadores podrán aceptarla de nuevo.');
+            const rechazadasOn = document.getElementById('dm-missions-rechazadas-panel')?.style.display !== 'none';
+            const historialOn = document.getElementById('dm-missions-historial-panel')?.style.display !== 'none';
+            renderDMMissionsList(rechazadasOn ? 'rechazadas' : (historialOn ? 'historial' : 'activas'));
+        }).catch(e => showToast('Error: ' + e.message, true));
+    }).catch(e => showToast('Error: ' + e.message, true));
+}
+
+// ---------- JUGADOR ----------
+
+function switchPlayerMissionsSubtab(subtabId) {
+    const section = document.getElementById('player-missions');
+    if (!section) return;
+    const subtabs = section.querySelectorAll('.player-missions-subtab');
+    const activasPanel = document.getElementById('player-missions-activas-panel');
+    const historialPanel = document.getElementById('player-missions-historial-panel');
+    const leyendaPanel = document.getElementById('player-missions-leyenda-panel');
+    if (!subtabs.length || !activasPanel || !historialPanel || !leyendaPanel) return;
+    subtabs.forEach(t => {
+        t.classList.toggle('active', t.getAttribute('data-player-missions-subtab') === subtabId);
+    });
+    activasPanel.style.display = subtabId === 'activas' ? 'block' : 'none';
+    historialPanel.style.display = subtabId === 'historial' ? 'block' : 'none';
+    leyendaPanel.style.display = subtabId === 'leyenda' ? 'block' : 'none';
+    if (subtabId === 'activas') loadPlayerMissions('activas');
+    if (subtabId === 'historial') loadPlayerMissions('historial');
+    if (subtabId === 'leyenda') loadPlayerLegendTracks();
+}
+
+let _playerMissionsUnsubscribe = null;
+let _missionsBadgeUnsubscribe = null;
+
+function updateMissionsPendingBadge(count) {
+    const el = document.getElementById('missions-pending-badge');
+    if (!el) return;
+    if (count > 0) {
+        el.textContent = count > 99 ? '99+' : String(count);
+        el.classList.remove('nav-badge--hidden');
+    } else {
+        el.textContent = '';
+        el.classList.add('nav-badge--hidden');
+    }
+}
+
+function startMissionsPendingBadge() {
+    const user = getCurrentUser();
+    if (!user || !user.id || !isPlayer()) return;
+    if (!document.getElementById('missions-pending-badge')) return;
+    if (typeof _missionsBadgeUnsubscribe === 'function') {
+        _missionsBadgeUnsubscribe();
+        _missionsBadgeUnsubscribe = null;
+    }
+    function isVisibleToPlayer(m) {
+        const visibleTo = (m.visibleTo || 'all').toString().toLowerCase();
+        if (visibleTo === 'all') return true;
+        const assigned = m.assignedPlayerIds;
+        const ids = Array.isArray(assigned) ? assigned : (assigned && typeof assigned === 'object' ? Object.values(assigned) : []);
+        return ids.some(pid => String(pid) === String(user.id));
+    }
+    _missionsBadgeUnsubscribe = db.collection('missions').onSnapshot(snap => {
+        const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const visible = all.filter(m => {
+            const status = (m.status || '').toString().toLowerCase();
+            return status === MISSION_STATUS.visible && isVisibleToPlayer(m);
+        });
+        const pending = visible.filter(m => !(m.playerProgress && m.playerProgress[user.id]));
+        updateMissionsPendingBadge(pending.length);
+    }, err => {
+        console.error('Missions badge:', err);
+        updateMissionsPendingBadge(0);
+    });
+}
+
+function loadPlayerMissions(subtab) {
+    const user = getCurrentUser();
+    if (!user || !user.id || !isPlayer()) return;
+    const activasContainer = document.getElementById('player-missions-activas-list');
+    const historialContainer = document.getElementById('player-missions-historial-list');
+    if (!activasContainer || !historialContainer) return;
+
+    activasContainer.innerHTML = '<p style="color:#8b7355; text-align:center; padding:20px;">Cargando misiones...</p>';
+    historialContainer.innerHTML = '<p style="color:#8b7355; text-align:center; padding:20px;">Cargando historial...</p>';
+
+    function isVisibleToPlayer(m) {
+        const visibleTo = (m.visibleTo || 'all').toString().toLowerCase();
+        if (visibleTo === 'all') return true;
+        const assigned = m.assignedPlayerIds;
+        const ids = Array.isArray(assigned) ? assigned : (assigned && typeof assigned === 'object' ? Object.values(assigned) : []);
+        return ids.some(pid => String(pid) === String(user.id));
+    }
+
+    if (typeof _playerMissionsUnsubscribe === 'function') {
+        _playerMissionsUnsubscribe();
+        _playerMissionsUnsubscribe = null;
+    }
+
+    function runMissionsSnapshot(snap, playerNamesMap) {
+        const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const visibleRaw = all.filter(m => {
+            const status = (m.status || '').toString().toLowerCase();
+            return status === MISSION_STATUS.visible && isVisibleToPlayer(m);
+        });
+        const completedOrArchived = all.filter(m => {
+            const s = (m.status || '').toString().toLowerCase();
+            return (s === MISSION_STATUS.completed || s === MISSION_STATUS.archived) && isVisibleToPlayer(m);
+        });
+
+        const uid = String(user.id);
+        const activas = visibleRaw.filter(m => {
+            const pp = m.playerProgress || {};
+            const prog = pp[user.id] || pp[uid];
+            return !prog || prog.status !== PLAYER_PROGRESS_STATUS.rejected;
+        });
+
+        const order = { in_progress: 0, accepted: 1, available: 2 };
+        activas.sort((a, b) => {
+            const getOrder = (mission) => {
+                const pp = mission.playerProgress || {};
+                const p = pp[user.id] || pp[uid];
+                if (!p) return order.available;
+                if (p.status === PLAYER_PROGRESS_STATUS.in_progress) return order.in_progress;
+                if (p.status === PLAYER_PROGRESS_STATUS.accepted) return order.accepted;
+                return order.available;
+            };
+            const o = getOrder(a) - getOrder(b);
+            if (o !== 0) return o;
+            const ta = a.createdAt && a.createdAt.toDate ? a.createdAt.toDate().getTime() : 0;
+            const tb = b.createdAt && b.createdAt.toDate ? b.createdAt.toDate().getTime() : 0;
+            return tb - ta;
+        });
+
+        const pendingCount = visibleRaw.filter(m => {
+            const pp = m.playerProgress || {};
+            return !(pp[user.id] || pp[uid]);
+        }).length;
+        updateMissionsPendingBadge(pendingCount);
+
+        completedOrArchived.sort((a, b) => {
+            const ta = a.completedAt && a.completedAt.toDate ? a.completedAt.toDate().getTime() : 0;
+            const tb = b.completedAt && b.completedAt.toDate ? b.completedAt.toDate().getTime() : 0;
+            return tb - ta;
+        });
+
+        renderPlayerMissionsLists(activas, completedOrArchived, user.id, subtab, playerNamesMap || {});
+    }
+
+    db.collection('players').get().then(playersSnap => {
+        const playerNamesMap = {};
+        playersSnap.docs.forEach(d => {
+            const data = d.data();
+            const nombre = (data.nombre || data.name || '').toString().trim();
+            playerNamesMap[d.id] = nombre;
+            playerNamesMap[String(d.id)] = nombre;
+        });
+
+        _playerMissionsUnsubscribe = db.collection('missions').onSnapshot(snap => {
+            runMissionsSnapshot(snap, playerNamesMap);
+        }, err => {
+            console.error('Player missions:', err);
+            activasContainer.innerHTML = '<p style="color:#8b7355; text-align:center; padding:30px;">No se pudieron cargar las misiones.</p>';
+            historialContainer.innerHTML = '<p style="color:#8b7355; text-align:center; padding:30px;">No se pudo cargar el historial.</p>';
+        });
+    }).catch(() => {
+        _playerMissionsUnsubscribe = db.collection('missions').onSnapshot(snap => {
+            runMissionsSnapshot(snap, {});
+        }, err => {
+            console.error('Player missions:', err);
+            activasContainer.innerHTML = '<p style="color:#8b7355; text-align:center; padding:30px;">No se pudieron cargar las misiones.</p>';
+            historialContainer.innerHTML = '<p style="color:#8b7355; text-align:center; padding:30px;">No se pudo cargar el historial.</p>';
+        });
+    });
+}
+
+function renderPlayerMissionsLists(activas, historial, playerId, subtab, playerNamesMap) {
+    const activasContainer = document.getElementById('player-missions-activas-list');
+    const historialContainer = document.getElementById('player-missions-historial-list');
+    if (!activasContainer || !historialContainer) return;
+
+    const esc = s => String(s || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const getName = (pid, p) => {
+        const name = (p && (p.playerName || p.nombre)) || (playerNamesMap && (playerNamesMap[pid] || playerNamesMap[String(pid)]));
+        return (name && String(name).trim()) || 'Aventurero';
+    };
+
+    activasContainer.innerHTML = activas.length === 0
+        ? '<p style="color:#8b7355; text-align:center; padding:30px;">No tienes misiones activas. El DM hará visibles las misiones cuando estén listas.</p>'
+        : activas.map(m => {
+            const pp = m.playerProgress || {};
+            const prog = pp[playerId] || pp[String(playerId)] || null;
+            const progressStatus = prog ? prog.status : null;
+            const statusLabel = progressStatus === PLAYER_PROGRESS_STATUS.in_progress ? 'En curso' : progressStatus === PLAYER_PROGRESS_STATUS.accepted ? 'Aceptada' : 'Disponible';
+            const nivelLabel = m.nivel != null && m.nivel !== '' ? ` · Nivel ${m.nivel}` : '';
+            const desc = (m.description || '').trim();
+            const partyNames = Object.keys(pp)
+                .filter(pid => {
+                    const p = pp[pid];
+                    return p && (p.status === PLAYER_PROGRESS_STATUS.accepted || p.status === PLAYER_PROGRESS_STATUS.in_progress);
+                })
+                .map(pid => getName(pid, pp[pid]));
+            const partyLabel = partyNames.length ? 'Party: ' + partyNames.map(n => esc(n)).join(', ') : '';
+            const notesListRaw = (prog && Array.isArray(prog.notesList)) ? prog.notesList : [];
+            const legacyNotes = (prog && (prog.notes || prog.notas || '')) ? String(prog.notes || prog.notas).trim() : '';
+            const notesList = notesListRaw.length > 0
+                ? notesListRaw
+                : (legacyNotes ? [{ text: legacyNotes, createdAt: null }] : []);
+            const notesCount = notesList.length;
+            const notesListWithIndex = notesList.map((n, i) => ({ ...n, originalIndex: i }));
+            const notesListSorted = [...notesListWithIndex].sort((a, b) => {
+                const ta = (a && a.createdAt && a.createdAt.toMillis) ? a.createdAt.toMillis() : 0;
+                const tb = (b && b.createdAt && b.createdAt.toMillis) ? b.createdAt.toMillis() : 0;
+                return tb - ta;
+            });
+            const notesListHtml = notesListSorted.length === 0
+                ? ''
+                : '<ul class="player-mission-notes-list">' + notesListSorted
+                    .map(n => {
+                        const t = (n && n.text) ? String(n.text).trim() : '';
+                        if (!t) return '';
+                        const dateStr = n.createdAt && n.createdAt.toDate
+                            ? n.createdAt.toDate().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                            : '';
+                        const idx = n.originalIndex != null ? n.originalIndex : -1;
+                        return `<li class="player-mission-notes-item" data-mission-id="${esc(m.id)}" data-note-index="${idx}"><span class="player-mission-notes-item-date">${esc(dateStr)}</span><div class="player-mission-notes-item-text">${esc(t).replace(/\n/g, '<br>')}</div><div class="player-mission-notes-item-actions"><button type="button" class="btn btn-small btn-notes-action" onclick="startEditMissionNote('${esc(m.id)}', ${idx})" title="Editar">✏️</button><button type="button" class="btn btn-small btn-notes-action btn-secondary" onclick="deletePlayerMissionNote('${esc(m.id)}', ${idx})" title="Borrar">🗑️</button></div></li>`;
+                    })
+                    .filter(Boolean)
+                    .join('') + '</ul>';
+            const notesSection = progressStatus === PLAYER_PROGRESS_STATUS.in_progress
+                ? `<div class="player-mission-notes-wrap">
+                        <details class="player-mission-notes-details" ${notesCount > 0 ? 'open' : ''}>
+                            <summary class="player-mission-notes-summary">📝 Mis notas${notesCount > 0 ? ' (' + notesCount + ')' : ''}</summary>
+                            <div class="player-mission-notes-inner">
+                                ${notesListHtml}
+                                <textarea id="player-mission-notes-${esc(m.id)}" class="player-mission-notes-input" rows="3" placeholder="Añade una nota (pistas, avances, recordatorios...)"></textarea>
+                                <button type="button" class="btn btn-small" onclick="savePlayerMissionNotes('${esc(m.id)}')">Añadir nota</button>
+                            </div>
+                        </details>
+                    </div>`
+                : '';
+            return `
+                <div class="mission-card" data-mission-id="${esc(m.id)}">
+                    <div class="mission-card-header">
+                        <h3 class="mission-card-title">${esc(m.title || 'Sin título')}</h3>
+                        <span class="mission-card-meta">${statusLabel}${esc(nivelLabel)}</span>
+                    </div>
+                    ${desc ? `<p class="mission-card-desc">${esc(desc)}</p>` : ''}
+                    ${m.reward ? `<p class="mission-card-extra">🎁 ${esc(m.reward)}</p>` : ''}
+                    ${partyLabel ? `<p class="mission-card-extra" style="color:#8fbc8f;">👥 ${partyLabel}</p>` : ''}
+                    <div class="mission-card-actions">
+                        ${!progressStatus ? `<button type="button" class="btn btn-small" onclick="updatePlayerMissionProgress('${esc(m.id)}', 'accepted')">Aceptar misión</button><button type="button" class="btn btn-small btn-secondary" onclick="updatePlayerMissionProgress('${esc(m.id)}', 'rejected')">Rechazar</button>` : ''}
+                        ${progressStatus === PLAYER_PROGRESS_STATUS.accepted ? `<button type="button" class="btn btn-small" onclick="updatePlayerMissionProgress('${esc(m.id)}', 'in_progress')">En curso</button>` : ''}
+                    </div>
+                    ${notesSection}
+                </div>`;
+        }).join('');
+
+    historialContainer.innerHTML = historial.length === 0
+        ? '<p style="color:#8b7355; text-align:center; padding:30px;">Misiones que el DM ha marcado como completadas aparecerán aquí.</p>'
+        : historial.map(m => {
+            const completedAt = m.completedAt && m.completedAt.toDate ? m.completedAt.toDate().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+            const nivelLabel = m.nivel != null && m.nivel !== '' ? ` · Nivel ${m.nivel}` : '';
+            const desc = (m.description || '').trim();
+            return `
+                <div class="mission-card" style="opacity: 0.92;">
+                    <div class="mission-card-header">
+                        <h3 class="mission-card-title">${esc(m.title || 'Sin título')}</h3>
+                        <span class="mission-card-meta">Completada · ${completedAt}${esc(nivelLabel)}</span>
+                    </div>
+                    ${desc ? `<p class="mission-card-desc">${esc(desc)}</p>` : ''}
+                    ${m.reward ? `<p class="mission-card-extra">🎁 ${esc(m.reward)}</p>` : ''}
+                </div>`;
+        }).join('');
+}
+
+function savePlayerMissionNotes(missionId) {
+    const user = getCurrentUser();
+    if (!user || !user.id || !isPlayer() || !missionId) return;
+    const textarea = document.getElementById('player-mission-notes-' + missionId);
+    const newText = textarea ? textarea.value.trim() : '';
+    if (!newText) {
+        showToast('Escribe algo para añadir una nota', true);
+        return;
+    }
+    const ref = db.collection('missions').doc(missionId);
+    ref.get().then(doc => {
+        if (!doc.exists) return;
+        const data = doc.data();
+        const playerProgress = data.playerProgress || {};
+        const current = playerProgress[user.id] || {};
+        const existingList = Array.isArray(current.notesList) ? current.notesList : [];
+        const legacyNotes = (current.notes || current.notas || '').trim();
+        const baseList = existingList.length > 0
+            ? existingList
+            : (legacyNotes ? [{ text: legacyNotes, createdAt: null }] : []);
+        const notesList = [
+            ...baseList,
+            { text: newText, createdAt: firebase.firestore.Timestamp.now() }
+        ];
+        playerProgress[user.id] = {
+            ...current,
+            status: current.status || PLAYER_PROGRESS_STATUS.in_progress,
+            notesList,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            playerName: current.playerName || user.nombre || ''
+        };
+        ref.update({
+            playerProgress,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }).then(() => {
+            if (textarea) textarea.value = '';
+            showToast('Nota añadida');
+        }).catch(e => showToast('Error: ' + e.message, true));
+    }).catch(e => showToast('Error: ' + e.message, true));
+}
+
+function deletePlayerMissionNote(missionId, noteIndex) {
+    const user = getCurrentUser();
+    if (!user || !user.id || !isPlayer() || !missionId || noteIndex == null) return;
+    const ref = db.collection('missions').doc(missionId);
+    ref.get().then(doc => {
+        if (!doc.exists) return;
+        const data = doc.data();
+        const playerProgress = data.playerProgress || {};
+        const current = playerProgress[user.id] || {};
+        const notesList = Array.isArray(current.notesList) ? [...current.notesList] : [];
+        if (noteIndex < 0 || noteIndex >= notesList.length) return;
+        notesList.splice(noteIndex, 1);
+        playerProgress[user.id] = {
+            ...current,
+            status: current.status || PLAYER_PROGRESS_STATUS.in_progress,
+            notesList,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            playerName: current.playerName || user.nombre || ''
+        };
+        ref.update({
+            playerProgress,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }).then(() => showToast('Nota borrada')).catch(e => showToast('Error: ' + e.message, true));
+    }).catch(e => showToast('Error: ' + e.message, true));
+}
+
+function updatePlayerMissionNote(missionId, noteIndex, newText) {
+    const user = getCurrentUser();
+    if (!user || !user.id || !isPlayer() || !missionId || noteIndex == null) return;
+    const text = (newText || '').trim();
+    const ref = db.collection('missions').doc(missionId);
+    ref.get().then(doc => {
+        if (!doc.exists) return;
+        const data = doc.data();
+        const playerProgress = data.playerProgress || {};
+        const current = playerProgress[user.id] || {};
+        const notesList = Array.isArray(current.notesList) ? [...current.notesList] : [];
+        if (noteIndex < 0 || noteIndex >= notesList.length) return;
+        const note = notesList[noteIndex];
+        notesList[noteIndex] = { ...note, text };
+        playerProgress[user.id] = {
+            ...current,
+            status: current.status || PLAYER_PROGRESS_STATUS.in_progress,
+            notesList,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            playerName: current.playerName || user.nombre || ''
+        };
+        ref.update({
+            playerProgress,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }).then(() => showToast('Nota guardada')).catch(e => showToast('Error: ' + e.message, true));
+    }).catch(e => showToast('Error: ' + e.message, true));
+}
+
+function startEditMissionNote(missionId, noteIndex) {
+    const card = document.querySelector('.mission-card[data-mission-id="' + missionId + '"]');
+    if (!card) return;
+    const li = card.querySelector('.player-mission-notes-item[data-note-index="' + noteIndex + '"]');
+    if (!li) return;
+    const dateEl = li.querySelector('.player-mission-notes-item-date');
+    const textEl = li.querySelector('.player-mission-notes-item-text');
+    if (!textEl) return;
+    const dateStr = dateEl ? dateEl.textContent : '';
+    const currentText = (textEl.innerText || textEl.textContent || '');
+    const savedHtml = li.innerHTML;
+    li.innerHTML = '';
+    const wrap = document.createElement('div');
+    wrap.className = 'player-mission-notes-edit-wrap';
+    const textarea = document.createElement('textarea');
+    textarea.className = 'player-mission-notes-input player-mission-notes-edit-input';
+    textarea.rows = 4;
+    textarea.value = currentText;
+    const btnWrap = document.createElement('div');
+    btnWrap.className = 'player-mission-notes-edit-buttons';
+    const btnSave = document.createElement('button');
+    btnSave.type = 'button';
+    btnSave.className = 'btn btn-small';
+    btnSave.textContent = 'Guardar';
+    btnSave.onclick = () => {
+        const val = textarea.value.trim();
+        if (!val) { showToast('La nota no puede estar vacía', true); return; }
+        updatePlayerMissionNote(missionId, noteIndex, val);
+    };
+    const btnCancel = document.createElement('button');
+    btnCancel.type = 'button';
+    btnCancel.className = 'btn btn-small btn-secondary';
+    btnCancel.textContent = 'Cancelar';
+    btnCancel.onclick = () => {
+        li.innerHTML = savedHtml;
+    };
+    btnWrap.appendChild(btnSave);
+    btnWrap.appendChild(btnCancel);
+    wrap.appendChild(textarea);
+    wrap.appendChild(btnWrap);
+    li.appendChild(wrap);
+    textarea.focus();
+}
+
+function updatePlayerMissionProgress(missionId, status) {
+    const user = getCurrentUser();
+    if (!user || !user.id || !isPlayer() || !missionId) return;
+    if (status === 'completed') return;
+    const ref = db.collection('missions').doc(missionId);
+    ref.get().then(doc => {
+        if (!doc.exists) return;
+        const data = doc.data();
+        const playerProgress = data.playerProgress || {};
+        playerProgress[user.id] = {
+            status,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            playerName: user.nombre || ''
+        };
+        ref.update({
+            playerProgress,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }).then(() => {
+            if (status === PLAYER_PROGRESS_STATUS.accepted) showToast('Misión aceptada');
+            else if (status === PLAYER_PROGRESS_STATUS.in_progress) showToast('Marcada en curso');
+            else if (status === PLAYER_PROGRESS_STATUS.rejected) showToast('Misión rechazada');
+        }).catch(e => showToast('Error: ' + e.message, true));
+    }).catch(e => showToast('Error: ' + e.message, true));
+}
+
+// ==================== ESCUCHA LA LEYENDA (audio MP3 por link) ====================
+const LEGEND_COLLECTION = 'legend_audio';
+let _legendUnsubscribe = null;
+let _playerLegendUnsubscribe = null;
+
+function loadLegendTracks() {
+    const container = document.getElementById('dm-legend-list');
+    if (!container) return;
+    if (typeof _legendUnsubscribe === 'function') {
+        _legendUnsubscribe();
+        _legendUnsubscribe = null;
+    }
+    _legendUnsubscribe = db.collection(LEGEND_COLLECTION)
+        .orderBy('createdAt', 'desc')
+        .onSnapshot(snap => {
+            const tracks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            renderLegendList(container, tracks, true);
+        }, err => {
+            console.error('Legend load:', err);
+            container.innerHTML = '<p style="color:#8b7355; text-align:center; padding:30px;">No se pudieron cargar los audios.</p>';
+        });
+}
+
+function renderLegendList(container, tracks, isDM) {
+    if (!container) return;
+    const esc = s => String(s || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    if (tracks.length === 0) {
+        container.innerHTML = '<p style="color:#8b7355; text-align:center; padding:30px;">Aún no hay audios. El DM puede añadir enlaces a MP3.</p>';
+        return;
+    }
+    container.innerHTML = tracks.map(t => {
+        const title = esc(t.title || 'Audio');
+        const desc = (t.description || t.desc || '').trim();
+        const descHtml = desc ? `<div class="legend-track-desc"><p class="legend-track-desc-text">${esc(desc).replace(/\n/g, '<br>')}</p></div>` : '';
+        const url = (t.url || '').trim();
+        const safeUrl = url ? esc(url) : '';
+        const audioHtml = url
+            ? `<div class="legend-track-audio"><audio controls preload="metadata"><source src="${safeUrl}" type="audio/mpeg">Tu navegador no soporta audio.</audio></div>`
+            : '<div class="legend-track-audio"><p style="color:#8b7355; font-size:0.9em;">URL no válida</p></div>';
+        const actionsBtns = isDM
+            ? `<button type="button" class="btn btn-small" onclick="openLegendEditModal('${esc(t.id)}')" title="Editar">✏️ Editar</button><button type="button" class="btn btn-small btn-secondary mini-card-delete-btn" onclick="deleteLegendTrack('${esc(t.id)}')" title="Eliminar">🗑️</button>`
+            : '';
+        return `
+            <div class="mission-card legend-card">
+                <div class="mission-card-header">
+                    <h3 class="mission-card-title">🎧 ${title}</h3>
+                    ${actionsBtns}
+                </div>
+                <div class="legend-track-body">
+                    ${descHtml}
+                    ${audioHtml}
+                </div>
+            </div>`;
+    }).join('');
+}
+
+function addLegendTrack() {
+    const urlInput = document.getElementById('legend-audio-url');
+    const titleInput = document.getElementById('legend-audio-title');
+    const descInput = document.getElementById('legend-audio-description');
+    if (!urlInput) return;
+    const url = (urlInput.value || '').trim();
+    if (!url) {
+        showToast('Escribe la URL del audio (MP3 u otro)', true);
+        return;
+    }
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        showToast('La URL debe comenzar con https:// (o http://)', true);
+        return;
+    }
+    const title = (titleInput && titleInput.value) ? titleInput.value.trim() : '';
+    const description = (descInput && descInput.value) ? descInput.value.trim() : '';
+    db.collection(LEGEND_COLLECTION).add({
+        url,
+        title: title || 'Audio',
+        description: description || '',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(() => {
+        showToast('Audio añadido');
+        if (urlInput) urlInput.value = '';
+        if (titleInput) titleInput.value = '';
+        if (descInput) descInput.value = '';
+    }).catch(e => showToast('Error: ' + e.message, true));
+}
+
+function openLegendEditModal(trackId) {
+    const modal = document.getElementById('legend-edit-modal');
+    const urlInput = document.getElementById('legend-edit-url');
+    const titleInput = document.getElementById('legend-edit-title');
+    const descInput = document.getElementById('legend-edit-description');
+    if (!modal || !urlInput || !titleInput) return;
+    db.collection(LEGEND_COLLECTION).doc(trackId).get().then(doc => {
+        if (!doc.exists) return;
+        const t = doc.data();
+        urlInput.value = (t.url || '').trim();
+        titleInput.value = (t.title || '').trim();
+        if (descInput) descInput.value = (t.description || t.desc || '').trim();
+        modal.dataset.trackId = trackId;
+        openModal('legend-edit-modal');
+    }).catch(e => showToast('Error: ' + e.message, true));
+}
+
+function saveLegendTrack() {
+    const modal = document.getElementById('legend-edit-modal');
+    const trackId = modal && modal.dataset.trackId;
+    const urlInput = document.getElementById('legend-edit-url');
+    const titleInput = document.getElementById('legend-edit-title');
+    const descInput = document.getElementById('legend-edit-description');
+    if (!trackId || !urlInput) return;
+    const url = (urlInput.value || '').trim();
+    if (!url) {
+        showToast('La URL del audio es obligatoria', true);
+        return;
+    }
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        showToast('La URL debe comenzar con https:// (o http://)', true);
+        return;
+    }
+    const title = (titleInput && titleInput.value) ? titleInput.value.trim() : '';
+    const description = (descInput && descInput.value) ? descInput.value.trim() : '';
+    db.collection(LEGEND_COLLECTION).doc(trackId).update({
+        url,
+        title: title || 'Audio',
+        description: description || '',
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(() => {
+        showToast('Audio actualizado');
+        closeModal('legend-edit-modal');
+        delete modal.dataset.trackId;
+    }).catch(e => showToast('Error: ' + e.message, true));
+}
+
+function deleteLegendTrack(id) {
+    if (!id || !confirm('¿Eliminar este audio?')) return;
+    db.collection(LEGEND_COLLECTION).doc(id).delete().then(() => {
+        showToast('Audio eliminado');
+    }).catch(e => showToast('Error: ' + e.message, true));
+}
+
+function loadPlayerLegendTracks() {
+    const container = document.getElementById('player-legend-list');
+    if (!container) return;
+    if (typeof _playerLegendUnsubscribe === 'function') {
+        _playerLegendUnsubscribe();
+        _playerLegendUnsubscribe = null;
+    }
+    _playerLegendUnsubscribe = db.collection(LEGEND_COLLECTION)
+        .orderBy('createdAt', 'desc')
+        .onSnapshot(snap => {
+            const tracks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            renderLegendList(container, tracks, false);
+        }, err => {
+            console.error('Player legend load:', err);
+            container.innerHTML = '<p style="color:#8b7355; text-align:center; padding:30px;">No se pudieron cargar los audios.</p>';
+        });
+}

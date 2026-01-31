@@ -1,4 +1,4 @@
-# 🏰 Nueva Valdoria
+# 🏰 D&D Companion
 
 **Dashboard para Dungeon Master** y **app de personajes** en una sola entrada. Login compartido por tipo de usuario (DM o Personaje), nombre y PIN. Diseñado para campañas de D&D y juegos de rol por turnos.
 
@@ -25,6 +25,7 @@ El primer DM se crea desde el login con **"👑 Crear Cuenta DM"**. Los personaj
 | 👥 **Jugadores** | Grupo de aventureros: crear, editar, oro, inventario, banco, Cartas del Destino, Mi Casa, dar ítems. Crear otro DM. |
 | 🏘️ **Ciudades/Pueblos** | Ciudades con nivel de peligro, visibilidad a jugadores, notas por ciudad. NPCs y tiendas por ciudad. |
 | 📮 **Notificaciones** | **Enviar**: cartas a uno o todos los jugadores. **Historial**: notificaciones enviadas. **🤖 Mensajes automáticos**: reglas que envían un mensaje al correo del jugador al comprar un ítem o rentar un cuarto, y opcionalmente quitar el ítem de la tienda. Las reglas se crean, editan y eliminan desde aquí. |
+| 📋 **Misiones** | Crear misiones (título, descripción, recompensa), hacerlas visibles a todos o a jugadores asignados. **Activas**: borrador/visible. **Historial**: completadas o archivadas. Los aventureros ven solo las visibles y trackean su progreso (aceptar, en curso, completada). |
 | 📜 **Historial** | Transacciones (compras, hospedaje, retiros, etc.) con filtros por aventurero y tienda. |
 | ⚔️ **Battle Tracker** | Abre `battle-tracker.html` en nueva pestaña. |
 | 🚪 **Salir** | Cerrar sesión. |
@@ -57,6 +58,7 @@ El primer DM se crea desde el login con **"👑 Crear Cuenta DM"**. Los personaj
 | 🎒 **Inventario** | Ítems del personaje. Buscador por nombre/efecto y filtro por tipo de tienda. Vista tabla en escritorio y tarjetas en móvil. |
 | 🃏 **CDD & Correo** | **Cartas del Destino** asignadas por el DM. **Correo**: cartas nuevas y historial. Badge con cantidad de correos sin leer en el botón de nav y en el subtab Correo. |
 | 🏠 **Home** | **Mi Casa**: nombre, imagen, descripción, ubicación, notas del DM. Notas personales editables por el jugador. |
+| 📋 **Misiones** | Misiones que el DM ha hecho visibles. **Activas**: aceptar, marcar en curso o completada. **Historial**: misiones completadas. |
 | ⚔️ **Battle Tracker** | Abre `battle-tracker.html` en nueva pestaña. |
 | 🚪 **Salir** | Cerrar sesión. |
 
@@ -96,6 +98,8 @@ dm-dashboard-modular/
 ├── battle-tracker.html     # Tracker de combate (abre desde nav DM/Personaje)
 ├── heroes-legendarios.html # Página adicional (héroes legendarios)
 ├── .firebaserc             # Proyecto Firebase por defecto (nueva-valdoria)
+├── firebase.json           # Configuración Firebase (reglas Firestore)
+├── firestore.rules         # Reglas de seguridad Firestore (missions, legend_audio, etc.)
 ├── AUTH_SETUP.md           # Configuración de autenticación y colecciones
 ├── CREAR_DM.md             # Cómo crear el primer DM
 ├── README.md               # Este archivo
@@ -117,6 +121,7 @@ dm-dashboard-modular/
     ├── transactions.js     # Historial de transacciones
     ├── notifications.js    # Notificaciones DM, correo personaje, badge sin leer
     ├── automation.js       # Reglas de mensajes automáticos
+    ├── missions.js         # Misiones: DM crea/edita/visibilidad; jugador trackea progreso e historial
     └── player-app.js       # Solo usado por player.html (entrada opcional)
 ```
 
@@ -146,11 +151,25 @@ dm-dashboard-modular/
 | `transactions` | Compras, hospedaje, retiros, etc. |
 | `notifications` | Cartas enviadas a personajes (mensaje, leida, playerId, etc.). |
 | `automation_rules` | Reglas de mensajes automáticos (tienda, ítem/cuarto, mensaje, quitar de tienda). |
+| `missions` | Misiones (título, descripción, status: draft/visible/completed/archived, visibleTo, assignedPlayerIds, reward, playerProgress por jugador, completedAt). |
+| `legend_audio` | Audios de "Escucha la leyenda" (título, url, descripción). DM CRUD; jugador solo lectura. |
 | `settings` | Configuración global; documento `map` para nombre del continente y URL del mapa. |
 
 Subcolecciones: `cities/{id}/playerNotes` para notas de jugadores por ciudad.
 
 Configuración de Firebase en `js/app.js` (`firebaseConfig`). Proyecto por defecto: `nueva-valdoria` (`.firebaserc`).
+
+### Reglas de Firestore
+
+El proyecto incluye `firestore.rules` y `firebase.json` para desplegar las reglas desde la CLI. Las reglas permiten lectura y escritura en todas las colecciones usadas por la app (incluidas `missions` y `legend_audio`). La app usa autenticación custom (nombre + PIN), no Firebase Auth, por lo que las reglas no pueden distinguir DM de jugador en el servidor; mantén el enlace del dashboard privado o usa Firebase App Check si lo expones.
+
+**Desplegar reglas:**
+
+```bash
+firebase deploy --only firestore:rules
+```
+
+Requisito: tener Firebase CLI instalado y haber hecho `firebase login` y `firebase use nueva-valdoria` (o tu proyecto).
 
 ---
 

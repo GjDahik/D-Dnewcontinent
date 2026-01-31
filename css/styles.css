@@ -695,6 +695,245 @@ body {
 .mini-card-info { color: #8b7355; font-size: 0.9em; margin-bottom: 10px; }
 .mini-card-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
+/* Tarjetas de misiones: layout ordenado, títulos largos sin desbordar */
+.missions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+.mission-card {
+    background: linear-gradient(180deg, #2a2522 0%, #1e1b18 100%);
+    border: 1px solid #4a3c31;
+    border-radius: 8px;
+    padding: 18px 20px;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.mission-card:hover {
+    border-color: #8b5a2b;
+    box-shadow: 0 2px 12px rgba(139, 90, 43, 0.15);
+}
+.mission-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 10px;
+    min-height: 0;
+}
+.mission-card-title {
+    font-family: 'Cinzel', serif;
+    color: #d4af37;
+    font-size: 1.05em;
+    line-height: 1.35;
+    margin: 0;
+    flex: 1;
+    min-width: 0;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+.mission-card-meta {
+    flex-shrink: 0;
+    font-size: 0.8em;
+    color: #8b7355;
+    white-space: nowrap;
+    text-align: right;
+}
+.mission-card-desc {
+    color: #a89878;
+    font-size: 0.9em;
+    line-height: 1.5;
+    margin: 0 0 10px 0;
+    max-height: 4.5em;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    word-wrap: break-word;
+}
+.mission-card-extra {
+    color: #8b7355;
+    font-size: 0.85em;
+    margin-bottom: 12px;
+}
+.mission-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+.mission-card-actions .btn { flex-shrink: 0; }
+
+/* Notas del jugador en misiones (En curso): área desplegable + lista */
+.player-mission-notes-wrap {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid #4a3c31;
+}
+.player-mission-notes-details {
+    border: 1px solid #4a3c31;
+    border-radius: 8px;
+    background: rgba(26, 26, 26, 0.5);
+    overflow: hidden;
+}
+.player-mission-notes-summary {
+    padding: 10px 14px;
+    cursor: pointer;
+    color: #a89878;
+    font-size: 0.95em;
+    font-family: 'Crimson Text', serif;
+    list-style: none;
+    user-select: none;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+.player-mission-notes-summary::-webkit-details-marker { display: none; }
+.player-mission-notes-summary::before {
+    content: '▶';
+    display: inline-block;
+    margin-right: 8px;
+    font-size: 0.7em;
+    transition: transform 0.2s ease;
+}
+.player-mission-notes-details[open] .player-mission-notes-summary::before {
+    transform: rotate(90deg);
+}
+.player-mission-notes-summary:hover {
+    background: rgba(139, 90, 43, 0.15);
+    color: #d4c4a8;
+}
+.player-mission-notes-inner {
+    padding: 12px 14px 14px;
+    border-top: 1px solid #4a3c31;
+}
+.player-mission-notes-list {
+    list-style: none;
+    margin: 0 0 14px 0;
+    padding: 0;
+}
+.player-mission-notes-item {
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    background: rgba(26, 26, 26, 0.7);
+    border: 1px solid #4a3c31;
+    border-radius: 6px;
+    border-left: 3px solid #8b5a2b;
+}
+.player-mission-notes-item:last-child { margin-bottom: 0; }
+.player-mission-notes-item-date {
+    display: block;
+    font-size: 0.75em;
+    color: #8b7355;
+    margin-bottom: 4px;
+}
+.player-mission-notes-item-date:empty { display: none; }
+.player-mission-notes-item-text {
+    color: #d4c4a8;
+    font-family: 'Crimson Text', serif;
+    font-size: 0.95em;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+.player-mission-notes-item-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+}
+.player-mission-notes-item-actions .btn-notes-action {
+    padding: 4px 8px;
+    font-size: 0.85em;
+}
+.player-mission-notes-edit-wrap {
+    width: 100%;
+}
+.player-mission-notes-edit-wrap .player-mission-notes-edit-input {
+    margin-bottom: 8px;
+}
+.player-mission-notes-edit-buttons {
+    display: flex;
+    gap: 8px;
+}
+.player-mission-notes-input {
+    width: 100%;
+    min-height: 80px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    background: #1a1a1a;
+    border: 2px solid #4a3c31;
+    border-radius: 8px;
+    color: #d4c4a8;
+    font-family: 'Crimson Text', serif;
+    font-size: 0.95em;
+    line-height: 1.6;
+    resize: vertical;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.player-mission-notes-input:focus {
+    outline: none;
+    border-color: #8b5a2b;
+    box-shadow: 0 0 10px rgba(139, 90, 43, 0.35);
+}
+.player-mission-notes-input::placeholder {
+    color: #6b5d4a;
+    font-style: italic;
+}
+.player-mission-notes-wrap .btn {
+    margin-top: 0;
+}
+
+/* Escucha la leyenda: descripción junto al reproductor en PC, apilado en móvil */
+.legend-card .legend-track-body {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    margin-top: 4px;
+}
+.legend-track-desc {
+    flex: 1;
+    min-width: 0;
+    color: #a89878;
+    font-size: 0.9em;
+    line-height: 1.5;
+}
+.legend-track-desc-text { margin: 0; word-wrap: break-word; white-space: pre-wrap; }
+.legend-track-audio {
+    flex: 0 0 auto;
+    min-width: 220px;
+    max-width: 100%;
+}
+.legend-track-audio audio {
+    width: 100%;
+    min-width: 200px;
+    max-width: 380px;
+    height: 40px;
+}
+@media (max-width: 768px) {
+    .legend-card .legend-track-body {
+        flex-direction: column;
+        gap: 12px;
+    }
+    .legend-track-desc { min-width: 100%; }
+    .legend-track-audio {
+        min-width: 100%;
+        width: 100%;
+    }
+    .legend-track-audio audio {
+        min-width: 100%;
+        max-width: 100%;
+    }
+    .legend-card .mission-card-header {
+        flex-wrap: wrap;
+    }
+    .legend-card .mission-card-header .mission-card-title { flex: 1 1 100%; }
+}
+
+/* Formulario Escucha la leyenda: en móvil campos y botón apilados */
+@media (max-width: 480px) {
+    .legend-form-row > div { flex: 1 1 100% !important; min-width: 100% !important; }
+    .legend-form-row .btn { width: 100%; }
+}
+
 /* Modal */
 .modal-overlay {
     display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;

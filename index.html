@@ -32,6 +32,7 @@
             <button class="nav-tab nav-tab-type-players" data-tab="players">👥 Jugadores</button>
             <button class="nav-tab nav-tab-type-cities" data-tab="cities">🏘️ Ciudades/Pueblos</button>
             <button class="nav-tab nav-tab-type-notifications" data-tab="notifications">📮 Notificaciones</button>
+            <button class="nav-tab nav-tab-type-missions" data-tab="missions">📋 Misiones</button>
             <button class="nav-tab nav-tab-type-transactions" data-tab="transactions">📜 Historial</button>
             <button class="nav-tab nav-tab-type-battle" type="button" onclick="window.open('battle-tracker.html', '_blank')" title="Abrir en nueva pestaña">⚔️ Battle Tracker</button>
             <button class="nav-tab nav-tab-logout" type="button" onclick="closeMobileNav('dm'); logout();">🚪 Salir</button>
@@ -156,6 +157,62 @@
             </div>
         </section>
 
+        <!-- MISIONES (DM) -->
+        <section id="missions" class="tab-content">
+            <div class="section-header">
+                <h2>📋 Misiones</h2>
+                <button type="button" class="btn" onclick="openMissionModal()">+ Nueva misión</button>
+            </div>
+            <div class="dm-missions-subtabs" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;">
+                <button type="button" class="dm-notifications-subtab dm-missions-subtab active" data-dm-missions-subtab="activas" onclick="switchDMMissionsSubtab('activas')">📌 Activas</button>
+                <button type="button" class="dm-notifications-subtab dm-missions-subtab" data-dm-missions-subtab="rechazadas" onclick="switchDMMissionsSubtab('rechazadas')">❌ Rechazadas</button>
+                <button type="button" class="dm-notifications-subtab dm-missions-subtab" data-dm-missions-subtab="historial" onclick="switchDMMissionsSubtab('historial')">📜 Historial (completadas)</button>
+                <button type="button" class="dm-notifications-subtab dm-missions-subtab" data-dm-missions-subtab="leyenda" onclick="switchDMMissionsSubtab('leyenda')">🎧 Escucha la leyenda</button>
+            </div>
+            <div id="dm-missions-container">
+                <div id="dm-missions-activas-panel" class="dm-notifications-subtab-content" style="display: block;">
+                    <div id="dm-missions-activas-list" class="missions-list">
+                        <p style="color:#8b7355; text-align:center; padding:20px;">Cargando misiones...</p>
+                    </div>
+                </div>
+                <div id="dm-missions-rechazadas-panel" class="dm-notifications-subtab-content" style="display: none;">
+                    <p class="dm-notifications-historial-desc">Misiones que uno o más jugadores han rechazado. Puedes volver a asignarlas.</p>
+                    <div id="dm-missions-rechazadas-list" class="missions-list">
+                        <p style="color:#8b7355; text-align:center; padding:20px;">Cargando...</p>
+                    </div>
+                </div>
+                <div id="dm-missions-historial-panel" class="dm-notifications-subtab-content" style="display: none;">
+                    <p class="dm-notifications-historial-desc">Misiones completadas o archivadas.</p>
+                    <div id="dm-missions-historial-list" class="missions-list">
+                        <p style="color:#8b7355; text-align:center; padding:20px;">Cargando historial...</p>
+                    </div>
+                </div>
+                <div id="dm-missions-leyenda-panel" class="dm-notifications-subtab-content" style="display: none;">
+                    <p class="dm-notifications-historial-desc">Añade enlaces a MP3 (o audio) para que los jugadores escuchen la leyenda.</p>
+                    <div class="form-group legend-form-wrap" style="margin-bottom: 20px;">
+                        <div class="legend-form-row" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: 12px;">
+                            <div style="flex: 1; min-width: 200px;">
+                                <label for="legend-audio-url">URL del audio (MP3 u otro)</label>
+                                <input type="url" id="legend-audio-url" placeholder="https://ejemplo.com/audio.mp3" class="searchbar" style="width: 100%;">
+                            </div>
+                            <div style="flex: 1; min-width: 180px;">
+                                <label for="legend-audio-title">Título (opcional)</label>
+                                <input type="text" id="legend-audio-title" placeholder="Ej: La leyenda del dragón" class="searchbar" style="width: 100%;">
+                            </div>
+                            <button type="button" class="btn" onclick="addLegendTrack()">+ Añadir</button>
+                        </div>
+                        <div style="flex: 1; min-width: 100%;">
+                            <label for="legend-audio-description">Descripción (opcional)</label>
+                            <textarea id="legend-audio-description" rows="2" placeholder="Breve descripción de la canción o la leyenda..." class="searchbar" style="width: 100%; resize: vertical;"></textarea>
+                        </div>
+                    </div>
+                    <div id="dm-legend-list" class="missions-list">
+                        <p style="color:#8b7355; text-align:center; padding:20px;">Cargando...</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <section id="transactions" class="tab-content">
             <div class="section-header">
                 <h2>📜 Historial de Transacciones</h2>
@@ -203,6 +260,7 @@
             <button class="nav-tab nav-tab-type-inventario" data-tab="player-inventario">🎒 Inventario</button>
             <button class="nav-tab nav-tab-type-cdd" data-tab="player-notifications">🃏 CDD & Correo<span class="nav-badge nav-badge-mail nav-badge--hidden" id="mail-unread-badge" aria-label="Correos sin leer"></span></button>
             <button class="nav-tab nav-tab-type-home" data-tab="player-home" title="Ver mi home">🏠 Home</button>
+            <button class="nav-tab nav-tab-type-missions" data-tab="player-missions">📋 Misiones<span class="nav-badge nav-badge-missions nav-badge--hidden" id="missions-pending-badge" aria-label="Misiones por aceptar"></span></button>
             <button class="nav-tab nav-tab-type-battle" type="button" onclick="window.open('battle-tracker.html', '_blank')" title="Abrir en nueva pestaña">⚔️ Battle Tracker</button>
             <button class="nav-tab nav-tab-logout" type="button" onclick="closeMobileNav('player'); logout();">🚪 Salir</button>
         </nav>
@@ -356,6 +414,38 @@
             </div>
             <div style="margin-top: 20px; display: flex; gap: 12px; flex-wrap: wrap;">
                 <button class="btn" onclick="saveMiCasaNotas()">💾 Guardar Mis Notas</button>
+            </div>
+        </section>
+
+        <!-- MISIONES (Jugador) -->
+        <section id="player-missions" class="tab-content">
+            <div class="section-header">
+                <h2>📋 Misiones</h2>
+            </div>
+            <div class="player-missions-subtabs" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;">
+                <button type="button" class="player-notifications-subtab player-missions-subtab active" data-player-missions-subtab="activas" onclick="switchPlayerMissionsSubtab('activas')">📌 Activas</button>
+                <button type="button" class="player-notifications-subtab player-missions-subtab" data-player-missions-subtab="historial" onclick="switchPlayerMissionsSubtab('historial')">📜 Historial (completadas)</button>
+                <button type="button" class="player-notifications-subtab player-missions-subtab" data-player-missions-subtab="leyenda" onclick="switchPlayerMissionsSubtab('leyenda')">🎧 Escucha la leyenda</button>
+            </div>
+            <div id="player-missions-container">
+                <div id="player-missions-activas-panel" class="player-notifications-subtab-content" style="display: block;">
+                    <p style="color:#8b7355; margin-bottom:16px;">Misiones que el DM ha hecho visibles. Acepta y marca tu progreso.</p>
+                    <div id="player-missions-activas-list" class="missions-list">
+                        <p style="color:#8b7355; text-align:center; padding:20px;">Cargando misiones...</p>
+                    </div>
+                </div>
+                <div id="player-missions-historial-panel" class="player-notifications-subtab-content" style="display: none;">
+                    <p style="color:#8b7355; margin-bottom:16px;">Misiones que has completado.</p>
+                    <div id="player-missions-historial-list" class="missions-list">
+                        <p style="color:#8b7355; text-align:center; padding:20px;">Cargando historial...</p>
+                    </div>
+                </div>
+                <div id="player-missions-leyenda-panel" class="player-notifications-subtab-content" style="display: none;">
+                    <p style="color:#8b7355; margin-bottom:16px;">Audios que el DM ha compartido para escuchar la leyenda.</p>
+                    <div id="player-legend-list" class="missions-list">
+                        <p style="color:#8b7355; text-align:center; padding:20px;">Cargando...</p>
+                    </div>
+                </div>
             </div>
         </section>
     </div>
@@ -2239,6 +2329,84 @@
     </div>
 
     <!-- Modal Crear DM -->
+    <div class="modal-overlay" id="legend-edit-modal">
+        <div class="modal" style="max-width: 560px;">
+            <div class="modal-header">
+                <h3>🎧 Editar canción</h3>
+                <button class="modal-close" onclick="closeModal('legend-edit-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>URL del audio (MP3 u otro)</label>
+                    <input type="url" id="legend-edit-url" placeholder="https://ejemplo.com/audio.mp3" class="searchbar" style="width: 100%;">
+                </div>
+                <div class="form-group">
+                    <label>Título</label>
+                    <input type="text" id="legend-edit-title" placeholder="Ej: La leyenda del dragón" class="searchbar" style="width: 100%;">
+                </div>
+                <div class="form-group">
+                    <label>Descripción (opcional)</label>
+                    <textarea id="legend-edit-description" rows="3" placeholder="Breve descripción de la canción o la leyenda..." class="searchbar" style="width: 100%; resize: vertical;"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('legend-edit-modal')">Cancelar</button>
+                <button class="btn" onclick="saveLegendTrack()">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="mission-modal">
+        <div class="modal" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 id="mission-modal-title">📋 Nueva misión</h3>
+                <button class="modal-close" onclick="closeModal('mission-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Título</label>
+                    <input type="text" id="mission-title" placeholder="Ej: Recuperar el artefacto">
+                </div>
+                <div class="form-group">
+                    <label>Descripción / Objetivos</label>
+                    <textarea id="mission-description" rows="5" placeholder="Describe la misión, pistas, objetivos..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Recompensa (opcional)</label>
+                    <input type="text" id="mission-reward" placeholder="Ej: 50 GP, ítem raro">
+                </div>
+                <div class="form-group">
+                    <label>Nivel de la misión (opcional)</label>
+                    <input type="number" id="mission-nivel" min="1" max="30" placeholder="Ej: 5" style="width: 100px;">
+                </div>
+                <div class="form-group">
+                    <label>Estado</label>
+                    <select id="mission-status">
+                        <option value="draft">Borrador (no visible)</option>
+                        <option value="visible">Visible para jugadores</option>
+                        <option value="completed">Completada</option>
+                        <option value="archived">Archivada</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Visible para</label>
+                    <select id="mission-visible-to">
+                        <option value="all">Todos los jugadores</option>
+                        <option value="player">Solo jugadores asignados</option>
+                    </select>
+                </div>
+                <div class="form-group" id="mission-assigned-players-group">
+                    <label>Asignar a jugadores (si "Solo jugadores asignados")</label>
+                    <div id="mission-assigned-players-wrap" style="max-height: 180px; overflow-y: auto; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 6px;"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('mission-modal')">Cancelar</button>
+                <button class="btn" onclick="saveMission()">Guardar misión</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="create-dm-modal">
         <div class="modal">
             <div class="modal-header">
@@ -2296,5 +2464,6 @@
     <script src="js/transactions.js"></script>
     <script src="js/notifications.js"></script>
     <script src="js/automation.js"></script>
+    <script src="js/missions.js"></script>
 </body>
 </html>

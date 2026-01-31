@@ -617,6 +617,8 @@ function showPlayerView() {
     setTimeout(() => {
         if (typeof loadPlayerNotifications === 'function') loadPlayerNotifications();
         if (typeof startUnreadMailBadge === 'function') startUnreadMailBadge();
+        if (typeof startMissionsPendingBadge === 'function') startMissionsPendingBadge();
+        if (typeof loadPlayerMissions === 'function') loadPlayerMissions('activas');
     }, 500);
 }
 
@@ -3088,6 +3090,7 @@ async function showDashboard() {
         if (typeof loadTransactions === 'function') loadTransactions();
         if (typeof loadNotificationRecipients === 'function') loadNotificationRecipients();
         if (typeof loadDMNotifications === 'function') loadDMNotifications();
+        if (typeof loadDMMissions === 'function') loadDMMissions();
         loadMapImage();
     } else {
         showLoginModal();
@@ -3222,6 +3225,14 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
         if (tab.dataset.tab === 'notifications') {
             if (typeof loadNotificationRecipients === 'function') loadNotificationRecipients();
             if (typeof loadDMNotifications === 'function') loadDMNotifications();
+        }
+        // Si se hace clic en el tab de misiones del DM, cargar misiones
+        if (tab.dataset.tab === 'missions') {
+            if (typeof loadDMMissions === 'function') loadDMMissions();
+        }
+        // Si se hace clic en el tab de misiones del jugador, cargar misiones
+        if (tab.dataset.tab === 'player-missions') {
+            if (typeof loadPlayerMissions === 'function') loadPlayerMissions('activas');
         }
     });
 });
