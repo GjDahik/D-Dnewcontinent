@@ -596,6 +596,31 @@
         </div>
     </div>
 
+    <!-- Modal detalle de ítem (inventario jugador: ver toda la info como en tienda) -->
+    <div class="modal-overlay" id="player-inventory-item-detail-modal">
+        <div class="modal player-inventory-detail-modal" style="max-width: 520px;">
+            <div class="modal-header player-use-confirm-header">
+                <h3 class="player-use-confirm-title" id="player-inventory-detail-title">📦 Detalle del ítem</h3>
+                <button class="modal-close" onclick="closeModal('player-inventory-item-detail-modal')" aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="modal-body player-inventory-detail-body">
+                <div class="player-inventory-detail-name" id="player-inventory-detail-name">—</div>
+                <div class="player-inventory-detail-meta">
+                    <span id="player-inventory-detail-tipo"></span>
+                    <span id="player-inventory-detail-precio"></span>
+                    <span id="player-inventory-detail-rareza"></span>
+                    <span id="player-inventory-detail-cantidad"></span>
+                </div>
+                <div class="player-inventory-detail-damage" id="player-inventory-detail-damage" style="display:none;"></div>
+                <div class="player-inventory-detail-effect" id="player-inventory-detail-effect">—</div>
+                <div class="player-inventory-detail-shop" id="player-inventory-detail-shop" style="display:none;"></div>
+            </div>
+            <div class="modal-footer player-use-confirm-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('player-inventory-item-detail-modal')">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal Mis notas de la ciudad (solo para jugador, desde la lista de ciudades) -->
     <div class="modal-overlay" id="player-city-notes-modal">
         <div class="modal" style="max-width: 560px;">

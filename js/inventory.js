@@ -733,6 +733,8 @@ function processCSVUpload() {
                 tipoForjaIdx = header.indexOf('type');
             }
             var damageIdx = header.indexOf('damage');
+            var danoIdx = header.indexOf('daño');
+            if (danoIdx === -1) danoIdx = header.indexOf('dano');
             var damageTypeIdx = header.indexOf('damagetype');
             // También aceptar "damageType" (con mayúscula)
             if (damageTypeIdx === -1) {
@@ -878,7 +880,7 @@ function processCSVUpload() {
                     if (validRarities.indexOf(rarityEmp) === -1) rarityEmp = 'común';
                     item = { name: name, price: price, section: sectionEmp, effect: effect, rarity: rarityEmp };
                 } else {
-                    var avg = avgIdx !== -1 ? (values[avgIdx] || '') : '';
+                    var avg = (avgIdx !== -1 ? (values[avgIdx] || '').trim() : '') || (danoIdx !== -1 ? (values[danoIdx] || '').trim() : '') || (damageIdx >= 0 ? (values[damageIdx] || '').trim() : '');
                     var rarity = (rarityIdx !== -1 ? (values[rarityIdx] || 'común') : 'común').toLowerCase().trim();
                     if (validRarities.indexOf(rarity) === -1) rarity = 'común';
                     item = { name: name, price: price, effect: effect, avg: avg, rarity: rarity };

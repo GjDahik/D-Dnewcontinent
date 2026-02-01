@@ -1319,6 +1319,61 @@ body.app-bg-noise-warm {
     background: linear-gradient(180deg, rgba(139, 90, 43, 0.65) 0%, rgba(90, 60, 30, 0.75) 100%);
 }
 
+/* Modal detalle de ítem (inventario jugador: ver toda la info como en tienda) */
+.player-inventory-detail-modal {
+    background: linear-gradient(180deg, rgba(26, 22, 18, 0.98) 0%, rgba(18, 15, 12, 0.98) 100%);
+    border: 1px solid #4a3c31;
+    box-shadow: 0 0 24px rgba(139, 90, 43, 0.2), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+.player-inventory-detail-body {
+    padding: 20px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.player-inventory-detail-name {
+    font-family: 'Cinzel', serif;
+    font-size: 1.25em;
+    font-weight: 600;
+    color: #d4af37;
+    letter-spacing: 1px;
+}
+.player-inventory-detail-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    font-size: 0.95em;
+    color: #a89878;
+}
+.player-inventory-detail-damage {
+    padding: 10px 14px;
+    background: rgba(255, 107, 53, 0.12);
+    border-radius: 8px;
+    border-left: 3px solid #ff6b35;
+    color: #ffcc00;
+    font-size: 1em;
+    font-weight: 600;
+}
+.player-inventory-detail-effect {
+    padding: 12px 14px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 8px;
+    border-left: 3px solid #8b5a2b;
+    color: #d4c4a8;
+    font-size: 0.95em;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.player-inventory-detail-shop {
+    font-size: 0.9em;
+    color: #8b7355;
+}
+.player-inventory-item-name:hover {
+    color: #f1c40f;
+}
+
 /* Tabla inventario (desktop) */
 .inventory-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 8px; border: 1px solid #4a3c31; }
 .inventory-table { width: 100%; min-width: 620px; border-collapse: collapse; font-size: 0.95em; }

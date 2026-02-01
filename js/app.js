@@ -628,7 +628,7 @@ function renderPlayerView(data) {
                 ? `<button type="button" class="btn btn-small" onclick="openUseItemConfirmStack('${idxStr}', this)" title="Usar las unidades indicadas">Utilizar</button>`
                 : `<button type="button" class="btn btn-small" onclick="openUseItemConfirm(${idxUse})" title="Usar 1">Utilizar</button>`;
             return `<tr class="player-inventory-row">
-                <td><span style="color:#d4c4a8; font-weight:600;">${esc(it.name || 'Item')}</span></td>
+                <td><span class="player-inventory-item-name" style="color:#d4c4a8; font-weight:600; cursor:pointer; text-decoration:underline; text-underline-offset:3px;" onclick="openPlayerInventoryItemDetail(${idxUse}, ${g.count})" role="button" tabindex="0" title="Ver detalle del ítem">${esc(it.name || 'Item')}</span></td>
                 <td><span class="inv-tipo">${esc(tipoLabel)}</span></td>
                 <td><span style="color:#8b7355; font-size:0.9em;">${esc(it.effect || '—')}</span></td>
                 <td><span style="color:#f1c40f;">${it.price != null ? esc(it.price + ' GP') : '—'}</span></td>
@@ -660,7 +660,7 @@ function renderPlayerView(data) {
                 : `<button type="button" class="btn btn-small" onclick="openUseItemConfirm(${idxUse})" title="Usar 1">Utilizar</button>`;
             return `<div class="inventory-card">
                 <div class="inventory-card-header">
-                    <span class="inventory-card-name">${esc(it.name || 'Item')}</span>
+                    <span class="inventory-card-name player-inventory-item-name" style="cursor:pointer; text-decoration:underline; text-underline-offset:3px;" onclick="openPlayerInventoryItemDetail(${idxUse}, ${g.count})" role="button" tabindex="0" title="Ver detalle del ítem">${esc(it.name || 'Item')}</span>
                     <span class="rarity-badge" style="background:${r};color:#fff;">${esc(it.rarity || 'común')}</span>
                 </div>
                 <div class="inventory-card-meta">
@@ -683,6 +683,51 @@ function renderPlayerView(data) {
 }
 
 var _pendingUseAction = null;
+
+function openPlayerInventoryItemDetail(inventoryIndex, count) {
+    if (!lastPlayerViewData || !lastPlayerViewData.inventario) return;
+    var item = lastPlayerViewData.inventario[inventoryIndex];
+    if (!item) return;
+    var esc = function(s) { return String(s || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
+    var name = esc(item.name || 'Item');
+    var effectRaw = getItemDesc(item) || item.effect || '—';
+    var effect = esc(effectRaw).replace(/\n/g, '<br>');
+    var tipoLabel = getTipoLabel(item);
+    var price = item.price != null ? item.price + ' GP' : '—';
+    var rarity = item.rarity || 'común';
+    var r = { común: '#2ecc71', infrecuente: '#3498db', rara: '#9b59b6', legendaria: '#e74c3c' }[rarity] || '#555';
+    var shopTipo = (item.shopTipo || '').trim();
+    document.getElementById('player-inventory-detail-title').textContent = '📦 ' + (item.name || 'Item');
+    document.getElementById('player-inventory-detail-name').innerHTML = name;
+    document.getElementById('player-inventory-detail-tipo').textContent = 'Tipo: ' + tipoLabel;
+    document.getElementById('player-inventory-detail-precio').innerHTML = '<span style="color:#f1c40f;">' + esc(price) + '</span>';
+    document.getElementById('player-inventory-detail-rareza').innerHTML = '<span class="rarity-badge" style="background:' + r + ';color:#fff;padding:2px 8px;border-radius:4px;">' + esc(rarity) + '</span>';
+    document.getElementById('player-inventory-detail-cantidad').textContent = 'Cantidad: ' + (count != null ? count : 1);
+    document.getElementById('player-inventory-detail-effect').innerHTML = effect;
+    var damageEl = document.getElementById('player-inventory-detail-damage');
+    var damageText = '';
+    if (item.ac != null && item.ac !== '') {
+        damageText = '🛡️ CA: ' + esc(item.ac);
+    } else if (item.damage) {
+        damageText = '⚡ ' + esc(item.damage) + (item.damageType ? ' ' + esc(item.damageType) : '');
+    } else if (item.avg && String(item.avg).trim()) {
+        damageText = '⚡ ' + esc(String(item.avg).trim());
+    }
+    if (damageText) {
+        damageEl.innerHTML = damageText;
+        damageEl.style.display = 'block';
+    } else {
+        damageEl.style.display = 'none';
+    }
+    var shopEl = document.getElementById('player-inventory-detail-shop');
+    if (shopTipo) {
+        shopEl.style.display = 'block';
+        shopEl.textContent = 'Procedencia: ' + shopTipo;
+    } else {
+        shopEl.style.display = 'none';
+    }
+    openModal('player-inventory-item-detail-modal');
+}
 
 function openUseItemConfirm(index) {
     if (!lastPlayerViewData || !lastPlayerViewData.inventario) return;
@@ -3639,6 +3684,9 @@ async function playerPotionCheckout() {
         if (!p) continue;
         const entry = { name: p.name || 'Item', price: p.price, effect: p.effect || '', rarity: (p.rarity || 'común') };
         entry.shopTipo = (shop && shop.tipo ? shop.tipo : 'pociones').toString().toLowerCase();
+        if (p.avg) entry.avg = p.avg;
+        if (p.damage) entry.damage = p.damage;
+        if (p.damageType) entry.damageType = p.damageType;
         for (let q = 0; q < item.qty; q++) inventario.push(entry);
     }
     await db.collection('players').doc(user.id).update({ oro: newOro, inventario });
