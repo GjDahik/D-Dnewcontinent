@@ -16,6 +16,42 @@ var playerCitiesData = [], playerShopsData = [], playerNpcsData = [];
 var rutasConocidasData = [];
 var currentRutaParaViaje = null;
 
+// Temas de fondo (DM elige en Mapa → Fondo de la app; se guarda en settings/app)
+var APP_BACKGROUND_THEMES = ['default', 'parchment', 'dungeon', 'tavern', 'map-grid', 'minimal', 'warm', 'noise-warm'];
+
+function applyAppBackgroundClass(themeId) {
+    if (!APP_BACKGROUND_THEMES.includes(themeId)) themeId = 'default';
+    APP_BACKGROUND_THEMES.forEach(function(t) { document.body.classList.remove('app-bg-' + t); });
+    document.body.classList.add('app-bg-' + themeId);
+}
+
+async function loadAppBackgroundTheme() {
+    try {
+        var snap = await db.collection('settings').doc('app').get();
+        var themeId = (snap.exists && snap.data().backgroundTheme) ? snap.data().backgroundTheme : 'default';
+        if (!APP_BACKGROUND_THEMES.includes(themeId)) themeId = 'default';
+        applyAppBackgroundClass(themeId);
+        var sel = document.getElementById('app-background-select');
+        if (sel) sel.value = themeId;
+    } catch (e) {
+        applyAppBackgroundClass('default');
+    }
+}
+
+function setAppBackgroundTheme(themeId) {
+    if (!APP_BACKGROUND_THEMES.includes(themeId)) themeId = 'default';
+    db.collection('settings').doc('app').set({ backgroundTheme: themeId }, { merge: true })
+        .then(function() {
+            applyAppBackgroundClass(themeId);
+            var sel = document.getElementById('app-background-select');
+            if (sel) sel.value = themeId;
+            showToast('Fondo actualizado');
+        })
+        .catch(function(e) {
+            showToast('Error al guardar el fondo: ' + e.message, true);
+        });
+}
+
 function getCityInfoForShop(shop) {
     if (!shop || !shop.ciudadId) return { cityId: '', cityName: '' };
     const city = playerCitiesData.find(c => c.id === shop.ciudadId);
@@ -3946,6 +3982,7 @@ async function showDashboard() {
         if (typeof loadDMMissions === 'function') loadDMMissions();
         loadMapImage();
         if (typeof loadRutasConocidas === 'function') loadRutasConocidas();
+        loadAppBackgroundTheme();
     } else {
         showLoginModal();
     }
@@ -3955,6 +3992,7 @@ async function showDashboard() {
 // ==================== INITIALIZE ====================
 document.addEventListener('DOMContentLoaded', function() {
     updateFooterTagline();
+    loadAppBackgroundTheme();
     if (checkAuth()) {
         if (isDM()) showDashboard();
         else if (isPlayer()) showPlayerView();

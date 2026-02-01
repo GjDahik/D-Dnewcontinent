@@ -51,6 +51,19 @@
                     <option value="0">—</option>
                 </select>
             </div>
+            <div class="map-default-level-row map-default-level-row-dashboard" id="app-background-row">
+                <label for="app-background-select" style="color:#a89878; font-size:0.9em;">Fondo de la app:</label>
+                <select id="app-background-select" class="map-default-level-select" onchange="setAppBackgroundTheme(this.value)" aria-label="Tema de fondo de la aplicación">
+                    <option value="default">Predeterminado (oscuro + ruido)</option>
+                    <option value="parchment">Pergamino</option>
+                    <option value="dungeon">Mazmorra</option>
+                    <option value="tavern">Noche de taberna</option>
+                    <option value="map-grid">Cuadrícula mapa</option>
+                    <option value="minimal">Minimalista oscuro</option>
+                    <option value="warm">Cálido (velas)</option>
+                    <option value="noise-warm">Ruido + cálido</option>
+                </select>
+            </div>
             <div id="map-config-row" class="map-config-row" style="display:none;">
                 <div class="map-levels-form">
                     <label for="map-continent-name" style="color:#a89878; font-size:0.9em;">Nombre del nivel:</label>

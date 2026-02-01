@@ -10,6 +10,58 @@ body {
     padding: 20px;
     overflow-x: hidden; /* evita scroll horizontal en móvil */
 }
+
+/* Temas de fondo (DM elige en Mapa → Fondo de la app) */
+body.app-bg-default {
+    background-color: #1a1a1a;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    background-blend-mode: overlay;
+}
+body.app-bg-parchment {
+    background-color: #2a2520;
+    background-image: linear-gradient(180deg, rgba(62, 52, 42, 0.97) 0%, rgba(42, 35, 28, 0.98) 100%),
+        url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.6' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    background-blend-mode: normal;
+}
+body.app-bg-dungeon {
+    background-color: #14161c;
+    background-image: linear-gradient(180deg, #1a1c22 0%, #12141a 50%, #0e1014 100%),
+        url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
+    background-blend-mode: overlay;
+}
+body.app-bg-tavern {
+    background-color: #1e1814;
+    background-image: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(80, 45, 25, 0.4) 0%, transparent 50%),
+        linear-gradient(180deg, #252220 0%, #1a1612 100%),
+        url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+    background-blend-mode: overlay;
+}
+body.app-bg-map-grid {
+    background-color: #1a1a1a;
+    background-image:
+        linear-gradient(rgba(212, 196, 168, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(212, 196, 168, 0.04) 1px, transparent 1px),
+        url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 100% 100%, 24px 24px, 100% 100%;
+    background-blend-mode: overlay;
+}
+body.app-bg-minimal {
+    background-color: #161412;
+    background-image: linear-gradient(180deg, #1c1a18 0%, #141210 100%);
+    background-blend-mode: normal;
+}
+body.app-bg-warm {
+    background-color: #1e1814;
+    background-image: radial-gradient(ellipse 70% 60% at 50% 20%, rgba(120, 60, 30, 0.25) 0%, transparent 45%),
+        linear-gradient(180deg, #221c18 0%, #161210 100%);
+    background-blend-mode: normal;
+}
+body.app-bg-noise-warm {
+    background-color: #1c1814;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-blend-mode: overlay;
+}
+
 .container { max-width: 1400px; margin: 0 auto; width: 100%; }
 
 /* Searchbar (DM dashboard) */
