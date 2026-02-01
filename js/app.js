@@ -13,6 +13,8 @@ const db = firebase.firestore();
 // ==================== GLOBAL DATA ====================
 var citiesData = [], npcsData = [], shopsData = [], playersData = [];
 var playerCitiesData = [], playerShopsData = [], playerNpcsData = [];
+var rutasConocidasData = [];
+var currentRutaParaViaje = null;
 
 function getCityInfoForShop(shop) {
     if (!shop || !shop.ciudadId) return { cityId: '', cityName: '' };
@@ -22,6 +24,7 @@ function getCityInfoForShop(shop) {
 
 let playerPotionCart = [], playerPotionShopId = null, playerPotionProducts = [], playerPotionFilter = 'all', playerPotionSearchTerm = '';
 let lastPlayerViewData = null;
+let playerUbicacionActual = '';
 let playerTavernShopId = null, playerTavernCart = [];
 let playerForgeShopId = null, playerForgeCart = [], playerForgeLevel = 1, playerForgeTab = 'forge-shop';
 let playerArtesaniasShopId = null, playerArtesaniasCart = [], playerArtesaniasTab = 'flechas';
@@ -212,6 +215,11 @@ function showLoginModal() {
 const DEFAULT_MAP_IMAGE_URL = 'https://i.imgur.com/ppAIykX.png';
 const DEFAULT_CONTINENT_NAME = 'Nueva Valdoria';
 
+let mapLevels = [];
+let mapEditIndex = -1;
+let playerMapLevelIndex = 0;
+let defaultMapLevelIndex = 0;
+
 const FOOTER_TAGLINES = [
     'Caos a la orden del dia',
     'Caos calculado, consecuencias inevitables.',
@@ -237,47 +245,246 @@ async function loadMapImage() {
     try {
         const snap = await db.collection('settings').doc('map').get();
         const data = snap.exists ? snap.data() : {};
-        const url = (data.imageUrl) ? data.imageUrl.trim() : DEFAULT_MAP_IMAGE_URL;
-        const continentName = (data.continentName) ? data.continentName.trim() : DEFAULT_CONTINENT_NAME;
-        
-        const mapImg = document.getElementById('map-img');
-        const playerMapImg = document.getElementById('player-map-img');
-        const inputEl = document.getElementById('map-image-url');
-        const continentInputEl = document.getElementById('map-continent-name');
-        const mapTitleDM = document.getElementById('map-title-dm');
-        const mapTitlePlayer = document.getElementById('map-title-player');
-        
-        if (mapImg) mapImg.src = url;
-        if (playerMapImg) playerMapImg.src = url;
-        if (inputEl && isDM()) inputEl.value = url;
-        if (continentInputEl && isDM()) continentInputEl.value = continentName;
-        
-        // Actualizar títulos del mapa
-        if (mapTitleDM) mapTitleDM.textContent = '🗺️ Mapa de ' + continentName;
-        if (mapTitlePlayer) mapTitlePlayer.textContent = '🗺️ Mapa de ' + continentName;
-        
-        // Actualizar atributos alt de las imágenes
-        if (mapImg) mapImg.alt = 'Mapa de ' + continentName;
-        if (playerMapImg) playerMapImg.alt = 'Mapa de ' + continentName;
-        
-        // Actualizar texto de jugadores
+        if (Array.isArray(data.levels) && data.levels.length > 0) {
+            mapLevels = data.levels.map(l => ({ ...l, visible: l.visible !== false }));
+        } else {
+            const url = (data.imageUrl) ? data.imageUrl.trim() : DEFAULT_MAP_IMAGE_URL;
+            const name = (data.continentName) ? data.continentName.trim() : DEFAULT_CONTINENT_NAME;
+            mapLevels = [{ name, imageUrl: url, visible: true }];
+        }
+        const visibleLevels = getVisibleMapLevels();
+        let defaultIdx = data.defaultLevelIndex;
+        if (defaultIdx != null && typeof defaultIdx === 'string') defaultIdx = parseInt(defaultIdx, 10);
+        if (defaultIdx == null || typeof defaultIdx !== 'number' || isNaN(defaultIdx)) defaultIdx = 0;
+        defaultIdx = Math.max(0, Math.min(defaultIdx, mapLevels.length - 1));
+        defaultMapLevelIndex = defaultIdx;
+        if (visibleLevels.length > 0) {
+            if (mapLevels[defaultIdx] && mapLevels[defaultIdx].visible !== false) {
+                let idxInVisible = 0;
+                for (let i = 0; i < defaultIdx; i++) {
+                    if (mapLevels[i].visible !== false) idxInVisible++;
+                }
+                playerMapLevelIndex = idxInVisible;
+            } else {
+                playerMapLevelIndex = 0;
+            }
+        } else {
+            playerMapLevelIndex = 0;
+        }
+        if (playerMapLevelIndex >= visibleLevels.length) playerMapLevelIndex = Math.max(0, visibleLevels.length - 1);
+        updateMapDMView();
+        updateMapPlayerView();
         const playersContinentText = document.getElementById('players-continent-text');
-        if (playersContinentText) playersContinentText.textContent = 'Los héroes de ' + continentName;
+        if (playersContinentText && mapLevels.length > 0) playersContinentText.textContent = 'Los héroes de ' + (mapLevels[0].name || DEFAULT_CONTINENT_NAME);
     } catch (e) {
-        const mapImg = document.getElementById('map-img');
-        const playerMapImg = document.getElementById('player-map-img');
-        const mapTitleDM = document.getElementById('map-title-dm');
-        const mapTitlePlayer = document.getElementById('map-title-player');
-        
-        if (mapImg) mapImg.src = DEFAULT_MAP_IMAGE_URL;
-        if (playerMapImg) playerMapImg.src = DEFAULT_MAP_IMAGE_URL;
-        if (mapTitleDM) mapTitleDM.textContent = '🗺️ Mapa de ' + DEFAULT_CONTINENT_NAME;
-        if (mapTitlePlayer) mapTitlePlayer.textContent = '🗺️ Mapa de ' + DEFAULT_CONTINENT_NAME;
-        
-        // Actualizar texto de jugadores
+        mapLevels = [{ name: DEFAULT_CONTINENT_NAME, imageUrl: DEFAULT_MAP_IMAGE_URL, visible: true }];
+        defaultMapLevelIndex = 0;
+        playerMapLevelIndex = 0;
+        updateMapDMView();
+        updateMapPlayerView();
         const playersContinentText = document.getElementById('players-continent-text');
         if (playersContinentText) playersContinentText.textContent = 'Los héroes de ' + DEFAULT_CONTINENT_NAME;
     }
+}
+
+function getVisibleMapLevels() {
+    return mapLevels.filter(l => l.visible !== false);
+}
+
+function updateMapDMView() {
+    const mapImg = document.getElementById('map-img');
+    const mapTitleDM = document.getElementById('map-title-dm');
+    const idx = (defaultMapLevelIndex >= 0 && defaultMapLevelIndex < mapLevels.length) ? defaultMapLevelIndex : 0;
+    const currentLevel = mapLevels.length > 0 ? mapLevels[idx] : null;
+    const url = currentLevel ? (currentLevel.imageUrl || DEFAULT_MAP_IMAGE_URL).trim() : DEFAULT_MAP_IMAGE_URL;
+    const name = currentLevel ? (currentLevel.name || DEFAULT_CONTINENT_NAME).trim() : DEFAULT_CONTINENT_NAME;
+    if (mapImg) { mapImg.src = url; mapImg.alt = 'Mapa de ' + name; }
+    if (mapTitleDM) mapTitleDM.textContent = '🗺️ Mapa de ' + name;
+    if (!isDM()) return;
+    const listEl = document.getElementById('map-levels-list');
+    const inputEl = document.getElementById('map-image-url');
+    const continentInputEl = document.getElementById('map-continent-name');
+    const hintEl = document.getElementById('map-edit-mode-hint');
+    if (hintEl) hintEl.textContent = mapEditIndex >= 0 ? 'Editando nivel ' + (mapEditIndex + 1) + '. Guarda o cancela.' : 'Rellena nombre y URL y pulsa "Añadir nivel abajo" o "arriba".';
+    const addBtns = document.getElementById('map-add-buttons');
+    const editBtns = document.getElementById('map-edit-buttons');
+    if (addBtns) addBtns.style.display = mapEditIndex >= 0 ? 'none' : 'inline';
+    if (editBtns) editBtns.style.display = mapEditIndex >= 0 ? 'inline' : 'none';
+    if (mapEditIndex >= 0 && mapEditIndex < mapLevels.length) {
+        const lev = mapLevels[mapEditIndex];
+        if (inputEl) inputEl.value = lev.imageUrl || '';
+        if (continentInputEl) continentInputEl.value = lev.name || '';
+    } else if (mapEditIndex === -1 && inputEl && continentInputEl) {
+        inputEl.value = '';
+        continentInputEl.value = '';
+    }
+    const defaultSelectEl = document.getElementById('map-default-level-select');
+    if (defaultSelectEl && mapLevels.length > 0) {
+        if (defaultMapLevelIndex >= mapLevels.length) defaultMapLevelIndex = mapLevels.length - 1;
+        defaultSelectEl.innerHTML = mapLevels.map((lev, i) => {
+            const n = (lev.name || 'Nivel ' + (i + 1)).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return `<option value="${i}">${n}</option>`;
+        }).join('');
+        defaultSelectEl.value = String(defaultMapLevelIndex);
+    } else if (defaultSelectEl) {
+        defaultSelectEl.innerHTML = '<option value="0">—</option>';
+    }
+    if (!listEl) return;
+    if (mapLevels.length === 0) {
+        listEl.innerHTML = '<p style="color:#8b7355; font-style:italic;">No hay niveles. Añade uno abajo o arriba.</p>';
+        return;
+    }
+    listEl.innerHTML = mapLevels.map((lev, i) => {
+        const n = (lev.name || 'Nivel ' + (i + 1)).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const imgUrl = (lev.imageUrl || '').trim() || DEFAULT_MAP_IMAGE_URL;
+        const isVisible = lev.visible !== false;
+        return `<div class="map-level-item ${isVisible ? '' : 'map-level-item-hidden'}" data-index="${i}">
+            <img src="${imgUrl.replace(/"/g, '&quot;')}" alt="" class="map-level-thumb" onerror="this.src='${DEFAULT_MAP_IMAGE_URL.replace(/'/g, "\\'")}'">
+            <span class="map-level-name">${n}</span>
+            <label class="map-level-visible-label" title="${isVisible ? 'Ocultar para jugadores' : 'Mostrar a jugadores'}">
+                <input type="checkbox" class="map-level-visible-cb" ${isVisible ? 'checked' : ''} onchange="toggleMapLevelVisible(${i})" aria-label="Visible para jugadores">
+                <span class="map-level-visible-text">Visible</span>
+            </label>
+            <div class="map-level-actions">
+                <button type="button" class="btn btn-small" onclick="editMapLevel(${i})" title="Editar">✏️</button>
+                <button type="button" class="btn btn-small btn-danger" onclick="deleteMapLevel(${i})" title="Eliminar">🗑️</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function updateMapPlayerView() {
+    const visibleLevels = getVisibleMapLevels();
+    const playerMapImg = document.getElementById('player-map-img');
+    const mapTitlePlayer = document.getElementById('map-title-player');
+    const nameEl = document.getElementById('player-map-level-name');
+    const btnUp = document.getElementById('player-map-level-up');
+    const btnDown = document.getElementById('player-map-level-down');
+    if (visibleLevels.length === 0) {
+        if (playerMapImg) playerMapImg.src = DEFAULT_MAP_IMAGE_URL;
+        if (mapTitlePlayer) mapTitlePlayer.textContent = '🗺️ Mapa';
+        if (nameEl) nameEl.textContent = '—';
+        if (btnUp) btnUp.disabled = true;
+        if (btnDown) btnDown.disabled = true;
+        return;
+    }
+    if (playerMapLevelIndex >= visibleLevels.length) playerMapLevelIndex = visibleLevels.length - 1;
+    if (playerMapLevelIndex < 0) playerMapLevelIndex = 0;
+    const lev = visibleLevels[playerMapLevelIndex];
+    const url = (lev.imageUrl || DEFAULT_MAP_IMAGE_URL).trim();
+    const name = (lev.name || 'Nivel ' + (playerMapLevelIndex + 1)).trim();
+    if (playerMapImg) { playerMapImg.src = url; playerMapImg.alt = 'Mapa de ' + name; }
+    if (mapTitlePlayer) mapTitlePlayer.textContent = '🗺️ Mapa de ' + name;
+    if (nameEl) nameEl.textContent = name;
+    if (btnUp) btnUp.disabled = playerMapLevelIndex >= visibleLevels.length - 1;
+    if (btnDown) btnDown.disabled = playerMapLevelIndex <= 0;
+}
+
+function playerMapLevelUp() {
+    const visibleLevels = getVisibleMapLevels();
+    if (playerMapLevelIndex >= visibleLevels.length - 1) return;
+    playerMapLevelIndex++;
+    updateMapPlayerView();
+}
+
+function playerMapLevelDown() {
+    if (playerMapLevelIndex <= 0) return;
+    playerMapLevelIndex--;
+    updateMapPlayerView();
+}
+
+function toggleMapLevelVisible(index) {
+    if (index < 0 || index >= mapLevels.length) return;
+    mapLevels[index].visible = mapLevels[index].visible === false;
+    saveMapLevels().then(() => {
+        const visibleLevels = getVisibleMapLevels();
+        if (playerMapLevelIndex >= visibleLevels.length) playerMapLevelIndex = Math.max(0, visibleLevels.length - 1);
+        updateMapDMView();
+        updateMapPlayerView();
+        showToast(mapLevels[index].visible ? 'Nivel visible para jugadores' : 'Nivel oculto para jugadores');
+    });
+}
+
+function editMapLevel(index) {
+    mapEditIndex = index;
+    updateMapDMView();
+}
+
+function cancelMapLevelEdit() {
+    mapEditIndex = -1;
+    updateMapDMView();
+}
+
+async function saveMapLevelEdit() {
+    if (mapEditIndex < 0 || mapEditIndex >= mapLevels.length) return;
+    const inputEl = document.getElementById('map-image-url');
+    const continentInputEl = document.getElementById('map-continent-name');
+    const url = (inputEl && inputEl.value) ? inputEl.value.trim() : '';
+    const name = (continentInputEl && continentInputEl.value) ? continentInputEl.value.trim() : 'Nivel ' + (mapEditIndex + 1);
+    if (!url || (!url.startsWith('http://') && !url.startsWith('https://'))) {
+        showToast('URL de imagen no válida', true);
+        return;
+    }
+    const prev = mapLevels[mapEditIndex];
+    mapLevels[mapEditIndex] = { name, imageUrl: url, visible: prev && prev.visible !== false };
+    await saveMapLevels();
+    mapEditIndex = -1;
+    updateMapDMView();
+    updateMapPlayerView();
+    showToast('Nivel actualizado');
+}
+
+async function addMapLevel(above) {
+    const inputEl = document.getElementById('map-image-url');
+    const continentInputEl = document.getElementById('map-continent-name');
+    const url = (inputEl && inputEl.value) ? inputEl.value.trim() : '';
+    const name = (continentInputEl && continentInputEl.value) ? continentInputEl.value.trim() : 'Nuevo nivel';
+    if (!url || (!url.startsWith('http://') && !url.startsWith('https://'))) {
+        showToast('Escribe una URL de imagen válida (https://...) antes de añadir', true);
+        return;
+    }
+    const newLevel = { name: name || 'Nuevo nivel', imageUrl: url, visible: true };
+    if (above) mapLevels.push(newLevel);
+    else mapLevels.unshift(newLevel);
+    await saveMapLevels();
+    if (inputEl) inputEl.value = '';
+    if (continentInputEl) continentInputEl.value = '';
+    updateMapDMView();
+    updateMapPlayerView();
+    showToast('Nivel añadido');
+}
+
+async function deleteMapLevel(index) {
+    if (index < 0 || index >= mapLevels.length) return;
+    if (!confirm('¿Eliminar este nivel del mapa?')) return;
+    mapLevels.splice(index, 1);
+    if (mapEditIndex === index) mapEditIndex = -1;
+    else if (mapEditIndex > index) mapEditIndex--;
+    if (playerMapLevelIndex >= mapLevels.length) playerMapLevelIndex = Math.max(0, mapLevels.length - 1);
+    await saveMapLevels();
+    updateMapDMView();
+    updateMapPlayerView();
+    showToast('Nivel eliminado');
+}
+
+async function saveMapLevels() {
+    await db.collection('settings').doc('map').set({ levels: mapLevels }, { merge: true });
+}
+
+async function setDefaultMapLevel(index) {
+    const idx = typeof index === 'string' ? parseInt(index, 10) : index;
+    if (isNaN(idx) || idx < 0 || idx >= mapLevels.length) return;
+    defaultMapLevelIndex = idx;
+    updateMapDMView();
+    await db.collection('settings').doc('map').set({ defaultLevelIndex: idx }, { merge: true });
+    const visibleLevels = getVisibleMapLevels();
+    if (mapLevels[idx] && mapLevels[idx].visible !== false) {
+        let pos = 0;
+        for (let i = 0; i < idx; i++) { if (mapLevels[i].visible !== false) pos++; }
+        playerMapLevelIndex = pos;
+        updateMapPlayerView();
+    }
+    showToast('Mapa inicial para aventureros actualizado');
 }
 
 function toggleMapEditMode() {
@@ -294,55 +501,6 @@ function toggleMapEditMode() {
         row.style.display = 'flex';
         btn.textContent = '✔️ Ocultar configuración';
         btn.title = 'Volver al modo solo ver';
-    }
-}
-
-async function saveMapImage() {
-    if (!isDM()) return;
-    const inputEl = document.getElementById('map-image-url');
-    const continentInputEl = document.getElementById('map-continent-name');
-    if (!inputEl) return;
-    
-    const url = (inputEl.value || '').trim();
-    const continentName = (continentInputEl && continentInputEl.value) ? continentInputEl.value.trim() : DEFAULT_CONTINENT_NAME;
-    
-    if (!url) {
-        showToast('Escribe la URL de la imagen (ej: https://i.imgur.com/xxxxx.png)', true);
-        return;
-    }
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        showToast('La URL debe comenzar con https:// (ej: https://i.imgur.com/xxxxx.png)', true);
-        return;
-    }
-    try {
-        await db.collection('settings').doc('map').set({ 
-            imageUrl: url,
-            continentName: continentName || DEFAULT_CONTINENT_NAME
-        }, { merge: true });
-        
-        const mapImg = document.getElementById('map-img');
-        const playerMapImg = document.getElementById('player-map-img');
-        const mapTitleDM = document.getElementById('map-title-dm');
-        const mapTitlePlayer = document.getElementById('map-title-player');
-        
-        if (mapImg) {
-            mapImg.src = url;
-            mapImg.alt = 'Mapa de ' + continentName;
-        }
-        if (playerMapImg) {
-            playerMapImg.src = url;
-            playerMapImg.alt = 'Mapa de ' + continentName;
-        }
-        if (mapTitleDM) mapTitleDM.textContent = '🗺️ Mapa de ' + continentName;
-        if (mapTitlePlayer) mapTitlePlayer.textContent = '🗺️ Mapa de ' + continentName;
-        
-        // Actualizar texto de jugadores
-        const playersContinentText = document.getElementById('players-continent-text');
-        if (playersContinentText) playersContinentText.textContent = 'Los héroes de ' + continentName;
-        
-        showToast('Mapa actualizado correctamente');
-    } catch (e) {
-        showToast('Error al guardar: ' + e.message, true);
     }
 }
 
@@ -370,15 +528,20 @@ function groupInventoryItems(items) {
 
 function renderPlayerView(data) {
     lastPlayerViewData = data;
+    playerUbicacionActual = data.ubicacionActual || '';
     const nombre = data.nombre || '—';
     const classLevel = (data.clase || '—') + ' • Nivel ' + (data.nivel || 1);
     const oro = (data.oro != null ? data.oro : 0).toLocaleString() + ' GP';
+    const banco = (data.bancoBalance != null ? data.bancoBalance : 0).toLocaleString() + ' GP';
+    const items = data.inventario || [];
+    const totalInventarioValue = items.reduce((sum, it) => sum + (Number(it.price) || 0), 0);
     document.getElementById('player-header-name').textContent = nombre;
     document.getElementById('player-header-class-level').textContent = classLevel;
     document.getElementById('player-header-oro').textContent = '💰 ' + oro;
+    const bancoEl = document.getElementById('player-header-banco');
+    if (bancoEl) bancoEl.textContent = '🏦 ' + banco;
     const list = document.getElementById('player-view-inventory');
     const toolbar = document.getElementById('player-inventory-toolbar');
-    const items = data.inventario || [];
     const rarityColors = { común: '#2ecc71', infrecuente: '#3498db', rara: '#9b59b6', legendaria: '#e74c3c' };
     if (items.length === 0) {
         if (toolbar) toolbar.style.display = 'none';
@@ -404,6 +567,7 @@ function renderPlayerView(data) {
     const esc = s => String(s || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     let tableHtml = '';
     let cardsHtml = '';
+    const totalValueHtml = '<p class="player-inventory-total-value" style="margin-bottom:12px; color:#a89878; font-size:1em;">Valor total pertenencias: <strong style="color:#f1c40f;">' + totalInventarioValue.toLocaleString() + ' GP</strong></p>';
     if (filtered.length === 0) {
         const msg = searchTerm || filterShop
             ? 'No hay items que coincidan con los filtros.'
@@ -418,12 +582,15 @@ function renderPlayerView(data) {
             const r = rarityColors[it.rarity] || '#555';
             const tipoLabel = getTipoLabel(it);
             const isMultiple = g.count > 1;
-            const sellControl = isMultiple
-                ? `<input type="number" min="1" max="${g.count}" value="1" class="inv-sell-qty" data-indices="${idxStr}" data-max="${g.count}" aria-label="Unidades a vender" title="Unidades a vender">`
+            const qtyControl = isMultiple
+                ? `<input type="number" min="1" max="${g.count}" value="1" class="inv-sell-qty" data-indices="${idxStr}" data-max="${g.count}" aria-label="Cantidad" title="Cantidad (usar o vender)">`
                 : '';
             const sellBtn = isMultiple
-                ? `<button type="button" class="btn btn-secondary btn-small" onclick="playerSellItemStack('${idxStr}', this)" title="Vender las unidades indicadas (75% c/u)">Vender</button>`
-                : `<button type="button" class="btn btn-secondary btn-small" onclick="playerSellItemStack('${idxStr}', this)" title="Vender (75% del valor)">Vender</button>`;
+                ? `<button type="button" class="btn btn-secondary btn-small" onclick="openSellConfirmStack('${idxStr}', this)" title="Vender las unidades indicadas (75% c/u)">Vender</button>`
+                : `<button type="button" class="btn btn-secondary btn-small" onclick="openSellConfirm(${idxUse})" title="Vender (75% del valor)">Vender</button>`;
+            const useBtn = isMultiple
+                ? `<button type="button" class="btn btn-small" onclick="openUseItemConfirmStack('${idxStr}', this)" title="Usar las unidades indicadas">Utilizar</button>`
+                : `<button type="button" class="btn btn-small" onclick="openUseItemConfirm(${idxUse})" title="Usar 1">Utilizar</button>`;
             return `<tr class="player-inventory-row">
                 <td><span style="color:#d4c4a8; font-weight:600;">${esc(it.name || 'Item')}</span></td>
                 <td><span class="inv-tipo">${esc(tipoLabel)}</span></td>
@@ -432,8 +599,8 @@ function renderPlayerView(data) {
                 <td><span class="rarity-badge" style="background:${r}; color:#fff;">${esc(it.rarity || 'común')}</span></td>
                 <td class="inv-qty">${g.count}</td>
                 <td class="inv-actions">
-                    <button type="button" class="btn btn-small" onclick="playerUseItem(${idxUse})" title="Usar 1">Utilizar</button>
-                    ${sellControl}
+                    ${useBtn}
+                    ${qtyControl}
                     ${sellBtn}
                 </td>
             </tr>`;
@@ -446,12 +613,15 @@ function renderPlayerView(data) {
             const r = rarityColors[it.rarity] || '#555';
             const tipoLabel = getTipoLabel(it);
             const isMultiple = g.count > 1;
-            const sellControl = isMultiple
-                ? `<input type="number" min="1" max="${g.count}" value="1" class="inv-sell-qty" data-indices="${idxStr}" data-max="${g.count}" aria-label="Unidades a vender" title="Unidades a vender">`
+            const qtyControl = isMultiple
+                ? `<input type="number" min="1" max="${g.count}" value="1" class="inv-sell-qty" data-indices="${idxStr}" data-max="${g.count}" aria-label="Cantidad" title="Cantidad (usar o vender)">`
                 : '';
             const sellBtn = isMultiple
-                ? `<button type="button" class="btn btn-secondary btn-small" onclick="playerSellItemStack('${idxStr}', this)" title="Vender las unidades indicadas (75% c/u)">Vender</button>`
-                : `<button type="button" class="btn btn-secondary btn-small" onclick="playerSellItemStack('${idxStr}', this)" title="Vender (75% del valor)">Vender</button>`;
+                ? `<button type="button" class="btn btn-secondary btn-small" onclick="openSellConfirmStack('${idxStr}', this)" title="Vender las unidades indicadas (75% c/u)">Vender</button>`
+                : `<button type="button" class="btn btn-secondary btn-small" onclick="openSellConfirm(${idxUse})" title="Vender (75% del valor)">Vender</button>`;
+            const useBtn = isMultiple
+                ? `<button type="button" class="btn btn-small" onclick="openUseItemConfirmStack('${idxStr}', this)" title="Usar las unidades indicadas">Utilizar</button>`
+                : `<button type="button" class="btn btn-small" onclick="openUseItemConfirm(${idxUse})" title="Usar 1">Utilizar</button>`;
             return `<div class="inventory-card">
                 <div class="inventory-card-header">
                     <span class="inventory-card-name">${esc(it.name || 'Item')}</span>
@@ -464,15 +634,116 @@ function renderPlayerView(data) {
                 </div>
                 <div class="inventory-card-effect">${esc(it.effect || '—')}</div>
                 <div class="inventory-card-actions">
-                    <button type="button" class="btn btn-small" onclick="playerUseItem(${idxUse})" title="Usar 1">Utilizar</button>
-                    ${sellControl}
+                    ${useBtn}
+                    ${qtyControl}
                     ${sellBtn}
                 </div>
             </div>`;
         }).join('');
         cardsHtml = `<div class="inventory-cards-wrap">${cardsHtml}</div>`;
     }
-    list.innerHTML = tableHtml + cardsHtml;
+    list.innerHTML = totalValueHtml + tableHtml + cardsHtml;
+    renderPlayerMapUbicacionDropdown();
+}
+
+var _pendingUseAction = null;
+
+function openUseItemConfirm(index) {
+    if (!lastPlayerViewData || !lastPlayerViewData.inventario) return;
+    var item = lastPlayerViewData.inventario[index];
+    if (!item) return;
+    var name = (item.name || 'Item').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    var msgEl = document.getElementById('player-use-confirm-message');
+    if (msgEl) msgEl.innerHTML = '¿Usar <strong>1 × ' + name + '</strong>?';
+    _pendingUseAction = { type: 'single', index: index };
+    openModal('player-use-item-confirm-modal');
+}
+
+function openUseItemConfirmStack(indicesStr, buttonEl) {
+    if (!lastPlayerViewData || !lastPlayerViewData.inventario) return;
+    var indices = indicesStr.split(',').map(function(s) { return parseInt(s, 10); }).filter(function(n) { return !isNaN(n); });
+    if (indices.length === 0) return;
+    var qty = indices.length;
+    if (buttonEl && buttonEl.nodeType === 1) {
+        var container = buttonEl.closest('td') || buttonEl.closest('.inventory-card-actions');
+        var input = container ? container.querySelector('.inv-sell-qty') : null;
+        if (input) {
+            var max = parseInt(input.getAttribute('data-max'), 10) || indices.length;
+            qty = Math.min(Math.max(1, parseInt(input.value, 10) || 1), max);
+        }
+    }
+    var item = lastPlayerViewData.inventario[indices[0]];
+    var name = (item && item.name ? item.name : 'Item').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    var msgEl = document.getElementById('player-use-confirm-message');
+    if (msgEl) msgEl.innerHTML = qty === 1 ? '¿Usar <strong>1 × ' + name + '</strong>?' : '¿Usar <strong>' + qty + ' × ' + name + '</strong>?';
+    _pendingUseAction = { type: 'stack', indicesStr: indicesStr, qtyOrButton: buttonEl };
+    openModal('player-use-item-confirm-modal');
+}
+
+function doConfirmedUseItem() {
+    if (!_pendingUseAction) { closeModal('player-use-item-confirm-modal'); return; }
+    var a = _pendingUseAction;
+    _pendingUseAction = null;
+    closeModal('player-use-item-confirm-modal');
+    if (a.type === 'single') playerUseItem(a.index);
+    else playerUseItemStack(a.indicesStr, a.qtyOrButton);
+}
+
+var _pendingSellAction = null;
+
+function openSellConfirm(index) {
+    if (!lastPlayerViewData || !lastPlayerViewData.inventario) return;
+    var item = lastPlayerViewData.inventario[index];
+    if (!item) return;
+    var name = (item.name || 'Item').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    var valorVenta = Math.floor((item.price || 0) * 0.75);
+    var msgEl = document.getElementById('player-sell-confirm-message');
+    var hintEl = document.getElementById('player-sell-confirm-hint');
+    if (msgEl) msgEl.innerHTML = '¿Vender <strong>1 × ' + name + '</strong> por <strong>' + valorVenta.toLocaleString() + ' GP</strong>?';
+    if (hintEl) hintEl.textContent = '75% del valor de compra.';
+    _pendingSellAction = { type: 'single', index: index };
+    openModal('player-sell-item-confirm-modal');
+}
+
+function openSellConfirmStack(indicesStr, buttonEl) {
+    if (!lastPlayerViewData || !lastPlayerViewData.inventario) return;
+    var indices = indicesStr.split(',').map(function(s) { return parseInt(s, 10); }).filter(function(n) { return !isNaN(n); });
+    if (indices.length === 0) return;
+    var qty = indices.length;
+    if (buttonEl && buttonEl.nodeType === 1) {
+        var container = buttonEl.closest('td') || buttonEl.closest('.inventory-card-actions');
+        var input = container ? container.querySelector('.inv-sell-qty') : null;
+        if (input) {
+            var max = parseInt(input.getAttribute('data-max'), 10) || indices.length;
+            qty = Math.min(Math.max(1, parseInt(input.value, 10) || 1), max);
+        }
+        indices = indices.slice(0, qty);
+    }
+    if (indices.length === 0) return;
+    var inv = lastPlayerViewData.inventario;
+    var totalVenta = 0;
+    indices.forEach(function(i) {
+        if (i >= 0 && i < inv.length) totalVenta += Math.floor((inv[i].price || 0) * 0.75);
+    });
+    var itemName = (inv[indices[0]] || {}).name || 'Item';
+    var name = itemName.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    var msgEl = document.getElementById('player-sell-confirm-message');
+    var hintEl = document.getElementById('player-sell-confirm-hint');
+    if (msgEl) msgEl.innerHTML = qty === 1
+        ? '¿Vender <strong>1 × ' + name + '</strong> por <strong>' + totalVenta.toLocaleString() + ' GP</strong>?'
+        : '¿Vender <strong>' + qty + ' × ' + name + '</strong> por <strong>' + totalVenta.toLocaleString() + ' GP</strong> en total?';
+    if (hintEl) hintEl.textContent = '75% del valor de compra por unidad.';
+    _pendingSellAction = { type: 'stack', indicesStr: indicesStr, qtyOrButton: buttonEl };
+    openModal('player-sell-item-confirm-modal');
+}
+
+function doConfirmedSellItem() {
+    if (!_pendingSellAction) { closeModal('player-sell-item-confirm-modal'); return; }
+    var a = _pendingSellAction;
+    _pendingSellAction = null;
+    closeModal('player-sell-item-confirm-modal');
+    if (a.type === 'single') playerSellItem(a.index);
+    else playerSellItemStack(a.indicesStr, a.qtyOrButton);
 }
 
 async function playerUseItem(index) {
@@ -498,6 +769,67 @@ async function playerUseItem(index) {
             fecha: firebase.firestore.FieldValue.serverTimestamp()
         });
         showToast('Item usado y eliminado del inventario');
+        if (lastPlayerViewData) {
+            lastPlayerViewData.inventario = inventario;
+            renderPlayerView(lastPlayerViewData);
+        } else {
+            ref.get().then(doc => { if (doc.exists) renderPlayerView(doc.data()); });
+        }
+    } catch (e) {
+        showToast('Error: ' + e.message, true);
+    }
+}
+
+async function playerUseItemStack(indicesStr, qtyOrButton) {
+    const user = getCurrentUser();
+    if (!user || !isPlayer() || !indicesStr) return;
+    let indices = indicesStr.split(',').map(s => parseInt(s, 10)).filter(n => !isNaN(n));
+    if (indices.length === 0) return;
+    let qty = indices.length;
+    if (typeof qtyOrButton === 'object' && qtyOrButton && qtyOrButton.nodeType === 1) {
+        const container = qtyOrButton.closest('td') || qtyOrButton.closest('.inventory-card-actions');
+        const input = container ? container.querySelector('.inv-sell-qty') : null;
+        if (input) {
+            const max = parseInt(input.getAttribute('data-max'), 10) || indices.length;
+            qty = Math.min(Math.max(1, parseInt(input.value, 10) || 1), max);
+        }
+        indices = indices.slice(0, qty);
+    } else if (typeof qtyOrButton === 'number' && qtyOrButton > 0) {
+        qty = Math.min(qtyOrButton, indices.length);
+        indices = indices.slice(0, qty);
+    }
+    if (indices.length === 0) return;
+    try {
+        const ref = db.collection('players').doc(user.id);
+        const snap = await ref.get();
+        if (!snap.exists) { showToast('Personaje no encontrado', true); return; }
+        const data = snap.data();
+        const inventario = (data.inventario || []).slice();
+        const set = new Set(indices);
+        const toRemove = indices.slice().sort((a, b) => b - a);
+        toRemove.forEach(i => {
+            if (i >= 0 && i < inventario.length) inventario.splice(i, 1);
+        });
+        await ref.update({ inventario });
+        const itemName = (data.inventario[indices[0]] || {}).name || 'Item';
+        for (let i = 0; i < indices.length; i++) {
+            await db.collection('transactions').add({
+                tipo: 'uso',
+                itemName: itemName,
+                playerName: data.nombre || 'Desconocido',
+                playerId: user.id,
+                shopName: '—',
+                precio: 0,
+                fecha: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
+        showToast(indices.length === 1 ? 'Item usado' : indices.length + ' items usados');
+        if (lastPlayerViewData) {
+            lastPlayerViewData.inventario = inventario;
+            renderPlayerView(lastPlayerViewData);
+        } else {
+            ref.get().then(doc => { if (doc.exists) renderPlayerView(doc.data()); });
+        }
     } catch (e) {
         showToast('Error: ' + e.message, true);
     }
@@ -516,8 +848,6 @@ async function playerSellItem(index) {
         const item = inventario[index];
         const precioCompra = item.price || 0;
         const valorVenta = Math.floor(precioCompra * 0.75);
-        const msg = '¿Vender «' + (item.name || 'Item') + '» por ' + valorVenta + ' GP? (75% del valor de compra)';
-        if (!confirm(msg)) return;
         const nuevoOro = (data.oro != null ? data.oro : 0) + valorVenta;
         inventario.splice(index, 1);
         await ref.update({ oro: nuevoOro, inventario });
@@ -531,6 +861,13 @@ async function playerSellItem(index) {
             fecha: firebase.firestore.FieldValue.serverTimestamp()
         });
         showToast('Vendido por ' + valorVenta + ' GP');
+        if (lastPlayerViewData) {
+            lastPlayerViewData.oro = nuevoOro;
+            lastPlayerViewData.inventario = inventario;
+            renderPlayerView(lastPlayerViewData);
+        } else {
+            ref.get().then(doc => { if (doc.exists) renderPlayerView(doc.data()); });
+        }
     } catch (e) {
         showToast('Error: ' + e.message, true);
     }
@@ -567,9 +904,6 @@ async function playerSellItemStack(indicesStr, qtyOrButton) {
         indices.forEach(i => {
             if (i >= 0 && i < inventario.length) totalVenta += Math.floor((inventario[i].price || 0) * 0.75);
         });
-        const label = indices.length > 1 ? indices.length + '× ' + firstName : firstName;
-        const msg = '¿Vender ' + label + ' por ' + totalVenta + ' GP en total? (75% del valor de compra por unidad)';
-        if (!confirm(msg)) return;
         const nuevoInv = inventario.filter((_, i) => !set.has(i));
         const nuevoOro = (data.oro != null ? data.oro : 0) + totalVenta;
         await ref.update({ oro: nuevoOro, inventario: nuevoInv });
@@ -583,6 +917,13 @@ async function playerSellItemStack(indicesStr, qtyOrButton) {
             fecha: firebase.firestore.FieldValue.serverTimestamp()
         });
         showToast('Vendido por ' + totalVenta + ' GP');
+        if (lastPlayerViewData) {
+            lastPlayerViewData.oro = nuevoOro;
+            lastPlayerViewData.inventario = nuevoInv;
+            renderPlayerView(lastPlayerViewData);
+        } else {
+            ref.get().then(doc => { if (doc.exists) renderPlayerView(doc.data()); });
+        }
     } catch (e) {
         showToast('Error: ' + e.message, true);
     }
@@ -641,6 +982,7 @@ function loadPlayerWorld() {
             openPlayerCityShops(playerDirectorioCityId, playerDirectorioCityNombre);
         }
     });
+    if (typeof loadRutasConocidas === 'function') loadRutasConocidas();
 }
 
 function renderPlayerCities() {
@@ -656,19 +998,495 @@ function renderPlayerCities() {
         const npcs = playerNpcsData.filter(n => n.ciudadId === city.id);
         const cityId = city.id;
         const cityNombre = (city.nombre || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        const esc = (s) => String(s || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         return `
-            <div class="card" id="player-city-card-${cityId}">
-                ${city.imagenUrl ? `<div style="width:100%; height:200px; overflow:hidden; border-radius:8px 8px 0 0; background:#2a231c; display:flex; align-items:center; justify-content:center;"><img src="${city.imagenUrl.replace(/"/g, '&quot;')}" alt="${cityNombre}" style="width:100%; height:100%; object-fit:cover;" onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\\'padding:40px; color:#8b7355;\\'>🖼️</div>';"></div>` : ''}
+            <div class="card" id="player-city-card-${esc(cityId)}">
+                ${city.imagenUrl ? `<div style="width:100%; height:200px; overflow:hidden; border-radius:8px 8px 0 0; background:#2a231c; display:flex; align-items:center; justify-content:center;"><img src="${esc(city.imagenUrl)}" alt="${cityNombre}" style="width:100%; height:100%; object-fit:cover;" onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\\'padding:40px; color:#8b7355;\\'>🖼️</div>';"></div>` : ''}
                 <div class="card-header">
-                    <h3 class="card-title">🏰 ${city.nombre || 'Sin nombre'}</h3>
+                    <h3 class="card-title">🏰 ${esc(city.nombre || 'Sin nombre')}</h3>
                 </div>
                 <div class="card-body">
-                    <p style="color:#8b7355; font-size:0.95em; margin-bottom:12px;">${city.descripcion || 'Sin descripción'}</p>
+                    <p style="color:#8b7355; font-size:0.95em; margin-bottom:12px;">${esc(city.descripcion || 'Sin descripción')}</p>
                     <p style="color:#a89878; font-size:0.9em; margin-bottom:12px;">🛒 ${shops.length} tienda${shops.length !== 1 ? 's' : ''} · 🎭 ${npcs.length} personaje${npcs.length !== 1 ? 's' : ''}</p>
                     <button class="btn" onclick="openPlayerCityShops('${cityId}', '${cityNombre}')">Ver directorio</button>
                 </div>
             </div>`;
     }).join('');
+    renderPlayerMapUbicacionDropdown();
+}
+
+function renderPlayerMapUbicacionDropdown() {
+    const sel = document.getElementById('player-map-ubicacion-select');
+    if (!sel) return;
+    const visibleCities = playerCitiesData.filter(c => c.visibleToPlayers !== false);
+    const currentValue = playerUbicacionActual || '';
+    sel.innerHTML = '<option value="">— Selecciona tu ciudad —</option>' + visibleCities.map(c => {
+        const n = (c.nombre || 'Sin nombre').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        const selected = c.id === currentValue ? ' selected' : '';
+        return `<option value="${(c.id || '').replace(/"/g, '&quot;')}"${selected}>${n}</option>`;
+    }).join('');
+    if (typeof renderPlayerRutas === 'function') renderPlayerRutas();
+}
+
+async function setPlayerUbicacion(cityId) {
+    const user = getCurrentUser();
+    if (!user || !user.id || !isPlayer()) return;
+    playerUbicacionActual = cityId || '';
+    try {
+        await db.collection('players').doc(user.id).update({ ubicacionActual: playerUbicacionActual || null });
+        showToast('Ubicación actualizada');
+    } catch (e) {
+        showToast('No se pudo guardar la ubicación', true);
+    }
+    renderPlayerRutas();
+}
+
+// ==================== RUTAS CONOCIDAS ====================
+function loadRutasConocidas() {
+    if (!db) return;
+    if (window._rutasSubscribed) return;
+    window._rutasSubscribed = true;
+    db.collection('rutas_conocidas').onSnapshot(snap => {
+        rutasConocidasData = (snap.docs || []).map(d => ({ id: d.id, ...d.data() }));
+        if (isDM()) renderDMRutas();
+        if (isPlayer()) renderPlayerRutas();
+    });
+}
+
+function renderDMRutas() {
+    const listEl = document.getElementById('dm-rutas-list');
+    if (!listEl) return;
+    const cities = (typeof citiesData !== 'undefined' && Array.isArray(citiesData)) ? citiesData : [];
+    const getName = (id) => (cities.find(c => c.id === id) || {}).nombre || id || '—';
+    if (rutasConocidasData.length === 0) {
+        listEl.innerHTML = '<p style="color:#8b7355; font-style:italic; padding:20px;">No hay rutas. Pulsa "➕ Añadir ruta" para crear una.</p>';
+        return;
+    }
+    listEl.innerHTML = rutasConocidasData.map(r => {
+        const salida = getName(r.ciudadSalidaId);
+        const llegada = getName(r.ciudadLlegadaId);
+        const medio = (r.medioTransporte || '—').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const duracion = (r.duracion || '—').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const hasNoches = r.noches != null && r.noches !== '' && !isNaN(Number(r.noches));
+        const nochesStr = hasNoches ? (Number(r.noches) + (Number(r.noches) === 1 ? ' noche' : ' noches')) : '—';
+        return `<div class="dm-ruta-item">
+            <span class="dm-ruta-route">${salida} → ${llegada}</span>
+            <span class="dm-ruta-medio">${medio}</span>
+            <span class="dm-ruta-duracion">${duracion}</span>
+            <span class="dm-ruta-noches">${nochesStr}</span>
+            <div class="dm-ruta-actions">
+                <button type="button" class="btn btn-small" onclick="editRuta('${r.id}')" title="Editar">✏️</button>
+                <button type="button" class="btn btn-small btn-danger" onclick="deleteRuta('${r.id}')" title="Eliminar">🗑️</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function openRutaModal(rutaId) {
+    document.getElementById('ruta-edit-id').value = rutaId || '';
+    document.getElementById('ruta-modal-title').textContent = rutaId ? '🛤️ Editar ruta' : '🛤️ Añadir ruta';
+    document.getElementById('ruta-save-btn').textContent = rutaId ? '💾 Guardar cambios' : '💾 Guardar ruta';
+    document.getElementById('ruta-ciudad-salida').value = '';
+    document.getElementById('ruta-ciudad-llegada').value = '';
+    document.getElementById('ruta-medio').value = '';
+    document.getElementById('ruta-duracion').value = '';
+    const nochesEl = document.getElementById('ruta-noches');
+    if (nochesEl) nochesEl.value = '';
+    const cities = (typeof citiesData !== 'undefined' && Array.isArray(citiesData)) ? citiesData : [];
+    const opt = (id, name) => `<option value="${(id || '').replace(/"/g, '&quot;')}">${(name || 'Sin nombre').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</option>`;
+    document.getElementById('ruta-ciudad-salida').innerHTML = '<option value="">— Selecciona —</option>' + cities.map(c => opt(c.id, c.nombre)).join('');
+    document.getElementById('ruta-ciudad-llegada').innerHTML = '<option value="">— Selecciona —</option>' + cities.map(c => opt(c.id, c.nombre)).join('');
+    if (rutaId) {
+        const r = rutasConocidasData.find(x => x.id === rutaId);
+        if (r) {
+            document.getElementById('ruta-ciudad-salida').value = r.ciudadSalidaId || '';
+            document.getElementById('ruta-ciudad-llegada').value = r.ciudadLlegadaId || '';
+            document.getElementById('ruta-medio').value = r.medioTransporte || '';
+            document.getElementById('ruta-duracion').value = r.duracion || '';
+            if (nochesEl) nochesEl.value = r.noches != null && r.noches !== '' ? r.noches : '';
+        }
+    }
+    openModal('ruta-modal');
+}
+
+async function saveRuta() {
+    const id = document.getElementById('ruta-edit-id').value.trim();
+    const ciudadSalidaId = document.getElementById('ruta-ciudad-salida').value.trim();
+    const ciudadLlegadaId = document.getElementById('ruta-ciudad-llegada').value.trim();
+    const medioTransporte = (document.getElementById('ruta-medio').value || '').trim();
+    const duracion = (document.getElementById('ruta-duracion').value || '').trim();
+    const nochesRaw = document.getElementById('ruta-noches');
+    const noches = nochesRaw && nochesRaw.value !== '' ? parseInt(nochesRaw.value, 10) : null;
+    if (!ciudadSalidaId || !ciudadLlegadaId) {
+        showToast('Elige ciudad de salida y de llegada', true);
+        return;
+    }
+    const data = { ciudadSalidaId, ciudadLlegadaId, medioTransporte, duracion };
+    if (noches != null && !isNaN(noches) && noches >= 0) data.noches = noches;
+    try {
+        if (id) {
+            await db.collection('rutas_conocidas').doc(id).update(data);
+            showToast('Ruta actualizada');
+        } else {
+            await db.collection('rutas_conocidas').add(data);
+            showToast('Ruta creada');
+        }
+        closeModal('ruta-modal');
+    } catch (e) {
+        showToast('Error al guardar: ' + (e.message || e), true);
+    }
+}
+
+function editRuta(id) {
+    openRutaModal(id);
+}
+
+async function deleteRuta(id) {
+    if (!id || !confirm('¿Eliminar esta ruta?')) return;
+    try {
+        await db.collection('rutas_conocidas').doc(id).delete();
+        showToast('Ruta eliminada');
+    } catch (e) {
+        showToast('Error al eliminar', true);
+    }
+}
+
+function renderPlayerRutas() {
+    const salidaEl = document.getElementById('player-ruta-salida');
+    const llegadaEl = document.getElementById('player-ruta-llegada');
+    const medioEl = document.getElementById('player-ruta-medio');
+    if (!salidaEl || !llegadaEl || !medioEl) return;
+    const visibleCities = (playerCitiesData || []).filter(c => c.visibleToPlayers !== false);
+    const opt = (id, name) => `<option value="${(id || '').replace(/"/g, '&quot;')}">${(name || 'Sin nombre').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</option>`;
+    salidaEl.innerHTML = '<option value="">— Selecciona —</option>' + visibleCities.map(c => opt(c.id, c.nombre)).join('');
+    llegadaEl.innerHTML = '<option value="">— Selecciona —</option>' + visibleCities.map(c => opt(c.id, c.nombre)).join('');
+    const medios = [...new Set((rutasConocidasData || []).map(r => (r.medioTransporte || '').trim()).filter(Boolean))].sort();
+    medioEl.innerHTML = '<option value="">— Selecciona —</option>' + medios.map(m => `<option value="${m.replace(/"/g, '&quot;')}">${m.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</option>`).join('');
+    if (playerUbicacionActual) salidaEl.value = playerUbicacionActual;
+    playerRutaCalcular();
+}
+
+function togglePlayerRutasPanel() {
+    const wrap = document.getElementById('player-map-rutas-wrap');
+    const btn = document.getElementById('player-map-rutas-toggle-btn');
+    if (!wrap || !btn) return;
+    const isOpen = wrap.style.display !== 'none';
+    wrap.style.display = isOpen ? 'none' : 'block';
+    btn.classList.toggle('open', !isOpen);
+    btn.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+}
+
+function playerRutaCalcular() {
+    const resultEl = document.getElementById('player-map-rutas-result');
+    if (!resultEl) return;
+    const salidaId = (document.getElementById('player-ruta-salida') || {}).value || '';
+    const llegadaId = (document.getElementById('player-ruta-llegada') || {}).value || '';
+    const medio = ((document.getElementById('player-ruta-medio') || {}).value || '').trim();
+    currentRutaParaViaje = null;
+    if (!salidaId || !llegadaId || !medio) {
+        resultEl.innerHTML = '<p class="player-map-rutas-msg">Elige ciudad de salida, ciudad de llegada y medio de transporte.</p>';
+        resultEl.className = 'player-map-rutas-result';
+        return;
+    }
+    const r = (rutasConocidasData || []).find(x =>
+        (x.medioTransporte || '').trim() === medio &&
+        ((x.ciudadSalidaId === salidaId && x.ciudadLlegadaId === llegadaId) ||
+         (x.ciudadSalidaId === llegadaId && x.ciudadLlegadaId === salidaId))
+    );
+    if (!r) {
+        currentRutaParaViaje = null;
+        resultEl.innerHTML = '<p class="player-map-rutas-msg">No hay una ruta conocida con esa combinación.</p>';
+        resultEl.className = 'player-map-rutas-result';
+        return;
+    }
+    const noches = r.noches != null && r.noches !== '' && !isNaN(Number(r.noches)) ? Number(r.noches) : null;
+    currentRutaParaViaje = { r, salidaId, llegadaId };
+    const cities = (typeof playerCitiesData !== 'undefined' && Array.isArray(playerCitiesData)) ? playerCitiesData : [];
+    const getName = (cid) => (cities.find(c => c.id === cid) || {}).nombre || cid || '—';
+    const salidaNombre = getName(salidaId);
+    const llegadaNombre = getName(llegadaId);
+    let html = '';
+    if (noches != null && noches >= 0) {
+        html = '<p class="player-map-rutas-noches">🌙 <strong>Noches de viaje:</strong> ' + noches + (noches === 1 ? ' noche' : ' noches') + '</p>';
+    } else {
+        const duracion = (r.duracion || '—').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        html = '<p class="player-map-rutas-noches">⏱️ <strong>Duración:</strong> ' + duracion + '</p>';
+    }
+    html += '<button type="button" class="btn btn-small player-empezar-viaje-btn" onclick="startViaje()">🚀 Empezar viaje</button>';
+    resultEl.innerHTML = html;
+    resultEl.className = 'player-map-rutas-result player-map-rutas-result-ok';
+}
+
+function clearCurrentRutaParaViaje() {
+    currentRutaParaViaje = null;
+}
+
+function togglePlayerBitacoraPanel() {
+    const wrap = document.getElementById('player-map-bitacora-wrap');
+    const btn = document.getElementById('player-map-bitacora-toggle-btn');
+    if (!wrap || !btn) return;
+    const isOpen = wrap.style.display !== 'none';
+    wrap.style.display = isOpen ? 'none' : 'block';
+    btn.classList.toggle('open', !isOpen);
+    btn.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+    if (!isOpen && typeof loadBitacora === 'function') loadBitacora();
+}
+
+async function startViaje() {
+    const user = getCurrentUser();
+    if (!user || !user.id || !isPlayer()) return;
+    if (!currentRutaParaViaje) {
+        showToast('Consulta una ruta primero y pulsa Empezar viaje', true);
+        return;
+    }
+    const { r, salidaId, llegadaId } = currentRutaParaViaje;
+    const cities = (typeof playerCitiesData !== 'undefined' && Array.isArray(playerCitiesData)) ? playerCitiesData : [];
+    const getName = (cid) => (cities.find(c => c.id === cid) || {}).nombre || cid || '—';
+    const noches = r.noches != null && r.noches !== '' && !isNaN(Number(r.noches)) ? Math.max(1, Number(r.noches)) : 1;
+    const data = {
+        playerId: user.id,
+        ciudadSalidaId: salidaId,
+        ciudadLlegadaId: llegadaId,
+        ciudadSalidaNombre: getName(salidaId),
+        ciudadLlegadaNombre: getName(llegadaId),
+        medioTransporte: (r.medioTransporte || '').trim(),
+        noches,
+        duracion: (r.duracion || '').trim() || null,
+        fecha: firebase.firestore.FieldValue.serverTimestamp(),
+        notasNoches: Array(noches).fill('')
+    };
+    try {
+        await db.collection('bitacora_viajes').add(data);
+        showToast('Viaje añadido a la bitácora');
+        currentRutaParaViaje = null;
+        if (typeof loadBitacora === 'function') loadBitacora();
+        const bitacoraWrap = document.getElementById('player-map-bitacora-wrap');
+        const bitacoraBtn = document.getElementById('player-map-bitacora-toggle-btn');
+        if (bitacoraWrap) bitacoraWrap.style.display = 'block';
+        if (bitacoraBtn) bitacoraBtn.classList.add('open');
+        const rutasWrap = document.getElementById('player-map-rutas-wrap');
+        const rutasBtn = document.getElementById('player-map-rutas-toggle-btn');
+        if (rutasWrap) rutasWrap.style.display = 'none';
+        if (rutasBtn) { rutasBtn.classList.remove('open'); rutasBtn.setAttribute('aria-expanded', 'false'); }
+    } catch (e) {
+        showToast('Error al crear viaje: ' + (e.message || e), true);
+    }
+}
+
+async function deleteBitacoraViaje(viajeId) {
+    if (!viajeId) return;
+    const user = getCurrentUser();
+    if (!user || !user.id || !isPlayer()) return;
+    if (!confirm('¿Borrar esta entrada de la bitácora? No se puede deshacer.')) return;
+    try {
+        await db.collection('bitacora_viajes').doc(viajeId).delete();
+        showToast('Entrada borrada');
+        if (typeof loadBitacora === 'function') loadBitacora();
+    } catch (e) {
+        showToast('Error al borrar', true);
+    }
+}
+
+function toggleBitacoraViajeNoches(viajeId) {
+    const card = document.querySelector('.player-bitacora-viaje[data-viaje-id="' + viajeId + '"]');
+    if (!card) return;
+    const header = card.querySelector('.player-bitacora-header-toggle');
+    const chevron = card.querySelector('.player-bitacora-viaje-chevron');
+    const isCollapsed = card.classList.contains('player-bitacora-viaje-collapsed');
+    card.classList.toggle('player-bitacora-viaje-collapsed', !isCollapsed);
+    if (header) header.setAttribute('aria-expanded', isCollapsed ? 'true' : 'false');
+    if (chevron) chevron.textContent = isCollapsed ? '▼' : '▶';
+}
+
+function loadBitacora() {
+    const user = getCurrentUser();
+    if (!user || !user.id || !isPlayer()) return;
+    const listEl = document.getElementById('player-bitacora-list');
+    if (!listEl) return;
+    listEl.innerHTML = '<p style="color:#8b7355; padding:16px;">Cargando bitácora...</p>';
+    db.collection('bitacora_viajes').where('playerId', '==', user.id).get().then(snap => {
+        const viajes = (snap.docs || []).map(d => ({ id: d.id, ...d.data() }));
+        viajes.sort((a, b) => {
+            const ta = a.fecha && typeof a.fecha.toDate === 'function' ? a.fecha.toDate().getTime() : 0;
+            const tb = b.fecha && typeof b.fecha.toDate === 'function' ? b.fecha.toDate().getTime() : 0;
+            return tb - ta;
+        });
+        renderBitacora(viajes);
+    }).catch(() => {
+        listEl.innerHTML = '<p style="color:#8b7355; padding:16px;">Error al cargar la bitácora.</p>';
+    });
+}
+
+function renderBitacora(viajes) {
+    const listEl = document.getElementById('player-bitacora-list');
+    if (!listEl) return;
+    if (!viajes || viajes.length === 0) {
+        listEl.innerHTML = '<p class="player-map-rutas-msg">Aún no tienes viajes. Consulta una ruta y pulsa "Empezar viaje".</p>';
+        return;
+    }
+    listEl.innerHTML = viajes.map(v => {
+        const headerRuta = (v.ciudadSalidaNombre || '—') + ' → ' + (v.ciudadLlegadaNombre || '—');
+        const duracionStr = v.noches != null && v.noches > 0 ? (v.noches === 1 ? '1 noche' : v.noches + ' noches') : (v.duracion || '—');
+        let fechaDisplay = '—';
+        if (v.fecha) {
+            if (typeof v.fecha.toDate === 'function') fechaDisplay = v.fecha.toDate().toLocaleDateString();
+            else if (v.fecha instanceof Date) fechaDisplay = v.fecha.toLocaleDateString();
+            else fechaDisplay = String(v.fecha);
+        }
+        const noches = Math.max(1, Number(v.noches) || 1);
+        const notas = Array.isArray(v.notasNoches) ? v.notasNoches : Array(noches).fill('');
+        while (notas.length < noches) notas.push('');
+        const notasHtml = Array.from({ length: noches }, (_, i) => {
+            const raw = (notas[i] || '').trim();
+            const valEsc = raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+            return `<div class="player-bitacora-noche">
+                <label class="player-bitacora-noche-label">Noche ${i + 1}</label>
+                <div class="player-bitacora-note-row">
+                    <div class="player-bitacora-note-preview" data-viaje-id="${v.id}" data-night="${i}">${valEsc || ''}</div>
+                    <button type="button" class="btn btn-small" onclick="openBitacoraNoteModal('${v.id}', ${i})" title="Editar notas">📝</button>
+                </div>
+            </div>`;
+        }).join('');
+        return `<div class="player-bitacora-viaje player-bitacora-viaje-collapsed" data-viaje-id="${v.id}">
+            <div class="player-bitacora-header player-bitacora-header-toggle" onclick="toggleBitacoraViajeNoches('${v.id}')" onkeydown="if(event.key==='Enter'){event.preventDefault();toggleBitacoraViajeNoches('${v.id}');}" role="button" tabindex="0" aria-expanded="false" title="Desplegar / plegar noches">
+                <span class="player-bitacora-viaje-chevron" aria-hidden="true">▶</span>
+                <span class="player-bitacora-ruta">${(headerRuta).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>
+                <span class="player-bitacora-duracion">${(duracionStr).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>
+                <span class="player-bitacora-fecha">${(fechaDisplay).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>
+                <button type="button" class="btn btn-small player-bitacora-delete-btn" onclick="event.stopPropagation(); deleteBitacoraViaje('${v.id}');" title="Borrar esta entrada">🗑️</button>
+            </div>
+            <div class="player-bitacora-notas">${notasHtml}</div>
+        </div>`;
+    }).join('');
+}
+
+async function saveBitacoraNota(viajeId, nightIndex, text) {
+    if (!viajeId || nightIndex < 0) return;
+    try {
+        const ref = db.collection('bitacora_viajes').doc(viajeId);
+        const snap = await ref.get();
+        if (!snap.exists) return;
+        const data = snap.data();
+        const notas = Array.isArray(data.notasNoches) ? data.notasNoches.slice() : [];
+        const noches = Math.max(notas.length, nightIndex + 1);
+        while (notas.length < noches) notas.push('');
+        notas[nightIndex] = text;
+        await ref.update({ notasNoches: notas });
+    } catch (e) {
+        showToast('Error al guardar nota', true);
+        throw e;
+    }
+}
+
+function openBitacoraNoteModal(viajeId, nightIndex) {
+    const modal = document.getElementById('player-bitacora-note-modal');
+    const titleEl = document.getElementById('player-bitacora-note-modal-title');
+    const inputEl = document.getElementById('player-bitacora-note-modal-input');
+    if (!modal || !titleEl || !inputEl) return;
+    const preview = document.querySelector('.player-bitacora-note-preview[data-viaje-id="' + viajeId + '"][data-night="' + nightIndex + '"]');
+    const currentText = preview ? (preview.textContent || '').trim() : '';
+    modal.dataset.viajeId = viajeId;
+    modal.dataset.night = String(nightIndex);
+    titleEl.textContent = '📝 Noche ' + (Number(nightIndex) + 1);
+    inputEl.value = currentText;
+    openModal('player-bitacora-note-modal');
+}
+
+async function saveBitacoraNoteFromModal() {
+    const modal = document.getElementById('player-bitacora-note-modal');
+    const viajeId = modal && modal.dataset.viajeId;
+    const nightStr = modal && modal.dataset.night;
+    const inputEl = document.getElementById('player-bitacora-note-modal-input');
+    if (!viajeId || nightStr === undefined) return;
+    const nightIndex = parseInt(nightStr, 10);
+    if (isNaN(nightIndex) || nightIndex < 0) return;
+    const text = inputEl ? (inputEl.value || '').trim() : '';
+    try {
+        await saveBitacoraNota(viajeId, nightIndex, text);
+        showToast('Notas guardadas');
+        closeModal('player-bitacora-note-modal');
+        const preview = document.querySelector('.player-bitacora-note-preview[data-viaje-id="' + viajeId + '"][data-night="' + nightIndex + '"]');
+        if (preview) preview.textContent = text;
+    } catch (e) {
+        // saveBitacoraNota ya muestra toast de error
+    }
+}
+
+function loadPlayerCityNotesPreviews() {
+    const user = getCurrentUser();
+    if (!user || !user.id || (user.type !== 'player' && user.tipo !== 'player')) return;
+    const visibleCities = playerCitiesData.filter(c => c.visibleToPlayers !== false);
+    if (!visibleCities.length) return;
+    Promise.all(visibleCities.map(city =>
+        db.collection('cities').doc(city.id).collection('playerNotes').doc(user.id).get()
+            .then(snap => {
+                const data = snap.exists ? snap.data() : null;
+                const text = (data && (data.notes !== undefined || data.notas !== undefined))
+                    ? String(data.notes ?? data.notas ?? '').trim()
+                    : '';
+                return { cityId: city.id, text };
+            })
+            .catch(() => ({ cityId: city.id, text: '' }))
+    )).then(results => {
+        results.forEach(({ cityId, text }) => {
+            const el = document.querySelector('.player-city-note-preview[data-city-id="' + cityId + '"]');
+            if (el) el.textContent = text ? text : '';
+        });
+    });
+}
+
+function openCityNotesModalFromDirectorio() {
+    if (playerDirectorioCityId && playerDirectorioCityNombre) {
+        openCityNotesModal(playerDirectorioCityId, playerDirectorioCityNombre);
+    }
+}
+
+function openCityNotesModal(cityId, cityName) {
+    const user = getCurrentUser();
+    if (!user || !user.id || (user.type !== 'player' && user.tipo !== 'player')) return;
+    const modal = document.getElementById('player-city-notes-modal');
+    const titleEl = document.getElementById('player-city-notes-modal-title');
+    const inputEl = document.getElementById('player-city-notes-modal-input');
+    if (!modal || !titleEl || !inputEl) return;
+    modal.dataset.cityId = cityId;
+    titleEl.textContent = '📝 Mis notas — ' + (cityName || 'Ciudad');
+    inputEl.value = '';
+    db.collection('cities').doc(cityId).collection('playerNotes').doc(user.id).get()
+        .then(snap => {
+            const data = snap.exists ? snap.data() : null;
+            const text = (data && (data.notes !== undefined || data.notas !== undefined))
+                ? String(data.notes ?? data.notas ?? '')
+                : '';
+            inputEl.value = text;
+        })
+        .catch(() => {})
+        .finally(() => openModal('player-city-notes-modal'));
+}
+
+function saveCityNotesFromModal() {
+    const user = getCurrentUser();
+    if (!user || !user.id || (user.type !== 'player' && user.tipo !== 'player')) return;
+    const modal = document.getElementById('player-city-notes-modal');
+    const cityId = modal && modal.dataset.cityId;
+    const inputEl = document.getElementById('player-city-notes-modal-input');
+    if (!cityId || !inputEl) return;
+    const notes = inputEl.value.trim();
+    db.collection('cities').doc(cityId).collection('playerNotes').doc(user.id).set({
+        notes: notes,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true })
+        .then(() => {
+            showToast('Notas guardadas');
+            closeModal('player-city-notes-modal');
+            if (playerDirectorioCityId === cityId) {
+                const preview = document.getElementById('player-directorio-note-preview');
+                if (preview) preview.textContent = notes;
+            }
+        })
+        .catch(err => {
+            console.error('Error guardando notas:', err);
+            showToast('Error al guardar notas', true);
+        });
 }
 
 let playerDirectorioCityId = null, playerDirectorioCityNombre = null;
@@ -691,35 +1509,23 @@ function openPlayerCityShops(cityId, cityNombre) {
     } else if (imageContainer) {
         imageContainer.innerHTML = '';
     }
-    
-    // Cargar y configurar notas del jugador
-    const notesInput = document.getElementById('player-directorio-city-notes-input');
-    if (notesInput && currentUser && currentUser.type === 'player' && currentUser.id) {
-        // Cargar notas existentes
+
+    const notesBlock = document.getElementById('player-directorio-notes-block');
+    const notesPreview = document.getElementById('player-directorio-note-preview');
+    const isPlayer = currentUser && (currentUser.type === 'player' || currentUser.tipo === 'player');
+    if (notesBlock) notesBlock.style.display = isPlayer ? 'block' : 'none';
+    if (notesPreview && isPlayer && currentUser && currentUser.id) {
+        notesPreview.textContent = '';
         db.collection('cities').doc(cityId).collection('playerNotes').doc(currentUser.id).get()
-            .then(doc => {
-                if (doc.exists && doc.data().notes) {
-                    notesInput.value = doc.data().notes;
-                } else {
-                    notesInput.value = '';
-                }
+            .then(snap => {
+                const data = snap.exists ? snap.data() : null;
+                const text = (data && (data.notes !== undefined || data.notas !== undefined))
+                    ? String(data.notes ?? data.notas ?? '').trim()
+                    : '';
+                const el = document.getElementById('player-directorio-note-preview');
+                if (el) el.textContent = text;
             })
-            .catch(err => console.error('Error cargando notas:', err));
-        
-        // Guardar notas automáticamente con debounce (remover listeners anteriores si existen)
-        notesInput.removeEventListener('input', window._playerCityNotesHandler);
-        window._playerCityNotesHandler = function() {
-            clearTimeout(window._playerCityNotesSaveTimeout);
-            window._playerCityNotesSaveTimeout = setTimeout(() => {
-                const notes = notesInput.value.trim();
-                db.collection('cities').doc(cityId).collection('playerNotes').doc(currentUser.id).set({
-                    notes: notes,
-                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                }, { merge: true })
-                .catch(err => console.error('Error guardando notas:', err));
-            }, 1000);
-        };
-        notesInput.addEventListener('input', window._playerCityNotesHandler);
+            .catch(() => {});
     }
 
     const tipoEmoji = { herreria: '⚔️', pociones: '🧪', taberna: '🍺', biblioteca: '📚', arqueria: '🏹', emporio: '🛒', batalla: '🥊', santuario: '🪞', banco: '🏦', posada: '🏨' };
@@ -816,34 +1622,74 @@ async function openPlayerHabitantesModal(cityId, cityNombre) {
     if (!npcs.length) {
         list.innerHTML = '<p style="color:#8b7355; text-align:center; padding:40px;">No hay habitantes registrados en esta ciudad.</p>';
     } else {
+        const esc = (s) => String(s || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, "\\'");
         list.innerHTML = npcs.map((n, idx) => {
             const color = getNpcCardColor(idx);
-            const notes = playerNpcNotes[n.id] || '';
+            const notes = (playerNpcNotes[n.id] || '').trim();
+            const npcId = esc(n.id);
+            const npcNombre = (n.nombre || 'NPC').replace(/'/g, "\\'").replace(/"/g, '&quot;');
             return `
             <div class="player-mistfall-npc-card-colored" style="background: ${color.bg}; border-color: ${color.border};">
                 <div class="player-mistfall-npc-info">
-                    <h3 class="player-mistfall-npc-name">${n.nombre || 'NPC'}</h3>
-                    <p class="player-mistfall-npc-rol">${n.rol || ''}</p>
+                    <h3 class="player-mistfall-npc-name">${esc(n.nombre || 'NPC')}</h3>
+                    <p class="player-mistfall-npc-rol">${esc(n.rol || '')}</p>
                     <div class="player-mistfall-npc-notes-section" style="margin-top: 12px;">
                         <label style="color: #a89878; font-size: 0.85em; display: block; margin-bottom: 6px;">Mis notas:</label>
-                        <textarea class="player-mistfall-npc-notes-input" data-npc-id="${n.id}" placeholder="Escribe tus notas sobre este NPC..." style="width: 100%; min-height: 60px; padding: 8px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: #d4c4a8; font-family: inherit; font-size: 0.9em; resize: vertical;">${notes}</textarea>
+                        <div class="player-npc-note-preview" data-npc-id="${npcId}" style="color:#a89878; font-size:0.9em; min-height:1.5em; white-space:pre-wrap; word-break:break-word; margin-bottom:8px;">${esc(notes)}</div>
+                        <button type="button" class="btn btn-small" onclick="openNpcNotesModal('${npcId}', '${npcNombre}')" title="Editar notas">📝</button>
                     </div>
                 </div>
             </div>`;
         }).join('');
-        
-        // Agregar listeners para guardar notas automáticamente
-        list.querySelectorAll('.player-mistfall-npc-notes-input').forEach(textarea => {
-            let timeout;
-            textarea.addEventListener('input', () => {
-                clearTimeout(timeout);
-                timeout = setTimeout(() => {
-                    savePlayerNpcNote(textarea.dataset.npcId, textarea.value);
-                }, 1000);
-            });
-        });
     }
     openModal('player-habitantes-modal');
+}
+
+function openNpcNotesModal(npcId, npcName) {
+    const user = getCurrentUser();
+    if (!user || !user.id || (user.type !== 'player' && user.tipo !== 'player')) return;
+    const modal = document.getElementById('player-npc-notes-modal');
+    const titleEl = document.getElementById('player-npc-notes-modal-title');
+    const inputEl = document.getElementById('player-npc-notes-modal-input');
+    if (!modal || !titleEl || !inputEl) return;
+    modal.dataset.npcId = npcId;
+    titleEl.textContent = '📝 Mis notas — ' + (npcName || 'Personaje');
+    inputEl.value = '';
+    db.collection('players').doc(user.id).get()
+        .then(doc => {
+            const data = doc.exists ? doc.data() : {};
+            const npcNotes = data.npcNotes || {};
+            const text = (npcNotes[npcId] || '').trim();
+            inputEl.value = text;
+        })
+        .catch(() => {})
+        .finally(() => openModal('player-npc-notes-modal'));
+}
+
+function saveNpcNotesFromModal() {
+    const user = getCurrentUser();
+    if (!user || !user.id || (user.type !== 'player' && user.tipo !== 'player')) return;
+    const modal = document.getElementById('player-npc-notes-modal');
+    const npcId = modal && modal.dataset.npcId;
+    const inputEl = document.getElementById('player-npc-notes-modal-input');
+    if (!npcId || !inputEl) return;
+    const notes = inputEl.value.trim();
+    db.collection('players').doc(user.id).get()
+        .then(doc => {
+            const currentData = doc.exists ? doc.data() : {};
+            const npcNotes = currentData.npcNotes || {};
+            npcNotes[npcId] = notes;
+            return db.collection('players').doc(user.id).update({ npcNotes });
+        })
+        .then(() => {
+            showToast('Notas guardadas');
+            closeModal('player-npc-notes-modal');
+            document.querySelectorAll('.player-npc-note-preview[data-npc-id="' + npcId + '"]').forEach(el => { el.textContent = notes; });
+        })
+        .catch(e => {
+            console.error('Error guardando nota:', e);
+            showToast('Error al guardar nota', true);
+        });
 }
 
 async function savePlayerNpcNote(npcId, notes) {
@@ -858,6 +1704,7 @@ async function savePlayerNpcNote(npcId, notes) {
         npcNotes[npcId] = notes.trim();
         
         await playerRef.update({ npcNotes });
+        showToast('Nota guardada');
     } catch (e) {
         console.error('Error guardando nota:', e);
         showToast('Error al guardar nota', true);
@@ -886,32 +1733,25 @@ async function renderPlayerDirectorioHabitantes(cityId, cityNombre) {
     if (!npcs.length) {
         grid.innerHTML = '<p style="color:#8b7355; text-align:center; padding:40px; grid-column: 1 / -1;">No hay habitantes registrados en esta ciudad.</p>';
     } else {
+        const esc = (s) => String(s || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, "\\'");
         grid.innerHTML = npcs.map((n, idx) => {
             const color = getNpcCardColor(idx);
-            const notes = playerNpcNotes[n.id] || '';
+            const notes = (playerNpcNotes[n.id] || '').trim();
+            const npcId = esc(n.id);
+            const npcNombre = (n.nombre || 'NPC').replace(/'/g, "\\'").replace(/"/g, '&quot;');
             return `
             <div class="player-mistfall-npc-card-colored" style="background: ${color.bg}; border-color: ${color.border};">
                 <div class="player-mistfall-npc-info">
-                    <h3 class="player-mistfall-npc-name">${n.nombre || 'NPC'}</h3>
-                    <p class="player-mistfall-npc-rol">${n.rol || ''}</p>
+                    <h3 class="player-mistfall-npc-name">${esc(n.nombre || 'NPC')}</h3>
+                    <p class="player-mistfall-npc-rol">${esc(n.rol || '')}</p>
                     <div class="player-mistfall-npc-notes-section">
                         <label style="color: #a89878; font-size: 0.85em; display: block; margin-bottom: 6px;">Mis notas:</label>
-                        <textarea class="player-mistfall-npc-notes-input" data-npc-id="${n.id}" placeholder="Escribe tus notas sobre este NPC..." style="width: 100%; min-height: 60px; padding: 8px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: #d4c4a8; font-family: inherit; font-size: 0.9em; resize: vertical;">${notes}</textarea>
+                        <div class="player-npc-note-preview" data-npc-id="${npcId}" style="color:#a89878; font-size:0.9em; min-height:1.5em; white-space:pre-wrap; word-break:break-word; margin-bottom:8px;">${esc(notes)}</div>
+                        <button type="button" class="btn btn-small" onclick="openNpcNotesModal('${npcId}', '${npcNombre}')" title="Editar notas">📝</button>
                     </div>
                 </div>
             </div>`;
         }).join('');
-        
-        // Agregar listeners para guardar notas automáticamente
-        grid.querySelectorAll('.player-mistfall-npc-notes-input').forEach(textarea => {
-            let timeout;
-            textarea.addEventListener('input', () => {
-                clearTimeout(timeout);
-                timeout = setTimeout(() => {
-                    savePlayerNpcNote(textarea.dataset.npcId, textarea.value);
-                }, 1000);
-            });
-        });
     }
 }
 
@@ -1102,6 +1942,11 @@ async function doPlayerBancoDeposit() {
     document.getElementById('player-banco-balance').textContent = newBal.toLocaleString() + ' GP';
     document.getElementById('player-banco-amount').value = '';
     showToast('Depositados ' + amount.toLocaleString() + ' GP en el banco');
+    if (lastPlayerViewData) {
+        lastPlayerViewData.oro = newOro;
+        lastPlayerViewData.bancoBalance = newBal;
+        renderPlayerView(lastPlayerViewData);
+    }
 }
 
 async function doPlayerBancoWithdraw() {
@@ -1141,6 +1986,11 @@ async function doPlayerBancoWithdraw() {
     document.getElementById('player-banco-balance').textContent = newBal.toLocaleString() + ' GP';
     document.getElementById('player-banco-amount').value = '';
     showToast('Retirados ' + amount.toLocaleString() + ' GP (comisión ' + fee + ' GP).');
+    if (lastPlayerViewData) {
+        lastPlayerViewData.oro = newOro;
+        lastPlayerViewData.bancoBalance = newBal;
+        renderPlayerView(lastPlayerViewData);
+    }
 }
 
 function openPlayerPosadaModal(shopId) {
@@ -3019,6 +3869,9 @@ async function playerTavernCheckout() {
         }
         const it = items.find(i => i.id === row.id);
         if (!it) continue;
+        // Solo "Para Llevar" va al inventario; "Para Servir" se consume en la taberna
+        const paraLlevar = (it.categoria || 'servir').toLowerCase() === 'llevar';
+        if (!paraLlevar) continue;
         for (let q = 0; q < row.qty; q++) inventario.push({ name: it.name, price: it.price, effect: it.effect || '', rarity: 'común', shopTipo });
     }
     const newOro = oro - total;
@@ -3092,6 +3945,7 @@ async function showDashboard() {
         if (typeof loadDMNotifications === 'function') loadDMNotifications();
         if (typeof loadDMMissions === 'function') loadDMMissions();
         loadMapImage();
+        if (typeof loadRutasConocidas === 'function') loadRutasConocidas();
     } else {
         showLoginModal();
     }
@@ -3267,12 +4121,15 @@ function loadPlayerCartasDestino() {
     if (!user || !user.id || !isPlayer()) return;
     const list = document.getElementById('player-cartas-destino-list');
     const mensajeEl = document.getElementById('player-cartas-destino-mensaje');
+    const victoryEl = document.getElementById('player-cartas-destino-victory');
     if (!list) return;
     list.innerHTML = '<p style="color:#8b7355; text-align:center; padding:20px;">Cargando cartas...</p>';
     if (mensajeEl) mensajeEl.innerHTML = '';
+    if (victoryEl) victoryEl.style.display = 'none';
     db.collection('players').doc(user.id).get().then(doc => {
         const data = doc.exists ? doc.data() : {};
         const cartas = Array.isArray(data.cartasDestino) ? data.cartasDestino : [];
+        const completadas = Array.isArray(data.cartasDestinoCompletadas) ? data.cartasDestinoCompletadas : [];
         const mensaje = (data.mensajeGeneralCartasDestino || '').trim();
         if (mensajeEl) {
             if (mensaje) {
@@ -3288,8 +4145,12 @@ function loadPlayerCartasDestino() {
             list.innerHTML = '<p style="color:#8b7355; text-align:center; padding:40px 20px; font-style:italic;">El DM aún no te ha asignado cartas del destino.</p>';
             return;
         }
+        const firstFourChecked = cartas.length >= 4 && [0, 1, 2, 3].every(idx => completadas.indexOf(idx) !== -1);
+        if (victoryEl) victoryEl.style.display = firstFourChecked ? 'block' : 'none';
+
         list.innerHTML = cartas.map((c, i) => {
             const titulo = c.titulo || ('Carta ' + (i + 1));
+            const checked = completadas.indexOf(i) !== -1;
             let imgHtml;
             if (c.imagenUrl) {
                 const q = c.imagenUrl.replace(/"/g, '&quot;');
@@ -3301,12 +4162,36 @@ function loadPlayerCartasDestino() {
                 <div class="player-carta-destino-img-wrap">${imgHtml}</div>
                 <div class="player-carta-destino-info">
                     <h4 class="player-carta-destino-titulo">${titulo.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</h4>
+                    <label class="player-carta-destino-check-wrap" title="Cumplida">
+                        <input type="checkbox" class="player-carta-destino-check" data-index="${i}" ${checked ? 'checked' : ''} onchange="toggleCartasDestinoCompletada(${i})" aria-label="Cumplida">
+                    </label>
                 </div>
             </div>`;
         }).join('');
     }).catch(() => {
         list.innerHTML = '<p style="color:#8b7355; text-align:center; padding:20px;">Error al cargar cartas.</p>';
         if (mensajeEl) mensajeEl.innerHTML = '';
+        if (victoryEl) victoryEl.style.display = 'none';
+    });
+}
+
+// Toggle "cumplida" en una carta del destino y persistir; si las 4 primeras están chequeadas, se muestra el mensaje de victoria
+function toggleCartasDestinoCompletada(index) {
+    const user = getCurrentUser();
+    if (!user || !user.id || !isPlayer()) return;
+    const ref = db.collection('players').doc(user.id);
+    ref.get().then(doc => {
+        const data = doc.exists ? doc.data() : {};
+        const completadas = Array.isArray(data.cartasDestinoCompletadas) ? data.cartasDestinoCompletadas.slice() : [];
+        const pos = completadas.indexOf(index);
+        if (pos === -1) completadas.push(index);
+        else completadas.splice(pos, 1);
+        completadas.sort((a, b) => a - b);
+        return ref.update({ cartasDestinoCompletadas: completadas });
+    }).then(() => {
+        loadPlayerCartasDestino();
+    }).catch(() => {
+        showToast('No se pudo guardar el estado de la carta', true);
     });
 }
 
@@ -3335,8 +4220,8 @@ function loadMiCasaContent() {
         if (ubicacionEl) ubicacionEl.textContent = casaInfo.ubicacion || 'No especificada';
         const notasDmEl = document.getElementById('mi-casa-notas-dm-display');
         if (notasDmEl) notasDmEl.textContent = casaInfo.notas || 'No hay notas del DM.';
-        const notasPersonalesEl = document.getElementById('mi-casa-notas-personales');
-        if (notasPersonalesEl) notasPersonalesEl.value = casaInfo.notasPersonales || '';
+        const notasPreviewEl = document.getElementById('mi-casa-notas-preview');
+        if (notasPreviewEl) notasPreviewEl.textContent = casaInfo.notasPersonales || '';
     }).catch(err => {
         console.error('Error cargando información de la casa:', err);
         showToast('Error al cargar información de tu casa', true);
@@ -3363,31 +4248,45 @@ window.openMiCasaModal = function() {
     }
 }
 
-window.saveMiCasaNotas = function() {
+window.openMiCasaNotesModal = function() {
     const user = getCurrentUser();
-    if (!user || !user.id || !isPlayer()) {
-        showToast('Debes estar logueado como aventurero', true);
-        return;
-    }
-    
-    const notasPersonales = document.getElementById('mi-casa-notas-personales').value.trim();
-    
-    // Obtener datos existentes para preservar la información del DM
+    if (!user || !user.id || (user.type !== 'player' && user.tipo !== 'player')) return;
+    const inputEl = document.getElementById('player-mi-casa-notes-modal-input');
+    if (!inputEl) return;
+    inputEl.value = '';
+    db.collection('players').doc(user.id).get()
+        .then(doc => {
+            const data = doc.exists ? doc.data() : {};
+            const casa = data.casa || {};
+            const text = (casa.notasPersonales || '').trim();
+            inputEl.value = text;
+        })
+        .catch(() => {})
+        .finally(() => openModal('player-mi-casa-notes-modal'));
+}
+
+window.saveMiCasaNotesFromModal = function() {
+    const user = getCurrentUser();
+    if (!user || !user.id || (user.type !== 'player' && user.tipo !== 'player')) return;
+    const inputEl = document.getElementById('player-mi-casa-notes-modal-input');
+    if (!inputEl) return;
+    const notasPersonales = inputEl.value.trim();
     db.collection('players').doc(user.id).get().then(doc => {
         const playerData = doc.exists ? doc.data() : {};
         const casaExistente = playerData.casa || {};
-        
         const casaData = {
-            ...casaExistente, // Preservar toda la información del DM
-            notasPersonales: notasPersonales // Solo actualizar las notas personales
+            ...casaExistente,
+            notasPersonales: notasPersonales
         };
-        
         return db.collection('players').doc(user.id).update({
             casa: casaData,
             casaUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
     }).then(() => {
-        showToast('Tus notas personales guardadas');
+        showToast('Notas guardadas');
+        closeModal('player-mi-casa-notes-modal');
+        const previewEl = document.getElementById('mi-casa-notas-preview');
+        if (previewEl) previewEl.textContent = notasPersonales;
     }).catch(err => {
         console.error('Error guardando notas:', err);
         showToast('Error al guardar tus notas', true);

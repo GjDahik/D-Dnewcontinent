@@ -61,5 +61,15 @@ service cloud.firestore {
     match /legend_audio/{trackId} {
       allow read, write: if true;
     }
+
+    // Rutas conocidas: DM crea/edita/elimina; jugador solo lectura
+    match /rutas_conocidas/{rutaId} {
+      allow read, write: if true;
+    }
+
+    // Bitácora de viaje: entradas por jugador (ruta, duración, fecha, notas por noche)
+    match /bitacora_viajes/{viajeId} {
+      allow read, write: if true;
+    }
   }
 }

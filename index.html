@@ -45,19 +45,42 @@
                 <h2 id="map-title-dm">🗺️ Mapa</h2>
                 <button type="button" class="btn btn-small" id="map-edit-toggle-btn" onclick="toggleMapEditMode()" title="Mostrar u ocultar configuración del mapa">✏️ Editar mapa</button>
             </div>
+            <div class="map-default-level-row map-default-level-row-dashboard">
+                <label for="map-default-level-select" style="color:#a89878; font-size:0.9em;">Mapa inicial para aventureros (al hacer login):</label>
+                <select id="map-default-level-select" class="map-default-level-select" onchange="setDefaultMapLevel(parseInt(this.value, 10))" aria-label="Mapa que verá el aventurero al entrar">
+                    <option value="0">—</option>
+                </select>
+            </div>
             <div id="map-config-row" class="map-config-row" style="display:none;">
-                <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px;">
-                    <label for="map-continent-name" style="color:#a89878; font-size:0.9em;">Nombre del continente:</label>
-                    <input type="text" id="map-continent-name" placeholder="Ej: Nueva Valdoria" class="map-url-input" style="flex:1; min-width:200px; padding:8px 12px; background:rgba(0,0,0,0.4); border:1px solid #4a3c31; border-radius:6px; color:#d4c4a8;">
-                </div>
-                <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px;">
-                    <label for="map-image-url" style="color:#a89878; font-size:0.9em;">URL de la imagen (Imgur):</label>
+                <div class="map-levels-form">
+                    <label for="map-continent-name" style="color:#a89878; font-size:0.9em;">Nombre del nivel:</label>
+                    <input type="text" id="map-continent-name" placeholder="Ej: Planta baja" class="map-url-input" style="flex:1; min-width:200px; padding:8px 12px; background:rgba(0,0,0,0.4); border:1px solid #4a3c31; border-radius:6px; color:#d4c4a8;">
+                    <label for="map-image-url" style="color:#a89878; font-size:0.9em;">URL de la imagen:</label>
                     <input type="url" id="map-image-url" placeholder="https://i.imgur.com/xxxxx.png" class="map-url-input" style="flex:1; min-width:200px; padding:8px 12px; background:rgba(0,0,0,0.4); border:1px solid #4a3c31; border-radius:6px; color:#d4c4a8;">
-                    <button type="button" class="btn btn-small" onclick="saveMapImage()">Guardar</button>
+                    <div class="map-levels-form-actions">
+                        <span id="map-add-buttons">
+                            <button type="button" class="btn btn-small" onclick="addMapLevel(true)">➕ Añadir nivel abajo</button>
+                            <button type="button" class="btn btn-small" onclick="addMapLevel(false)">➕ Añadir nivel arriba</button>
+                        </span>
+                        <span id="map-edit-buttons" style="display:none;">
+                            <button type="button" class="btn btn-small" onclick="saveMapLevelEdit()">💾 Guardar cambios</button>
+                            <button type="button" class="btn btn-secondary btn-small" onclick="cancelMapLevelEdit()">Cancelar</button>
+                        </span>
+                        <span id="map-edit-mode-hint" style="color:#8b7355; font-size:0.85em;"></span>
+                    </div>
                 </div>
+                <div id="map-levels-list" class="map-levels-list"></div>
             </div>
             <div style="text-align:center; background: linear-gradient(180deg, rgba(42, 42, 62, 0.9) 0%, rgba(26, 26, 46, 0.95) 100%); border: 2px solid #c9a227; border-radius: 12px; padding: 20px;">
                 <img id="map-img" src="https://i.imgur.com/ppAIykX.png" alt="Mapa" style="max-width:100%; border-radius:10px;">
+            </div>
+            <div class="dm-map-rutas-section">
+                <div class="section-header" style="margin-top:24px;">
+                    <h2 style="margin:0;">🛤️ Rutas conocidas</h2>
+                    <button type="button" class="btn btn-small" id="ruta-add-btn" onclick="openRutaModal()">➕ Añadir ruta</button>
+                </div>
+                <p style="color:#8b7355; margin-bottom:16px;">Rutas entre ciudades: salida, llegada, medio de transporte y duración. Los aventureros las consultan en el mapa.</p>
+                <div id="dm-rutas-list" class="dm-rutas-list"></div>
             </div>
         </section>
 
@@ -243,7 +266,10 @@
                     <div class="metal-plaque-content">
                         <h1 id="player-header-name" class="player-plaque-name">—</h1>
                         <p class="player-header-sub metal-plaque-subtitle" id="player-header-class-level">—</p>
-                        <p class="player-plaque-oro" id="player-header-oro">💰 0 GP</p>
+                        <div class="player-plaque-money-row">
+                            <p class="player-plaque-oro" id="player-header-oro">💰 0 GP</p>
+                            <p class="player-plaque-banco" id="player-header-banco">🏦 0 GP</p>
+                        </div>
                     </div>
                 </div>
                 <div class="header-actions">
@@ -269,8 +295,45 @@
             <div class="section-header">
                 <h2 id="map-title-player">🗺️ Mapa</h2>
             </div>
+            <div class="player-map-level-nav">
+                <button type="button" class="btn btn-small player-map-level-btn" id="player-map-level-up" onclick="playerMapLevelUp()" title="Nivel superior" aria-label="Subir de nivel">↓</button>
+                <span id="player-map-level-name" class="player-map-level-name">—</span>
+                <button type="button" class="btn btn-small player-map-level-btn" id="player-map-level-down" onclick="playerMapLevelDown()" title="Nivel inferior" aria-label="Bajar de nivel">↑</button>
+            </div>
             <div class="player-map-wrap">
                 <img id="player-map-img" src="https://i.imgur.com/ppAIykX.png" alt="Mapa" class="player-map-img">
+            </div>
+            <div class="player-map-ubicacion">
+                <label for="player-map-ubicacion-select" class="player-map-ubicacion-label">📍 Mi ubicación</label>
+                <select id="player-map-ubicacion-select" class="player-map-ubicacion-select" aria-label="Ciudad en la que te encuentras" onchange="setPlayerUbicacion(this.value)">
+                    <option value="">— Selecciona tu ciudad —</option>
+                </select>
+                <button type="button" class="btn btn-small player-map-rutas-toggle" id="player-map-rutas-toggle-btn" onclick="togglePlayerRutasPanel()" title="Abrir o cerrar Rutas conocidas">🛤️ Rutas conocidas</button>
+                <button type="button" class="btn btn-small player-map-bitacora-toggle" id="player-map-bitacora-toggle-btn" onclick="togglePlayerBitacoraPanel()" title="Abrir o cerrar Bitácora de viaje">📔 Bitácora</button>
+            </div>
+            <div id="player-map-rutas-wrap" class="player-map-rutas player-map-rutas-dropdown" style="display: none;">
+                <h3 class="player-map-rutas-title">🛤️ Consultar ruta</h3>
+                <p class="player-map-rutas-desc">Elige salida, llegada y medio. Si coincide con una ruta del DM, verás las noches de viaje.</p>
+                <div class="player-map-rutas-form">
+                    <label for="player-ruta-salida">Ciudad de salida</label>
+                    <select id="player-ruta-salida" class="player-ruta-select" onchange="playerRutaCalcular()">
+                        <option value="">— Selecciona —</option>
+                    </select>
+                    <label for="player-ruta-llegada">Ciudad de llegada</label>
+                    <select id="player-ruta-llegada" class="player-ruta-select" onchange="playerRutaCalcular()">
+                        <option value="">— Selecciona —</option>
+                    </select>
+                    <label for="player-ruta-medio">Medio de transporte</label>
+                    <select id="player-ruta-medio" class="player-ruta-select" onchange="playerRutaCalcular()">
+                        <option value="">— Selecciona —</option>
+                    </select>
+                </div>
+                <div id="player-map-rutas-result" class="player-map-rutas-result"></div>
+            </div>
+            <div id="player-map-bitacora-wrap" class="player-map-bitacora player-map-rutas-dropdown" style="display: none;">
+                <h3 class="player-map-rutas-title">📔 Bitácora de viaje</h3>
+                <p class="player-map-rutas-desc">Viajes que has empezado. Cada uno tiene notas por noche.</p>
+                <div id="player-bitacora-list" class="player-bitacora-list"></div>
             </div>
         </section>
         <section id="player-ciudades" class="tab-content">
@@ -298,9 +361,10 @@
                 <div id="player-directorio-city-image-container" style="margin-bottom:30px;"></div>
                 <h3 class="player-mistfall-section-title">Comercios y Artesanos</h3>
                 <div id="player-directorio-shops-grid" class="player-mistfall-shops-grid"></div>
-                <div id="player-directorio-city-notes-section" style="margin-top:40px; padding:20px; background:rgba(26,26,26,0.6); border:1px solid #4a3c31; border-radius:8px;">
-                    <h3 style="font-family:'Cinzel', serif; color:#d4af37; font-size:1.2em; margin-bottom:12px; text-transform:uppercase; letter-spacing:2px;">📝 Mis Notas</h3>
-                    <textarea id="player-directorio-city-notes-input" class="player-city-notes-input" rows="5" placeholder="Escribe tus notas sobre esta ciudad..."></textarea>
+                <div id="player-directorio-notes-block" style="margin-top:32px; padding:20px; background:rgba(26,26,26,0.6); border:1px solid #4a3c31; border-radius:8px;">
+                    <h3 style="font-family:'Cinzel', serif; color:#d4af37; font-size:1.1em; margin-bottom:10px;">📝 Mis notas</h3>
+                    <div id="player-directorio-note-preview" style="color:#a89878; font-size:0.95em; margin-bottom:12px; min-height:1.5em; white-space:pre-wrap; word-break:break-word;"></div>
+                    <button type="button" class="btn btn-small" onclick="openCityNotesModalFromDirectorio()">📝 Editar notas</button>
                 </div>
             </div>
             <!-- Directorio de habitantes (solo lista de NPCs) -->
@@ -358,6 +422,9 @@
             <div id="player-notifications-container">
                 <div id="player-notifications-cartas-destino-panel" class="player-notifications-subtab-content" style="display: block;">
                     <p class="player-cartas-destino-desc">Cartas que el DM ha asignado a tu personaje.</p>
+                    <div id="player-cartas-destino-victory" class="player-cartas-destino-victory" style="display: none;" aria-live="polite">
+                        <div class="player-cartas-destino-victory-inner">✨ Has cumplido tu destino ✨</div>
+                    </div>
                     <div class="player-cartas-destino-layout">
                         <div id="player-cartas-destino-list" class="player-cartas-destino-grid"></div>
                         <div id="player-cartas-destino-mensaje" class="player-cartas-destino-mensaje-general"></div>
@@ -410,10 +477,8 @@
                     <span>📔</span>
                     <span>Mis Notas Personales</span>
                 </h3>
-                <textarea id="mi-casa-notas-personales" rows="7" placeholder="Escribe tus notas personales sobre tu casa, objetos importantes, secretos, recuerdos, etc..." style="width:100%; background:#1a1a1a; border:2px solid #4a3c31; color:#d4c4a8; padding:16px; border-radius:8px; font-family:'Crimson Text', serif; font-size:1em; resize:vertical; line-height:1.7; transition: all 0.3s ease;"></textarea>
-            </div>
-            <div style="margin-top: 20px; display: flex; gap: 12px; flex-wrap: wrap;">
-                <button class="btn" onclick="saveMiCasaNotas()">💾 Guardar Mis Notas</button>
+                <div id="mi-casa-notas-preview" style="color:#a89878; font-size:1em; line-height:1.6; white-space:pre-wrap; word-break:break-word; min-height:2em; margin-bottom:12px;"></div>
+                <button type="button" class="btn btn-small" onclick="openMiCasaNotesModal()">📝 Editar notas</button>
             </div>
         </section>
 
@@ -478,6 +543,127 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeModal('player-habitantes-modal')">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal confirmación Usar ítem (inventario jugador) -->
+    <div class="modal-overlay" id="player-use-item-confirm-modal">
+        <div class="modal player-use-confirm-modal" style="max-width: 420px;">
+            <div class="modal-header player-use-confirm-header">
+                <h3 class="player-use-confirm-title">✨ Utilizar ítem</h3>
+                <button class="modal-close" onclick="closeModal('player-use-item-confirm-modal')" aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="modal-body player-use-confirm-body">
+                <p class="player-use-confirm-message" id="player-use-confirm-message">¿Usar este ítem?</p>
+                <p class="player-use-confirm-hint">Se retirará del inventario.</p>
+            </div>
+            <div class="modal-footer player-use-confirm-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('player-use-item-confirm-modal')">Cancelar</button>
+                <button type="button" class="btn player-use-confirm-btn" id="player-use-confirm-do-btn" onclick="doConfirmedUseItem()">Utilizar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal confirmación Vender ítem (inventario jugador) -->
+    <div class="modal-overlay" id="player-sell-item-confirm-modal">
+        <div class="modal player-use-confirm-modal" style="max-width: 420px;">
+            <div class="modal-header player-use-confirm-header">
+                <h3 class="player-use-confirm-title">💰 Vender ítem</h3>
+                <button class="modal-close" onclick="closeModal('player-sell-item-confirm-modal')" aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="modal-body player-use-confirm-body">
+                <p class="player-use-confirm-message" id="player-sell-confirm-message">¿Vender este ítem?</p>
+                <p class="player-use-confirm-hint" id="player-sell-confirm-hint">75% del valor de compra.</p>
+            </div>
+            <div class="modal-footer player-use-confirm-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('player-sell-item-confirm-modal')">Cancelar</button>
+                <button type="button" class="btn player-use-confirm-btn" onclick="doConfirmedSellItem()">Vender</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Mis notas de la ciudad (solo para jugador, desde la lista de ciudades) -->
+    <div class="modal-overlay" id="player-city-notes-modal">
+        <div class="modal" style="max-width: 560px;">
+            <div class="modal-header">
+                <h3 id="player-city-notes-modal-title">📝 Mis notas</h3>
+                <button class="modal-close" onclick="closeModal('player-city-notes-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <textarea id="player-city-notes-modal-input" class="player-city-notes-input" rows="6" placeholder="Escribe tus notas sobre esta ciudad..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('player-city-notes-modal')">Cerrar</button>
+                <button type="button" class="btn" onclick="saveCityNotesFromModal()">💾 Guardar notas</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Mis notas personales (Mi Casa) -->
+    <div class="modal-overlay" id="player-mi-casa-notes-modal">
+        <div class="modal" style="max-width: 560px;">
+            <div class="modal-header">
+                <h3>📔 Mis notas personales — Mi Casa</h3>
+                <button class="modal-close" onclick="closeModal('player-mi-casa-notes-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <textarea id="player-mi-casa-notes-modal-input" class="player-city-notes-input" rows="6" placeholder="Escribe tus notas personales sobre tu casa, objetos importantes, secretos, recuerdos, etc..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('player-mi-casa-notes-modal')">Cerrar</button>
+                <button type="button" class="btn" onclick="saveMiCasaNotesFromModal()">💾 Guardar notas</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Mis notas por NPC (Habitantes) -->
+    <div class="modal-overlay" id="player-npc-notes-modal">
+        <div class="modal" style="max-width: 560px;">
+            <div class="modal-header">
+                <h3 id="player-npc-notes-modal-title">📝 Mis notas</h3>
+                <button class="modal-close" onclick="closeModal('player-npc-notes-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <textarea id="player-npc-notes-modal-input" class="player-city-notes-input" rows="5" placeholder="Escribe tus notas sobre este personaje..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('player-npc-notes-modal')">Cerrar</button>
+                <button type="button" class="btn" onclick="saveNpcNotesFromModal()">💾 Guardar notas</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Mis notas de misión (En curso) — igual que ciudad / Mi Casa / NPC -->
+    <div class="modal-overlay" id="player-mission-notes-modal">
+        <div class="modal" style="max-width: 560px;">
+            <div class="modal-header">
+                <h3 id="player-mission-notes-modal-title">📝 Mis notas</h3>
+                <button class="modal-close" onclick="closeModal('player-mission-notes-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <textarea id="player-mission-notes-modal-input" class="player-city-notes-input" rows="6" placeholder="Escribe tus notas sobre esta misión (pistas, avances, recordatorios...)"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('player-mission-notes-modal')">Cerrar</button>
+                <button type="button" class="btn" id="player-mission-notes-modal-save-btn" onclick="saveMissionNotesFromModal()">💾 Guardar notas</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Notas de noche (Bitácora de viaje) -->
+    <div class="modal-overlay" id="player-bitacora-note-modal">
+        <div class="modal" style="max-width: 560px;">
+            <div class="modal-header">
+                <h3 id="player-bitacora-note-modal-title">📝 Noche 1</h3>
+                <button class="modal-close" onclick="closeModal('player-bitacora-note-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <textarea id="player-bitacora-note-modal-input" class="player-city-notes-input" rows="6" placeholder="Qué pasó esta noche..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('player-bitacora-note-modal')">Cerrar</button>
+                <button type="button" class="btn" onclick="saveBitacoraNoteFromModal()">💾 Guardar notas</button>
             </div>
         </div>
     </div>
@@ -1111,6 +1297,47 @@
         </div>
     </div>
 
+    <!-- Modal Ruta conocida (DM añade/edita) -->
+    <div class="modal-overlay" id="ruta-modal">
+        <div class="modal" style="max-width: 480px;">
+            <div class="modal-header">
+                <h3 id="ruta-modal-title">🛤️ Añadir ruta</h3>
+                <button class="modal-close" onclick="closeModal('ruta-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="ruta-edit-id">
+                <div class="form-group">
+                    <label for="ruta-ciudad-salida">Ciudad de salida</label>
+                    <select id="ruta-ciudad-salida">
+                        <option value="">— Selecciona —</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="ruta-ciudad-llegada">Ciudad de llegada</label>
+                    <select id="ruta-ciudad-llegada">
+                        <option value="">— Selecciona —</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="ruta-medio">Medio de transporte</label>
+                    <input type="text" id="ruta-medio" placeholder="Ej: Barco, Carro, A pie">
+                </div>
+                <div class="form-group">
+                    <label for="ruta-duracion">Duración (texto)</label>
+                    <input type="text" id="ruta-duracion" placeholder="Ej: 2 días, 1 semana">
+                </div>
+                <div class="form-group">
+                    <label for="ruta-noches">Noches de viaje</label>
+                    <input type="number" id="ruta-noches" min="0" placeholder="Ej: 2" title="Cantidad de noches que tarda el viaje">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('ruta-modal')">Cancelar</button>
+                <button class="btn" id="ruta-save-btn" onclick="saveRuta()">💾 Guardar ruta</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal Ciudad -->
     <div class="modal-overlay" id="city-modal">
         <div class="modal">
@@ -1376,10 +1603,11 @@
                         <div>
                             <div id="player-inventory-name" style="color: #d4af37; font-family: 'Cinzel', serif; font-size: 1.3em; font-weight: 600; margin-bottom: 6px;"></div>
                             <div id="player-inventory-gold" style="color: #f1c40f; font-size: 1em; font-weight: 500;"></div>
+                            <div id="player-inventory-total-value" style="color: #a89878; font-size: 0.95em; margin-top: 4px;"></div>
                         </div>
                         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                             <button class="btn btn-small" onclick="openGiveItemModal()" style="min-width: 120px;">🎁 Dar Item</button>
-                            <button class="btn btn-small btn-secondary" onclick="downloadPlayerItemsTemplate()" style="min-width: 140px;">📥 Plantilla CSV</button>
+                            <button class="btn btn-small btn-secondary" onclick="downloadPlayerItemsTemplate()" style="min-width: 140px;">📥 Plantilla Excel</button>
                             <button class="btn btn-small btn-secondary" onclick="document.getElementById('player-inventory-csv-input').click();" style="min-width: 140px;">📤 Importar CSV</button>
                             <input type="file" id="player-inventory-csv-input" accept=".csv,.txt,.xlsx,.xls" style="display: none;" onchange="importPlayerItemsCSV(event)">
                         </div>
@@ -1389,8 +1617,8 @@
                 <!-- Instrucciones CSV -->
                 <div style="background: rgba(0,0,0,0.2); border-left: 3px solid #8b5a2b; border-radius: 4px; padding: 12px; margin-bottom: 16px;">
                     <p style="color: #8b7355; font-size: 0.85em; margin: 0; line-height: 1.5;">
-                        <strong style="color: #d4af37;">📋 Formato CSV:</strong> <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px; color: #d4c4a8;">name</code>, <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px; color: #d4c4a8;">price</code>, <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px; color: #d4c4a8;">effect</code>, <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px; color: #d4c4a8;">rarity</code> 
-                        <span style="color: #a89878;">(común, infrecuente, rara, legendaria)</span>
+                        <strong style="color: #d4af37;">📋 Formato CSV:</strong> <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px; color: #d4c4a8;">name</code>, <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px; color: #d4c4a8;">price</code>, <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px; color: #d4c4a8;">effect</code>, <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px; color: #d4c4a8;">rarity</code>, <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px; color: #d4c4a8;">quantity</code> (opcional, por defecto 1) 
+                        <span style="color: #a89878;">— rarity: común, infrecuente, rara, legendaria</span>
                     </p>
                 </div>
 
@@ -1399,7 +1627,8 @@
                     <div id="player-inventory-list" style="max-height: 400px; overflow-y: auto; padding-right: 8px;" class="custom-scrollbar"></div>
                 </div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer" style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                <button type="button" class="btn btn-danger btn-small" onclick="clearPlayerInventory()" title="Vaciar todo el inventario de este jugador">🗑️ Borrar todo el inventario</button>
                 <button class="btn btn-secondary" onclick="closeModal('player-inventory-modal')">Cerrar</button>
             </div>
         </div>
@@ -1616,6 +1845,7 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
                     <span id="inventory-shop-name" style="color: #d4af37; font-family: 'Cinzel', serif;"></span>
                     <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button type="button" class="btn btn-small btn-secondary" onclick="downloadShopInventoryExcel()" title="Descargar inventario de esta tienda en Excel">📥 Descargar Excel</button>
                         <button type="button" class="btn btn-small btn-secondary" onclick="toggleTemplateSection()">📄 Plantilla</button>
                         <button type="button" class="btn btn-small btn-secondary" onclick="showImportSection()">📤 Importar</button>
                         <button type="button" class="btn btn-small" onclick="openItemModal()">+ Item</button>

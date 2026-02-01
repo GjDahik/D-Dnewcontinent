@@ -263,16 +263,33 @@ function openPlayerInventory(playerId) {
 
     document.getElementById('player-inventory-id').value = playerId;
     document.getElementById('player-inventory-name').textContent = player.nombre;
-    document.getElementById('player-inventory-gold').textContent = '💰 ' + player.oro.toLocaleString() + ' GP';
+    document.getElementById('player-inventory-gold').textContent = '💰 ' + (player.oro != null ? player.oro : 0).toLocaleString() + ' GP';
+    var items = player.inventario || [];
+    var totalValue = items.reduce(function(sum, it) { return sum + (Number(it.price) || 0); }, 0);
+    var totalValEl = document.getElementById('player-inventory-total-value');
+    if (totalValEl) totalValEl.textContent = 'Valor total pertenencias: ' + totalValue.toLocaleString() + ' GP';
     document.getElementById('player-inventory-title').textContent = '🎒 Inventario - ' + player.nombre;
 
     renderPlayerInventory(player);
     openModal('player-inventory-modal');
 }
 
+function groupPlayerInventoryItems(items) {
+    var map = {};
+    (items || []).forEach(function(item, i) {
+        var key = (item.name || '') + '|' + (item.effect || '') + '|' + (item.price != null ? item.price : '') + '|' + (item.rarity || '');
+        if (!map[key]) map[key] = { item: item, indices: [] };
+        map[key].indices.push(i);
+    });
+    return Object.keys(map).map(function(k) { var g = map[k]; return { item: g.item, count: g.indices.length, indices: g.indices }; });
+}
+
 function renderPlayerInventory(player) {
     const list = document.getElementById('player-inventory-list');
     const items = player.inventario || [];
+    var totalValue = items.reduce(function(sum, it) { return sum + (Number(it.price) || 0); }, 0);
+    var totalValEl = document.getElementById('player-inventory-total-value');
+    if (totalValEl) totalValEl.textContent = 'Valor total pertenencias: ' + totalValue.toLocaleString() + ' GP';
 
     if (items.length === 0) {
         list.innerHTML = `
@@ -299,23 +316,29 @@ function renderPlayerInventory(player) {
         'legendaria': '🔥 Legendaria'
     };
 
-    list.innerHTML = items.map((item, index) => `
-        <div class="mini-card" style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; padding:16px; transition:all 0.2s ease;">
-            <div style="flex:1; min-width:0;">
-                <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap;">
-                    <div class="mini-card-title" style="font-size:1.05em; font-weight:600;">${item.name}</div>
-                    <span style="background:${rarityColors[item.rarity] || '#888'}; color:#fff; padding:3px 10px; border-radius:12px; font-size:0.75em; font-weight:600; text-transform:uppercase; white-space:nowrap;">
-                        ${rarityLabels[item.rarity] || 'Común'}
-                    </span>
-                </div>
-                ${item.effect ? `<div class="mini-card-info" style="color:#d4c4a8; margin-bottom:6px; line-height:1.4;">${item.effect}</div>` : ''}
-                ${item.price ? `<div style="color:#f1c40f; font-size:0.9em; font-weight:500; margin-top:4px;">💰 Valor: ${item.price.toLocaleString()} GP</div>` : ''}
-            </div>
-            <div class="mini-card-actions" style="margin-left:12px; flex-shrink:0;">
-                <button class="btn btn-small btn-danger" onclick="removeItemFromPlayer(${index})" title="Quitar Item" style="padding:8px 12px;">🗑️</button>
-            </div>
-        </div>
-    `).join('');
+    var groups = groupPlayerInventoryItems(items);
+    var esc = function(s) { return String(s || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
+
+    list.innerHTML = groups.map(function(g) {
+        var it = g.item;
+        var firstIndex = g.indices[0];
+        var countLabel = g.count > 1 ? ' <span style="color:#a89878; font-weight:700;">× ' + g.count + '</span>' : '';
+        return '<div class="mini-card" style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; padding:16px; transition:all 0.2s ease;">' +
+            '<div style="flex:1; min-width:0;">' +
+                '<div style="display:flex; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap;">' +
+                    '<div class="mini-card-title" style="font-size:1.05em; font-weight:600;">' + esc(it.name) + countLabel + '</div>' +
+                    '<span style="background:' + (rarityColors[it.rarity] || '#888') + '; color:#fff; padding:3px 10px; border-radius:12px; font-size:0.75em; font-weight:600; text-transform:uppercase; white-space:nowrap;">' +
+                        (rarityLabels[it.rarity] || 'Común') +
+                    '</span>' +
+                '</div>' +
+                (it.effect ? '<div class="mini-card-info" style="color:#d4c4a8; margin-bottom:6px; line-height:1.4;">' + esc(it.effect) + '</div>' : '') +
+                (it.price ? '<div style="color:#f1c40f; font-size:0.9em; font-weight:500; margin-top:4px;">💰 Valor: ' + (it.price).toLocaleString() + ' GP</div>' : '') +
+            '</div>' +
+            '<div class="mini-card-actions" style="margin-left:12px; flex-shrink:0;">' +
+                '<button class="btn btn-small btn-danger" onclick="removeItemFromPlayer(' + firstIndex + ')" title="' + (g.count > 1 ? 'Quitar 1 unidad' : 'Quitar ítem') + '" style="padding:8px 12px;">🗑️</button>' +
+            '</div>' +
+        '</div>';
+    }).join('');
 }
 
 function openGiveItemModal() {
@@ -361,6 +384,33 @@ async function giveItemToPlayer() {
     closeModal('give-item-modal');
     player.inventario = inventario;
     renderPlayerInventory(player);
+}
+
+function clearPlayerInventory() {
+    const playerId = document.getElementById('player-inventory-id').value;
+    if (!playerId) {
+        showToast('Error: ID de jugador no encontrado', true);
+        return;
+    }
+    const player = playersData.find(p => p.id === playerId);
+    if (!player) {
+        showToast('Jugador no encontrado', true);
+        return;
+    }
+    const count = (player.inventario || []).length;
+    if (count === 0) {
+        showToast('El inventario ya está vacío');
+        return;
+    }
+    if (!confirm('¿Borrar todo el inventario de ' + (player.nombre || 'este jugador') + '? Se eliminarán ' + count + ' ítem(s). No se puede deshacer.')) return;
+
+    db.collection('players').doc(playerId).update({ inventario: [] })
+        .then(() => {
+            showToast('Inventario vaciado');
+            player.inventario = [];
+            renderPlayerInventory(player);
+        })
+        .catch(e => showToast('Error: ' + e.message, true));
 }
 
 function removeItemFromPlayer(index) {
@@ -419,6 +469,7 @@ function importPlayerItemsCSV(event) {
             var priceIdx = header.indexOf('price');
             var effectIdx = header.indexOf('effect');
             var rarityIdx = header.indexOf('rarity');
+            var qtyIdx = header.indexOf('quantity') !== -1 ? header.indexOf('quantity') : (header.indexOf('cantidad') !== -1 ? header.indexOf('cantidad') : header.indexOf('qty'));
 
             if (nameIdx === -1) {
                 showToast('El CSV debe tener al menos la columna "name"', true);
@@ -439,9 +490,10 @@ function importPlayerItemsCSV(event) {
                     continue;
                 }
 
-                var price = priceIdx !== -1 ? (parseInt(values[priceIdx]) || 0) : 0;
+                var price = priceIdx !== -1 ? (parseInt(values[priceIdx], 10) || 0) : 0;
                 var effect = effectIdx !== -1 ? (values[effectIdx] || '') : '';
                 var rarity = rarityIdx !== -1 ? (values[rarityIdx] || 'común').toLowerCase().trim() : 'común';
+                var quantity = qtyIdx !== -1 && values[qtyIdx] !== '' ? Math.max(1, parseInt(values[qtyIdx], 10) || 1) : 1;
                 
                 if (validRarities.indexOf(rarity) === -1) rarity = 'común';
 
@@ -452,8 +504,10 @@ function importPlayerItemsCSV(event) {
                     rarity: rarity
                 };
 
-                inventario.push(item);
-                count++;
+                for (var q = 0; q < quantity; q++) {
+                    inventario.push(item);
+                    count++;
+                }
             }
 
             if (count === 0) {

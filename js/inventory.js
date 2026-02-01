@@ -38,6 +38,53 @@ function manageInventory(shopId) {
     openModal('inventory-modal');
 }
 
+function downloadShopInventoryExcel() {
+    if (typeof XLSX === 'undefined') {
+        showToast('Exportación Excel no disponible', true);
+        return;
+    }
+    var shopId = document.getElementById('inventory-shop-id').value;
+    if (!shopId) {
+        showToast('Error: no hay tienda seleccionada', true);
+        return;
+    }
+    var shop = shopsData.find(function(s) { return s.id === shopId; });
+    if (!shop) {
+        showToast('Tienda no encontrada', true);
+        return;
+    }
+    var items = shop.inventario || [];
+    if (items.length === 0) {
+        showToast('El inventario de esta tienda está vacío');
+        return;
+    }
+    var allKeys = {};
+    var priorityKeys = ['name', 'price', 'effect', 'rarity', 'type', 'categoria', 'tier', 'tipo', 'section', 'tab', 'desc', 'damage', 'damageType', 'ac', 'tiempo', 'nivel', 'efLabel', 'avg'];
+    priorityKeys.forEach(function(k) { allKeys[k] = true; });
+    items.forEach(function(item) {
+        Object.keys(item).forEach(function(k) { allKeys[k] = true; });
+    });
+    var headers = priorityKeys.filter(function(k) { return allKeys[k]; });
+    var rest = Object.keys(allKeys).filter(function(k) { return headers.indexOf(k) === -1; }).sort();
+    headers = headers.concat(rest);
+    var rows = [headers];
+    items.forEach(function(item) {
+        rows.push(headers.map(function(h) {
+            var v = item[h];
+            if (v === undefined || v === null) return '';
+            if (typeof v === 'object') return JSON.stringify(v);
+            return String(v);
+        }));
+    });
+    var wb = XLSX.utils.book_new();
+    var ws = XLSX.utils.aoa_to_sheet(rows);
+    var sheetName = (shop.nombre || 'inventario').replace(/[\\/*?:\[\]]/g, '').trim().slice(0, 31) || 'Inventario';
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    var filename = 'inventario_' + (shop.nombre || shopId).replace(/[\\/*?:\[\]\s]/g, '_').trim() + '.xlsx';
+    XLSX.writeFile(wb, filename);
+    if (typeof showToast === 'function') showToast('Descargado: ' + filename);
+}
+
 function renderInventoryList(shop) {
     const list = document.getElementById('inventory-list');
     const items = shop.inventario || [];
@@ -499,13 +546,14 @@ Atlas del Territorio Cercano,20,mapas,Ruta segura,2 DL,,Otorga
     },
     jugadores: {
         filename: '07_items_jugadores.csv',
-        content: `name,price,effect,rarity
-Espada Larga +1,350,+1 a ataques y daño,infrecuente
-Armadura de Cuero Mágica,200,+1 a CA,infrecuente
-Poción de Curación Superior,150,Recupera 4d4+4 HP,infrecuente
-Anillo de Protección,5000,+1 a CA y tiradas de salvación,legendaria
-Capa Élfica,2500,Ventaja en tiradas de Sigilo,rara
-Pergamino de Fuego,100,Conjuro: Fireball (1 uso),rara
+        content: `name,price,effect,rarity,quantity
+Espada Larga +1,350,+1 a ataques y daño,infrecuente,1
+Armadura de Cuero Mágica,200,+1 a CA,infrecuente,1
+Poción de Curación Superior,150,Recupera 4d4+4 HP,infrecuente,1
+Hacha,25,Arma cuerpo a cuerpo,común,40
+Anillo de Protección,5000,+1 a CA y tiradas de salvación,legendaria,1
+Capa Élfica,2500,Ventaja en tiradas de Sigilo,rara,1
+Pergamino de Fuego,100,Conjuro: Fireball (1 uso),rara,1
 `
     }
 };
@@ -522,9 +570,24 @@ function downloadCSVTemplate(key) {
     if (typeof showToast === 'function') showToast('Descargado: ' + t.filename);
 }
 
-// Función para descargar plantilla de items de jugadores
+// Función para descargar plantilla de items de jugadores (Excel .xlsx)
 function downloadPlayerItemsTemplate() {
-    downloadCSVTemplate('jugadores');
+    if (typeof XLSX === 'undefined') {
+        downloadCSVTemplate('jugadores');
+        return;
+    }
+    var t = CSV_TEMPLATES.jugadores;
+    if (!t) return;
+    var lines = t.content.trim().split('\n');
+    var separator = lines[0].indexOf(';') !== -1 ? ';' : ',';
+    var rows = lines.map(function(line) {
+        return line.split(separator).map(function(cell) { return cell.trim().replace(/^"|"$/g, ''); });
+    });
+    var wb = XLSX.utils.book_new();
+    var ws = XLSX.utils.aoa_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb, ws, 'Items jugadores');
+    XLSX.writeFile(wb, '07_items_jugadores.xlsx');
+    if (typeof showToast === 'function') showToast('Descargado: 07_items_jugadores.xlsx');
 }
 
 function toggleTemplateSection() {

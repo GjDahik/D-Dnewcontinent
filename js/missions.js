@@ -531,40 +531,22 @@ function renderPlayerMissionsLists(activas, historial, playerId, subtab, playerN
                 })
                 .map(pid => getName(pid, pp[pid]));
             const partyLabel = partyNames.length ? 'Party: ' + partyNames.map(n => esc(n)).join(', ') : '';
-            const notesListRaw = (prog && Array.isArray(prog.notesList)) ? prog.notesList : [];
-            const legacyNotes = (prog && (prog.notes || prog.notas || '')) ? String(prog.notes || prog.notas).trim() : '';
-            const notesList = notesListRaw.length > 0
-                ? notesListRaw
-                : (legacyNotes ? [{ text: legacyNotes, createdAt: null }] : []);
-            const notesCount = notesList.length;
-            const notesListWithIndex = notesList.map((n, i) => ({ ...n, originalIndex: i }));
-            const notesListSorted = [...notesListWithIndex].sort((a, b) => {
-                const ta = (a && a.createdAt && a.createdAt.toMillis) ? a.createdAt.toMillis() : 0;
-                const tb = (b && b.createdAt && b.createdAt.toMillis) ? b.createdAt.toMillis() : 0;
-                return tb - ta;
-            });
-            const notesListHtml = notesListSorted.length === 0
-                ? ''
-                : '<ul class="player-mission-notes-list">' + notesListSorted
-                    .map(n => {
-                        const t = (n && n.text) ? String(n.text).trim() : '';
-                        if (!t) return '';
-                        const dateStr = n.createdAt && n.createdAt.toDate
-                            ? n.createdAt.toDate().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-                            : '';
-                        const idx = n.originalIndex != null ? n.originalIndex : -1;
-                        return `<li class="player-mission-notes-item" data-mission-id="${esc(m.id)}" data-note-index="${idx}"><span class="player-mission-notes-item-date">${esc(dateStr)}</span><div class="player-mission-notes-item-text">${esc(t).replace(/\n/g, '<br>')}</div><div class="player-mission-notes-item-actions"><button type="button" class="btn btn-small btn-notes-action" onclick="startEditMissionNote('${esc(m.id)}', ${idx})" title="Editar">✏️</button><button type="button" class="btn btn-small btn-notes-action btn-secondary" onclick="deletePlayerMissionNote('${esc(m.id)}', ${idx})" title="Borrar">🗑️</button></div></li>`;
-                    })
-                    .filter(Boolean)
-                    .join('') + '</ul>';
+            const notesText = (prog && (prog.notes !== undefined || prog.notas !== undefined))
+                ? String(prog.notes ?? prog.notas ?? '').trim()
+                : (() => {
+                    const list = (prog && Array.isArray(prog.notesList)) ? prog.notesList : [];
+                    if (!list.length) return '';
+                    return list.map(n => (n && n.text) ? String(n.text).trim() : '').filter(Boolean).join('\n\n');
+                })();
+            const missionTitleForModal = (m.title || 'Sin título').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            const notesPreview = notesText ? (notesText.length > 80 ? notesText.slice(0, 80) + '…' : notesText) : '';
             const notesSection = progressStatus === PLAYER_PROGRESS_STATUS.in_progress
                 ? `<div class="player-mission-notes-wrap">
-                        <details class="player-mission-notes-details" ${notesCount > 0 ? 'open' : ''}>
-                            <summary class="player-mission-notes-summary">📝 Mis notas${notesCount > 0 ? ' (' + notesCount + ')' : ''}</summary>
+                        <details class="player-mission-notes-details" ${notesText ? 'open' : ''}>
+                            <summary class="player-mission-notes-summary">📝 Mis notas${notesText ? ' (guardadas)' : ''}</summary>
                             <div class="player-mission-notes-inner">
-                                ${notesListHtml}
-                                <textarea id="player-mission-notes-${esc(m.id)}" class="player-mission-notes-input" rows="3" placeholder="Añade una nota (pistas, avances, recordatorios...)"></textarea>
-                                <button type="button" class="btn btn-small" onclick="savePlayerMissionNotes('${esc(m.id)}')">Añadir nota</button>
+                                ${notesPreview ? `<div class="player-mission-notes-preview" style="color:#a89878; font-size:0.9em; margin-bottom:8px; white-space:pre-wrap; word-break:break-word;">${esc(notesPreview)}</div>` : ''}
+                                <button type="button" class="btn btn-small" onclick="openMissionNotesModal('${esc(m.id)}', '${missionTitleForModal}')">📝 Notas</button>
                             </div>
                         </details>
                     </div>`
@@ -592,6 +574,26 @@ function renderPlayerMissionsLists(activas, historial, playerId, subtab, playerN
             const completedAt = m.completedAt && m.completedAt.toDate ? m.completedAt.toDate().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
             const nivelLabel = m.nivel != null && m.nivel !== '' ? ` · Nivel ${m.nivel}` : '';
             const desc = (m.description || '').trim();
+            const ppHist = m.playerProgress || {};
+            const progHist = ppHist[playerId] || ppHist[String(playerId)] || {};
+            const notesTextHist = (progHist.notes !== undefined || progHist.notas !== undefined)
+                ? String(progHist.notes ?? progHist.notas ?? '').trim()
+                : (() => {
+                    const list = (progHist.notesList && Array.isArray(progHist.notesList)) ? progHist.notesList : [];
+                    if (!list.length) return '';
+                    return list.map(n => (n && n.text) ? String(n.text).trim() : '').filter(Boolean).join('\n\n');
+                })();
+            const missionTitleHist = (m.title || 'Sin título').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            const notesSectionHist = notesTextHist
+                ? `<div class="player-mission-notes-wrap">
+                        <details class="player-mission-notes-details">
+                            <summary class="player-mission-notes-summary">📝 Mis notas (solo lectura)</summary>
+                            <div class="player-mission-notes-inner">
+                                <div class="player-mission-notes-preview" style="color:#a89878; font-size:0.9em; white-space:pre-wrap; word-break:break-word;">${esc(notesTextHist)}</div>
+                            </div>
+                        </details>
+                    </div>`
+                : '';
             return `
                 <div class="mission-card" style="opacity: 0.92;">
                     <div class="mission-card-header">
@@ -600,147 +602,78 @@ function renderPlayerMissionsLists(activas, historial, playerId, subtab, playerN
                     </div>
                     ${desc ? `<p class="mission-card-desc">${esc(desc)}</p>` : ''}
                     ${m.reward ? `<p class="mission-card-extra">🎁 ${esc(m.reward)}</p>` : ''}
+                    ${notesSectionHist}
                 </div>`;
         }).join('');
 }
 
-function savePlayerMissionNotes(missionId) {
+function openMissionNotesModal(missionId, missionTitle, readOnly) {
     const user = getCurrentUser();
     if (!user || !user.id || !isPlayer() || !missionId) return;
-    const textarea = document.getElementById('player-mission-notes-' + missionId);
-    const newText = textarea ? textarea.value.trim() : '';
-    if (!newText) {
-        showToast('Escribe algo para añadir una nota', true);
-        return;
-    }
-    const ref = db.collection('missions').doc(missionId);
-    ref.get().then(doc => {
-        if (!doc.exists) return;
-        const data = doc.data();
-        const playerProgress = data.playerProgress || {};
-        const current = playerProgress[user.id] || {};
-        const existingList = Array.isArray(current.notesList) ? current.notesList : [];
-        const legacyNotes = (current.notes || current.notas || '').trim();
-        const baseList = existingList.length > 0
-            ? existingList
-            : (legacyNotes ? [{ text: legacyNotes, createdAt: null }] : []);
-        const notesList = [
-            ...baseList,
-            { text: newText, createdAt: firebase.firestore.Timestamp.now() }
-        ];
-        playerProgress[user.id] = {
-            ...current,
-            status: current.status || PLAYER_PROGRESS_STATUS.in_progress,
-            notesList,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            playerName: current.playerName || user.nombre || ''
-        };
-        ref.update({
-            playerProgress,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        }).then(() => {
-            if (textarea) textarea.value = '';
-            showToast('Nota añadida');
-        }).catch(e => showToast('Error: ' + e.message, true));
-    }).catch(e => showToast('Error: ' + e.message, true));
+    const modal = document.getElementById('player-mission-notes-modal');
+    const titleEl = document.getElementById('player-mission-notes-modal-title');
+    const inputEl = document.getElementById('player-mission-notes-modal-input');
+    const saveBtn = document.getElementById('player-mission-notes-modal-save-btn');
+    if (!modal || !titleEl || !inputEl) return;
+    modal.dataset.missionId = missionId;
+    modal.dataset.readOnly = readOnly ? '1' : '';
+    titleEl.textContent = '📝 Mis notas — ' + (missionTitle || 'Misión') + (readOnly ? ' (solo lectura)' : '');
+    inputEl.value = '';
+    inputEl.readOnly = !!readOnly;
+    if (saveBtn) saveBtn.style.display = readOnly ? 'none' : '';
+    db.collection('missions').doc(missionId).get()
+        .then(doc => {
+            if (!doc.exists) return;
+            const data = doc.data();
+            const pp = data.playerProgress || {};
+            const prog = pp[user.id] || pp[String(user.id)] || {};
+            let text = (prog.notes !== undefined || prog.notas !== undefined)
+                ? String(prog.notes ?? prog.notas ?? '').trim()
+                : '';
+            if (!text && Array.isArray(prog.notesList) && prog.notesList.length > 0) {
+                text = prog.notesList.map(n => (n && n.text) ? String(n.text).trim() : '').filter(Boolean).join('\n\n');
+            }
+            inputEl.value = text;
+        })
+        .catch(() => {})
+        .finally(() => openModal('player-mission-notes-modal'));
 }
 
-function deletePlayerMissionNote(missionId, noteIndex) {
+function saveMissionNotesFromModal() {
     const user = getCurrentUser();
-    if (!user || !user.id || !isPlayer() || !missionId || noteIndex == null) return;
-    const ref = db.collection('missions').doc(missionId);
-    ref.get().then(doc => {
-        if (!doc.exists) return;
-        const data = doc.data();
-        const playerProgress = data.playerProgress || {};
-        const current = playerProgress[user.id] || {};
-        const notesList = Array.isArray(current.notesList) ? [...current.notesList] : [];
-        if (noteIndex < 0 || noteIndex >= notesList.length) return;
-        notesList.splice(noteIndex, 1);
-        playerProgress[user.id] = {
-            ...current,
-            status: current.status || PLAYER_PROGRESS_STATUS.in_progress,
-            notesList,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            playerName: current.playerName || user.nombre || ''
-        };
-        ref.update({
-            playerProgress,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        }).then(() => showToast('Nota borrada')).catch(e => showToast('Error: ' + e.message, true));
-    }).catch(e => showToast('Error: ' + e.message, true));
-}
-
-function updatePlayerMissionNote(missionId, noteIndex, newText) {
-    const user = getCurrentUser();
-    if (!user || !user.id || !isPlayer() || !missionId || noteIndex == null) return;
-    const text = (newText || '').trim();
-    const ref = db.collection('missions').doc(missionId);
-    ref.get().then(doc => {
-        if (!doc.exists) return;
-        const data = doc.data();
-        const playerProgress = data.playerProgress || {};
-        const current = playerProgress[user.id] || {};
-        const notesList = Array.isArray(current.notesList) ? [...current.notesList] : [];
-        if (noteIndex < 0 || noteIndex >= notesList.length) return;
-        const note = notesList[noteIndex];
-        notesList[noteIndex] = { ...note, text };
-        playerProgress[user.id] = {
-            ...current,
-            status: current.status || PLAYER_PROGRESS_STATUS.in_progress,
-            notesList,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            playerName: current.playerName || user.nombre || ''
-        };
-        ref.update({
-            playerProgress,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        }).then(() => showToast('Nota guardada')).catch(e => showToast('Error: ' + e.message, true));
-    }).catch(e => showToast('Error: ' + e.message, true));
-}
-
-function startEditMissionNote(missionId, noteIndex) {
-    const card = document.querySelector('.mission-card[data-mission-id="' + missionId + '"]');
-    if (!card) return;
-    const li = card.querySelector('.player-mission-notes-item[data-note-index="' + noteIndex + '"]');
-    if (!li) return;
-    const dateEl = li.querySelector('.player-mission-notes-item-date');
-    const textEl = li.querySelector('.player-mission-notes-item-text');
-    if (!textEl) return;
-    const dateStr = dateEl ? dateEl.textContent : '';
-    const currentText = (textEl.innerText || textEl.textContent || '');
-    const savedHtml = li.innerHTML;
-    li.innerHTML = '';
-    const wrap = document.createElement('div');
-    wrap.className = 'player-mission-notes-edit-wrap';
-    const textarea = document.createElement('textarea');
-    textarea.className = 'player-mission-notes-input player-mission-notes-edit-input';
-    textarea.rows = 4;
-    textarea.value = currentText;
-    const btnWrap = document.createElement('div');
-    btnWrap.className = 'player-mission-notes-edit-buttons';
-    const btnSave = document.createElement('button');
-    btnSave.type = 'button';
-    btnSave.className = 'btn btn-small';
-    btnSave.textContent = 'Guardar';
-    btnSave.onclick = () => {
-        const val = textarea.value.trim();
-        if (!val) { showToast('La nota no puede estar vacía', true); return; }
-        updatePlayerMissionNote(missionId, noteIndex, val);
-    };
-    const btnCancel = document.createElement('button');
-    btnCancel.type = 'button';
-    btnCancel.className = 'btn btn-small btn-secondary';
-    btnCancel.textContent = 'Cancelar';
-    btnCancel.onclick = () => {
-        li.innerHTML = savedHtml;
-    };
-    btnWrap.appendChild(btnSave);
-    btnWrap.appendChild(btnCancel);
-    wrap.appendChild(textarea);
-    wrap.appendChild(btnWrap);
-    li.appendChild(wrap);
-    textarea.focus();
+    if (!user || !user.id || !isPlayer()) return;
+    const modal = document.getElementById('player-mission-notes-modal');
+    if (modal && modal.dataset.readOnly === '1') return;
+    const missionId = modal && modal.dataset.missionId;
+    const inputEl = document.getElementById('player-mission-notes-modal-input');
+    if (!missionId || !inputEl) return;
+    const notes = inputEl.value.trim();
+    db.collection('missions').doc(missionId).get()
+        .then(doc => {
+            if (!doc.exists) return;
+            const data = doc.data();
+            const playerProgress = data.playerProgress || {};
+            const current = playerProgress[user.id] || {};
+            playerProgress[user.id] = {
+                ...current,
+                status: current.status || PLAYER_PROGRESS_STATUS.in_progress,
+                notes,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                playerName: current.playerName || user.nombre || ''
+            };
+            return db.collection('missions').doc(missionId).update({
+                playerProgress,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        })
+        .then(() => {
+            showToast('Notas guardadas');
+            closeModal('player-mission-notes-modal');
+        })
+        .catch(e => {
+            console.error('Error guardando notas:', e);
+            showToast('Error al guardar notas', true);
+        });
 }
 
 function updatePlayerMissionProgress(missionId, status) {

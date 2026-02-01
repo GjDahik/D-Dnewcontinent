@@ -133,6 +133,9 @@ body {
 .nav-tab-type-cities { border-color: #484c50; color: #6c7074; }
 .nav-tab-type-cities:hover { border-color: #585c60; color: #888c90; }
 .nav-tab-type-cities.active { border-color: #585c60; color: #888c90; box-shadow: 0 0 8px rgba(88, 92, 96, 0.25); }
+.nav-tab-type-routes { border-color: #4a5040; color: #6e7464; }
+.nav-tab-type-routes:hover { border-color: #5a6050; color: #8a9080; }
+.nav-tab-type-routes.active { border-color: #5a6050; color: #8a9080; box-shadow: 0 0 8px rgba(90, 96, 80, 0.25); }
 
 .nav-tab-type-notifications { border-color: #484c52; color: #6c7076; }
 .nav-tab-type-notifications:hover { border-color: #585c62; color: #888c92; }
@@ -495,6 +498,43 @@ body {
     word-wrap: break-word;
     overflow-wrap: break-word;
 }
+/* Checkbox "Cumplida" en cada carta del destino */
+.player-carta-destino-check-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 8px;
+    cursor: pointer;
+    user-select: none;
+}
+.player-carta-destino-check {
+    width: 18px;
+    height: 18px;
+    accent-color: #d4af37;
+    cursor: pointer;
+}
+/* Mensaje de victoria permanente: "Has cumplido tu destino" */
+.player-cartas-destino-victory {
+    width: 100%;
+    margin-bottom: 24px;
+    text-align: center;
+}
+.player-cartas-destino-victory-inner {
+    display: block;
+    width: 100%;
+    padding: 16px 28px;
+    background: linear-gradient(135deg, rgba(212, 175, 55, 0.25) 0%, rgba(180, 140, 40, 0.35) 100%);
+    border: 2px solid #d4af37;
+    border-radius: 12px;
+    font-family: 'Cinzel', serif;
+    font-size: 1.35em;
+    font-weight: 700;
+    color: #f4e4b8;
+    letter-spacing: 0.08em;
+    text-shadow: 0 0 20px rgba(212, 175, 55, 0.4);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
 /* Mensaje general a la derecha de las cartas (app jugador) */
 .player-cartas-destino-mensaje-general {
     margin-top: 0;
@@ -546,6 +586,125 @@ body {
     flex-direction: column;
     gap: 12px;
     margin-bottom: 16px;
+}
+.map-default-level-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+.map-default-level-row-dashboard {
+    margin-bottom: 16px;
+}
+.map-default-level-select {
+    min-width: 200px;
+    padding: 8px 12px;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid #4a3c31;
+    border-radius: 6px;
+    color: #d4c4a8;
+    font-size: 0.95em;
+}
+.map-levels-form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+.map-levels-form-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+.map-levels-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 280px;
+    overflow-y: auto;
+}
+.map-level-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: rgba(0,0,0,0.25);
+    border: 1px solid #4a3c31;
+    border-radius: 8px;
+}
+.map-level-thumb {
+    width: 64px;
+    height: 48px;
+    object-fit: cover;
+    border-radius: 6px;
+    flex-shrink: 0;
+}
+.map-level-name {
+    flex: 1;
+    color: #e5ddd4;
+    font-size: 0.95em;
+}
+.map-level-visible-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+    color: #a89878;
+    font-size: 0.85em;
+}
+.map-level-visible-cb {
+    width: 16px;
+    height: 16px;
+    accent-color: #8b5a2b;
+    cursor: pointer;
+}
+.map-level-visible-text {
+    white-space: nowrap;
+}
+.map-level-item-hidden {
+    opacity: 0.7;
+    border-color: #3a2c21;
+}
+.map-level-item-hidden .map-level-name {
+    color: #8b7355;
+    font-style: italic;
+}
+.map-level-actions {
+    display: flex;
+    gap: 6px;
+}
+
+/* Navegación de niveles en app jugador */
+.player-map-level-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+.player-map-level-name {
+    font-family: 'Cinzel', serif;
+    color: #d4af37;
+    font-size: 1.1em;
+    min-width: 120px;
+    text-align: center;
+}
+.player-map-level-btn {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    font-size: 1.4em;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.player-map-level-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
 }
 
 .btn {
@@ -615,6 +774,22 @@ body {
 }
 #player-cities-container .card .card-body .btn {
     align-self: center;
+}
+.player-city-card-notes {
+    width: 100%;
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    background: rgba(26, 26, 26, 0.5);
+    border: 1px solid #4a3c31;
+    border-radius: 6px;
+    text-align: left;
+}
+.player-city-note-preview {
+    max-height: 4.5em;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
 }
 
 /* City Expandable */
@@ -1043,6 +1218,55 @@ body {
 }
 .player-inventory-filter-select:focus { outline: none; border-color: #8b5a2b; }
 
+/* Modal confirmación Usar ítem */
+.player-use-confirm-modal {
+    background: linear-gradient(180deg, rgba(26, 22, 18, 0.98) 0%, rgba(18, 15, 12, 0.98) 100%);
+    border: 1px solid #4a3c31;
+    box-shadow: 0 0 24px rgba(139, 90, 43, 0.2), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+.player-use-confirm-header {
+    border-bottom: 1px solid #4a3c31;
+    padding: 14px 18px;
+}
+.player-use-confirm-title {
+    margin: 0;
+    font-family: 'Cinzel', serif;
+    font-size: 1.2em;
+    color: #d4af37;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+.player-use-confirm-body {
+    padding: 20px 18px;
+}
+.player-use-confirm-message {
+    margin: 0 0 8px 0;
+    font-size: 1.05em;
+    color: #e5ddd4;
+    line-height: 1.4;
+}
+.player-use-confirm-message strong {
+    color: #d4af37;
+}
+.player-use-confirm-hint {
+    margin: 0;
+    font-size: 0.9em;
+    color: #8b7355;
+}
+.player-use-confirm-footer {
+    border-top: 1px solid #4a3c31;
+    padding: 14px 18px;
+    gap: 10px;
+}
+.player-use-confirm-btn {
+    background: linear-gradient(180deg, rgba(139, 90, 43, 0.5) 0%, rgba(90, 60, 30, 0.6) 100%);
+    border: 1px solid rgba(212, 175, 55, 0.5);
+    color: #f4e4a6;
+}
+.player-use-confirm-btn:hover {
+    background: linear-gradient(180deg, rgba(139, 90, 43, 0.65) 0%, rgba(90, 60, 30, 0.75) 100%);
+}
+
 /* Tabla inventario (desktop) */
 .inventory-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 8px; border: 1px solid #4a3c31; }
 .inventory-table { width: 100%; min-width: 620px; border-collapse: collapse; font-size: 0.95em; }
@@ -1107,6 +1331,275 @@ body {
 .player-section-title { font-family: 'Cinzel', serif; color: #d4af37; font-size: 1.4em; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 2px; }
 .player-map-wrap { text-align: center; background: linear-gradient(180deg, rgba(42, 42, 62, 0.9) 0%, rgba(26, 26, 46, 0.95) 100%); border: 2px solid #c9a227; border-radius: 12px; padding: 20px; }
 .player-map-img { max-width: 100%; border-radius: 10px; display: block; margin: 0 auto; }
+.player-map-ubicacion {
+    margin-top: 20px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+}
+.player-map-rutas-toggle {
+    flex-shrink: 0;
+}
+.player-map-ubicacion-label {
+    font-family: 'Cinzel', serif;
+    color: #d4af37;
+    font-size: 1em;
+}
+.player-map-ubicacion-select {
+    min-width: 220px;
+    padding: 10px 14px;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid #5c4023;
+    border-radius: 8px;
+    color: #e5ddd4;
+    font-size: 1em;
+}
+.player-map-ubicacion-select:focus {
+    outline: none;
+    border-color: #c9a227;
+}
+
+/* Rutas conocidas (vista jugador, panel desplegable) */
+.player-map-rutas {
+    margin-top: 12px;
+    padding: 20px;
+}
+.player-map-rutas-dropdown {
+    border-radius: 10px;
+    background: rgba(26, 26, 26, 0.5);
+    border: 1px solid #4a3c31;
+    border-radius: 10px;
+}
+.player-map-rutas-title {
+    font-family: 'Cinzel', serif;
+    color: #d4af37;
+    font-size: 1.1em;
+    margin: 0 0 8px 0;
+}
+.player-map-rutas-desc {
+    color: #8b7355;
+    font-size: 0.9em;
+    margin: 0 0 16px 0;
+}
+.player-map-rutas-form {
+    display: grid;
+    gap: 10px 16px;
+    margin-bottom: 16px;
+}
+.player-map-rutas-form label {
+    color: #a89878;
+    font-size: 0.9em;
+}
+.player-ruta-select {
+    padding: 10px 12px;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid #4a3c31;
+    border-radius: 8px;
+    color: #e5ddd4;
+    font-size: 1em;
+}
+.player-map-rutas-result {
+    padding: 14px 16px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 8px;
+    color: #8b7355;
+    font-style: italic;
+}
+.player-map-rutas-result-ok {
+    color: #c9a227;
+    font-style: normal;
+    border: 1px solid rgba(201, 162, 39, 0.4);
+}
+.player-map-rutas-noches {
+    margin: 0;
+    font-size: 1.05em;
+}
+.player-map-rutas-msg {
+    color: #8b7355;
+    font-style: italic;
+    margin: 0;
+}
+.player-map-ruta-item {
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    background: rgba(0,0,0,0.25);
+    border-radius: 6px;
+    color: #e5ddd4;
+    font-size: 0.95em;
+}
+.player-map-rutas-toggle.open,
+.player-map-bitacora-toggle.open {
+    border-color: #c9a227;
+    color: #f4e4b8;
+}
+.player-map-bitacora-toggle {
+    flex-shrink: 0;
+}
+.player-empezar-viaje-btn {
+    margin-top: 12px;
+}
+
+/* Bitácora de viaje (jugador) */
+.player-map-bitacora {
+    margin-top: 12px;
+    padding: 20px;
+    background: rgba(26, 26, 26, 0.5);
+    border: 1px solid #4a3c31;
+    border-radius: 10px;
+}
+.player-bitacora-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+.player-bitacora-viaje {
+    padding: 16px;
+    background: rgba(0,0,0,0.25);
+    border: 1px solid #4a3c31;
+    border-radius: 10px;
+}
+.player-bitacora-header-toggle {
+    cursor: pointer;
+    user-select: none;
+}
+.player-bitacora-header-toggle:hover {
+    opacity: 0.9;
+}
+.player-bitacora-viaje-chevron {
+    display: inline-block;
+    width: 1.2em;
+    font-size: 0.75em;
+    color: #a89878;
+    margin-right: 4px;
+}
+.player-bitacora-viaje-collapsed .player-bitacora-notas {
+    display: none;
+}
+.player-bitacora-viaje-collapsed .player-bitacora-header {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+.player-bitacora-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 20px;
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #4a3c31;
+}
+.player-bitacora-ruta {
+    font-weight: 600;
+    color: #e5ddd4;
+    font-size: 1.05em;
+}
+.player-bitacora-duracion {
+    color: #a89878;
+    font-size: 0.95em;
+}
+.player-bitacora-fecha {
+    color: #8b7355;
+    font-size: 0.9em;
+}
+.player-bitacora-delete-btn {
+    margin-left: auto;
+    opacity: 0.85;
+}
+.player-bitacora-delete-btn:hover {
+    opacity: 1;
+}
+.player-bitacora-notas {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.player-bitacora-noche {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.player-bitacora-noche-label {
+    font-size: 0.9em;
+    color: #a89878;
+}
+.player-bitacora-note-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+.player-bitacora-note-preview {
+    flex: 1;
+    min-width: 0;
+    padding: 8px 10px;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid #4a3c31;
+    border-radius: 6px;
+    color: #e5ddd4;
+    font-size: 0.9em;
+    white-space: pre-wrap;
+    word-break: break-word;
+    min-height: 2.5em;
+}
+.player-bitacora-nota {
+    padding: 10px 12px;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid #4a3c31;
+    border-radius: 6px;
+    color: #e5ddd4;
+    font-size: 0.95em;
+    resize: vertical;
+    min-height: 60px;
+}
+.player-bitacora-nota:focus {
+    outline: none;
+    border-color: #8b5a2b;
+}
+
+/* Rutas conocidas (DM: lista) */
+.dm-map-rutas-section {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid #4a3c31;
+}
+.dm-rutas-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.dm-ruta-item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    background: rgba(0,0,0,0.25);
+    border: 1px solid #4a3c31;
+    border-radius: 8px;
+}
+.dm-ruta-route {
+    flex: 1;
+    min-width: 180px;
+    color: #e5ddd4;
+    font-weight: 600;
+}
+.dm-ruta-medio {
+    color: #a89878;
+    font-size: 0.95em;
+}
+.dm-ruta-duracion {
+    color: #a89878;
+    font-size: 0.95em;
+}
+.dm-ruta-noches {
+    color: #8b7355;
+    font-size: 0.9em;
+}
+.dm-ruta-actions {
+    display: flex;
+    gap: 6px;
+}
 
 /* Tienda de pociones (vista personaje) */
 .player-potion-products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; max-height: 380px; overflow-y: auto; }
@@ -1496,7 +1989,8 @@ body {
     .player-plaque-name {
         font-size: 1.35em;
     }
-    .player-plaque-oro {
+    .player-plaque-oro,
+    .player-plaque-banco {
         font-size: 1.05em;
         padding: 10px 16px;
     }
@@ -1836,9 +2330,16 @@ body {
     text-transform: none;
     font-style: normal;
 }
+.player-plaque-money-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 10px 16px;
+    margin-top: 8px;
+}
 .player-plaque-oro {
     margin: 0;
-    margin-top: 8px !important;
     padding: 8px 14px;
     background: linear-gradient(135deg, rgba(212, 175, 55, 0.25) 0%, rgba(139, 90, 43, 0.35) 100%);
     border: 1px solid rgba(212, 175, 55, 0.5);
@@ -1855,6 +2356,25 @@ body {
 }
 .player-plaque-oro:hover {
     background: linear-gradient(135deg, rgba(212, 175, 55, 0.35) 0%, rgba(139, 90, 43, 0.45) 100%);
+}
+.player-plaque-banco {
+    margin: 0;
+    padding: 8px 14px;
+    background: linear-gradient(135deg, rgba(90, 138, 90, 0.25) 0%, rgba(56, 100, 56, 0.35) 100%);
+    border: 1px solid rgba(90, 138, 90, 0.5);
+    border-radius: 6px;
+    color: #b8e0b8;
+    font-family: 'Cinzel', serif;
+    font-size: 1.15em;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-shadow: 
+        0 0 10px rgba(90, 138, 90, 0.4),
+        1px 1px 0 rgba(0,0,0,0.8);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.15), 0 2px 6px rgba(0,0,0,0.3);
+}
+.player-plaque-banco:hover {
+    background: linear-gradient(135deg, rgba(90, 138, 90, 0.35) 0%, rgba(56, 100, 56, 0.45) 100%);
 }
 
 /* Placa metálica del DM (nombre, igual que jugadores) */
