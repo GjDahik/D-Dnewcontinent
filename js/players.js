@@ -1,6 +1,6 @@
 // ==================== PLAYERS ====================
 function loadPlayers() {
-    db.collection('players').onSnapshot(snap => {
+    db.collection('players').limit(200).onSnapshot(snap => {
         playersData = [];
         snap.forEach(doc => playersData.push({ id: doc.id, ...doc.data() }));
         renderPlayers();
@@ -304,6 +304,7 @@ function renderPlayerInventory(player) {
 
     const rarityColors = {
         'común': '#2ecc71',
+        'inusual': '#3498db',
         'infrecuente': '#3498db',
         'rara': '#9b59b6',
         'legendaria': '#e74c3c'
@@ -311,7 +312,8 @@ function renderPlayerInventory(player) {
 
     const rarityLabels = {
         'común': '🟢 Común',
-        'infrecuente': '🔵 Infrecuente',
+        'inusual': '🔵 Inusual',
+        'infrecuente': '🔵 Inusual',
         'rara': '🟣 Rara',
         'legendaria': '🔥 Legendaria'
     };
@@ -476,7 +478,7 @@ function importPlayerItemsCSV(event) {
                 return;
             }
 
-            const validRarities = ['común', 'infrecuente', 'rara', 'legendaria'];
+            const validRarities = ['común', 'inusual', 'rara', 'legendaria'];
             let inventario = Array.isArray(player.inventario) ? player.inventario.slice() : [];
             let count = 0;
             let errors = [];
@@ -494,7 +496,7 @@ function importPlayerItemsCSV(event) {
                 var effect = effectIdx !== -1 ? (values[effectIdx] || '') : '';
                 var rarity = rarityIdx !== -1 ? (values[rarityIdx] || 'común').toLowerCase().trim() : 'común';
                 var quantity = qtyIdx !== -1 && values[qtyIdx] !== '' ? Math.max(1, parseInt(values[qtyIdx], 10) || 1) : 1;
-                
+                if (rarity === 'infrecuente') rarity = 'inusual';
                 if (validRarities.indexOf(rarity) === -1) rarity = 'común';
 
                 var item = {
@@ -566,7 +568,6 @@ function importPlayerItemsCSV(event) {
 // Exponer funciones globalmente
 window.giveItemToPlayer = giveItemToPlayer;
 window.importPlayerItemsCSV = importPlayerItemsCSV;
-window.downloadPlayerItemsTemplate = downloadPlayerItemsTemplate;
 
 function openPlayerCasaModal(playerId, playerNombre) {
     document.getElementById('dm-casa-player-id').value = playerId;
@@ -619,6 +620,47 @@ function savePlayerCasa() {
         showToast('Error al guardar información de la casa', true);
     });
 }
+
+/**
+ * Migración: actualiza todos los inventarios de jugadores cambiando rareza "infrecuente" → "inusual".
+ * Solo actualiza jugadores que tengan al menos un ítem con rarity === 'infrecuente'.
+ */
+window.migratePlayerInventoriesInfrecuenteToInusual = async function() {
+    if (typeof db === 'undefined') {
+        showToast('Error: base de datos no disponible', true);
+        return;
+    }
+    try {
+        const snap = await db.collection('players').limit(500).get();
+        let updated = 0;
+        let totalItemsChanged = 0;
+        for (const doc of snap.docs) {
+            const data = doc.data();
+            const inventario = data.inventario;
+            if (!Array.isArray(inventario) || inventario.length === 0) continue;
+            let changed = false;
+            const newInv = inventario.map(item => {
+                const r = (item.rarity || '').toLowerCase();
+                if (r === 'infrecuente') {
+                    changed = true;
+                    totalItemsChanged++;
+                    return { ...item, rarity: 'inusual' };
+                }
+                return item;
+            });
+            if (changed) {
+                await db.collection('players').doc(doc.id).update({ inventario: newInv });
+                updated++;
+            }
+        }
+        showToast(updated === 0
+            ? 'No había jugadores con ítems "infrecuente". Nada que actualizar.'
+            : 'Migración lista: ' + updated + ' jugador(es) actualizado(s), ' + totalItemsChanged + ' ítem(s) cambiado(s) a "inusual".');
+    } catch (err) {
+        console.error('Error en migración inventarios:', err);
+        showToast('Error en la migración: ' + (err.message || err), true);
+    }
+};
 
 // Initialize
 loadPlayers();

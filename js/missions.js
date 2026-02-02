@@ -34,6 +34,7 @@ function switchDMMissionsSubtab(subtabId) {
 function loadDMMissions() {
     db.collection('missions')
         .orderBy('createdAt', 'desc')
+        .limit(200)
         .onSnapshot(snap => {
             missionsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
             const activasOn = document.getElementById('dm-missions-activas-panel')?.style.display !== 'none';
@@ -390,7 +391,7 @@ function startMissionsPendingBadge() {
         const ids = Array.isArray(assigned) ? assigned : (assigned && typeof assigned === 'object' ? Object.values(assigned) : []);
         return ids.some(pid => String(pid) === String(user.id));
     }
-    _missionsBadgeUnsubscribe = db.collection('missions').onSnapshot(snap => {
+    _missionsBadgeUnsubscribe = db.collection('missions').limit(200).onSnapshot(snap => {
         const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         const visible = all.filter(m => {
             const status = (m.status || '').toString().toLowerCase();
@@ -477,7 +478,7 @@ function loadPlayerMissions(subtab) {
         renderPlayerMissionsLists(activas, completedOrArchived, user.id, subtab, playerNamesMap || {});
     }
 
-    db.collection('players').get().then(playersSnap => {
+    db.collection('players').limit(200).get().then(playersSnap => {
         const playerNamesMap = {};
         playersSnap.docs.forEach(d => {
             const data = d.data();
@@ -486,7 +487,7 @@ function loadPlayerMissions(subtab) {
             playerNamesMap[String(d.id)] = nombre;
         });
 
-        _playerMissionsUnsubscribe = db.collection('missions').onSnapshot(snap => {
+        _playerMissionsUnsubscribe = db.collection('missions').limit(200).onSnapshot(snap => {
             runMissionsSnapshot(snap, playerNamesMap);
         }, err => {
             console.error('Player missions:', err);
@@ -494,7 +495,7 @@ function loadPlayerMissions(subtab) {
             historialContainer.innerHTML = '<p style="color:#8b7355; text-align:center; padding:30px;">No se pudo cargar el historial.</p>';
         });
     }).catch(() => {
-        _playerMissionsUnsubscribe = db.collection('missions').onSnapshot(snap => {
+        _playerMissionsUnsubscribe = db.collection('missions').limit(200).onSnapshot(snap => {
             runMissionsSnapshot(snap, {});
         }, err => {
             console.error('Player missions:', err);
@@ -715,6 +716,7 @@ function loadLegendTracks() {
     }
     _legendUnsubscribe = db.collection(LEGEND_COLLECTION)
         .orderBy('createdAt', 'desc')
+        .limit(100)
         .onSnapshot(snap => {
             const tracks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
             renderLegendList(container, tracks, true);
@@ -849,6 +851,7 @@ function loadPlayerLegendTracks() {
     }
     _playerLegendUnsubscribe = db.collection(LEGEND_COLLECTION)
         .orderBy('createdAt', 'desc')
+        .limit(100)
         .onSnapshot(snap => {
             const tracks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
             renderLegendList(container, tracks, false);

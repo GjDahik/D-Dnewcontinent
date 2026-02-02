@@ -148,6 +148,80 @@ body.app-bg-noise-warm {
     letter-spacing: 1px;
 }
 
+/* Barra superior directorio: tabs centrados (PC y móvil) */
+.player-directorio-top-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 12px 20px;
+    margin-bottom: 24px;
+    padding: 12px 16px;
+    background: linear-gradient(180deg, #2a2522 0%, #1e1b18 100%);
+    border: 1px solid #4a3c31;
+    border-radius: 4px;
+}
+/* Botón "Menú" solo en móvil: muestra/oculta los tabs del directorio */
+.player-directorio-tabs-toggle {
+    display: none;
+    font-family: 'Cinzel', serif;
+    font-size: 0.95em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 12px 18px;
+    border: 1px solid #8b5a2b;
+    background: linear-gradient(180deg, #2a2522 0%, #1e1b18 100%);
+    color: #d4af37;
+    border-radius: 6px;
+    cursor: pointer;
+    width: 100%;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+}
+.player-directorio-tabs-toggle .player-directorio-tabs-toggle-icon {
+    display: inline-block;
+    transition: transform 0.2s ease;
+}
+.player-directorio-top-bar.directorio-tabs-collapsed .player-directorio-tabs-toggle .player-directorio-tabs-toggle-icon {
+    transform: rotate(180deg);
+}
+.player-directorio-top-bar .player-directorio-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 0;
+    padding: 0;
+    background: none;
+    border: none;
+    flex: 1;
+    min-width: 0;
+}
+/* Tabs de ciudad (Comercios, Historia, Mis notas, Habitantes) */
+.player-view-container.player-in-city-view .player-directorio-top-bar {
+    margin-bottom: 24px;
+}
+.player-view-container.player-in-city-view .player-directorio-tabs {
+    display: flex !important;
+    justify-content: center !important;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 0;
+    padding: 0;
+    background: none;
+    border: none;
+}
+.player-view-container.player-in-city-view .player-directorio-tab {
+    font-family: 'Cinzel', serif;
+    font-size: 0.95em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 12px 20px;
+    min-height: 44px;
+}
+
 /* Badge de notificación (correos sin leer) en nav */
 .nav-badge {
     position: absolute;
@@ -483,10 +557,19 @@ body.app-bg-noise-warm {
     display: flex;
     flex-direction: column;
     min-height: 260px;
+    cursor: pointer;
 }
 .player-carta-destino-card:hover {
     border-color: #8b5a2b;
     box-shadow: 0 5px 14px rgba(0,0,0,0.4);
+}
+.player-carta-destino-card:focus {
+    outline: none;
+    border-color: #c9a227;
+    box-shadow: 0 0 0 2px rgba(201, 162, 39, 0.35);
+}
+.player-carta-destino-card:active {
+    transform: scale(0.98);
 }
 .player-carta-destino-img-wrap {
     width: 100%;
@@ -595,12 +678,24 @@ body.app-bg-noise-warm {
     border: 1px solid #4a3c31;
     border-radius: 8px;
 }
+.player-cartas-destino-mensaje-title {
+    font-family: 'Cinzel', serif;
+    font-size: 1.15em;
+    font-weight: 600;
+    color: #c9a868;
+    letter-spacing: 0.06em;
+    margin: 0 0 16px 0;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #5a4a3a;
+}
 .player-cartas-destino-mensaje-general-content {
     color: #e8e2d8;
     font-size: 1.08em;
     line-height: 1.75;
     white-space: pre-wrap;
     word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
     letter-spacing: 0.02em;
     max-width: 52ch;
 }
@@ -788,7 +883,18 @@ body.app-bg-noise-warm {
 .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; }
 .card-title { font-family: 'Cinzel', serif; font-size: 1.3em; color: #d4af37; }
 .card-subtitle { color: #a89878; font-style: italic; font-size: 0.95em; }
-.card-body { margin-bottom: 15px; }
+.card-body {
+    margin-bottom: 15px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+.card-body p,
+.card-title {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
 .card-stat { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #5c4023; }
 .card-stat:last-child { border-bottom: none; }
 .card-stat-label { color: #a89878; }
@@ -837,11 +943,10 @@ body.app-bg-noise-warm {
     text-align: left;
 }
 .player-city-note-preview {
-    max-height: 4.5em;
-    overflow: hidden;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
+    word-break: break-word;
 }
 
 /* City Expandable */
@@ -857,13 +962,19 @@ body.app-bg-noise-warm {
     gap: 16px;
 }
 .city-header:hover { background: rgba(139, 90, 43, 0.1); }
-.city-info h3 { font-family: 'Cinzel', serif; font-size: 1.4em; color: #d4af37; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 2px; }
-.city-info p { color: #8b7355; font-style: italic; }
+.city-info h3 { font-family: 'Cinzel', serif; font-size: 1.4em; color: #d4af37; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 2px; word-wrap: break-word; overflow-wrap: break-word; }
+.city-info p { color: #8b7355; font-style: italic; word-wrap: break-word; overflow-wrap: break-word; }
+.city-content {
+    display: none;
+    padding: 0 20px 20px;
+    border-top: 1px solid #4a3c31;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
 .city-meta { display: flex; gap: 15px; align-items: center; }
 .city-meta span { color: #8b7355; font-size: 0.9em; }
 .city-toggle { font-size: 1.5em; color: #8b5a2b; transition: transform 0.3s; }
 .city-card.expanded .city-toggle { transform: rotate(180deg); }
-.city-content { display: none; padding: 0 20px 20px; border-top: 1px solid #4a3c31; }
 .city-card.expanded .city-content { display: block; }
 .city-actions { display: flex; gap: 10px; padding: 15px 20px; background: rgba(0,0,0,0.2); }
 
@@ -962,20 +1073,24 @@ body.app-bg-noise-warm {
     flex-shrink: 0;
     font-size: 0.8em;
     color: #8b7355;
-    white-space: nowrap;
     text-align: right;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 .mission-card-desc {
     color: #a89878;
     font-size: 0.9em;
     line-height: 1.5;
     margin: 0 0 10px 0;
-    max-height: 4.5em;
-    overflow: hidden;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
     word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    white-space: pre-wrap;
+    overflow: visible;
+    max-height: none;
+    display: block;
+    -webkit-line-clamp: unset;
+    text-overflow: unset;
 }
 .mission-card-extra {
     color: #8b7355;
@@ -1000,7 +1115,8 @@ body.app-bg-noise-warm {
     border: 1px solid #4a3c31;
     border-radius: 8px;
     background: rgba(26, 26, 26, 0.5);
-    overflow: hidden;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 .player-mission-notes-summary {
     padding: 10px 14px;
@@ -1168,6 +1284,15 @@ body.app-bg-noise-warm {
     justify-content: center; align-items: center; padding: 20px;
 }
 .modal-overlay.active { display: flex; }
+
+/* Modal de login: asegurar que el contenido sea visible y scrollee */
+#login-modal .modal { max-height: 90vh; overflow-y: auto; }
+#login-modal .modal-body { overflow-y: auto; }
+#login-modal #login-player-select-group,
+#login-modal #login-dm-name-group { display: none; }
+#login-modal #login-player-select-group.login-field-visible,
+#login-modal #login-dm-name-group.login-field-visible { display: block !important; }
+
 .modal {
     background: linear-gradient(180deg, #252220 0%, #1a1a1a 100%);
     border: 1px solid #8b5a2b; border-radius: 6px;
@@ -1183,7 +1308,17 @@ body.app-bg-noise-warm {
     cursor: pointer; transition: color 0.3s;
 }
 .modal-close:hover { color: #d4af37; }
-.modal-body { padding: 20px; }
+.modal-body {
+    padding: 20px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+.modal-body p,
+.modal-body .form-group {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
 .modal-footer {
     padding: 20px; border-top: 1px solid #4a3c31;
     display: flex; gap: 10px; justify-content: flex-end;
@@ -1445,8 +1580,34 @@ body.app-bg-noise-warm {
     align-items: center;
     gap: 12px;
 }
-.player-map-rutas-toggle {
+/* Botones Rutas y Bitácora: estilo mapa (dorado/marrón) */
+.player-map-rutas-toggle,
+.player-map-bitacora-toggle {
     flex-shrink: 0;
+    font-family: 'Cinzel', serif;
+    font-size: 0.95em;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    padding: 12px 18px;
+    min-height: 44px;
+    border-radius: 8px;
+    border: 1px solid #5a4a3a;
+    background: linear-gradient(180deg, #2a2522 0%, #1e1b18 100%);
+    color: #d4af37;
+    transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+.player-map-rutas-toggle:hover,
+.player-map-bitacora-toggle:hover {
+    border-color: #8b5a2b;
+    background: linear-gradient(180deg, #352f2a 0%, #2a2522 100%);
+    color: #f4e4b8;
+}
+.player-map-rutas-toggle.open,
+.player-map-bitacora-toggle.open {
+    border-color: #c9a227;
+    background: linear-gradient(180deg, #3d3528 0%, #2a2518 100%);
+    color: #f4e4b8;
+    box-shadow: 0 0 12px rgba(201, 162, 39, 0.25);
 }
 .player-map-ubicacion-label {
     font-family: 'Cinzel', serif;
@@ -1468,55 +1629,66 @@ body.app-bg-noise-warm {
 }
 
 /* Rutas conocidas (vista jugador, panel desplegable) */
-.player-map-rutas {
-    margin-top: 12px;
-    padding: 20px;
-}
+.player-map-rutas,
 .player-map-rutas-dropdown {
-    border-radius: 10px;
-    background: rgba(26, 26, 26, 0.5);
-    border: 1px solid #4a3c31;
-    border-radius: 10px;
+    margin-top: 16px;
+    padding: 24px;
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(30, 28, 24, 0.95) 0%, rgba(22, 20, 18, 0.98) 100%);
+    border: 1px solid #5a4a3a;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 .player-map-rutas-title {
     font-family: 'Cinzel', serif;
     color: #d4af37;
-    font-size: 1.1em;
-    margin: 0 0 8px 0;
+    font-size: 1.2em;
+    margin: 0 0 10px 0;
+    letter-spacing: 0.05em;
 }
 .player-map-rutas-desc {
     color: #8b7355;
     font-size: 0.9em;
-    margin: 0 0 16px 0;
+    margin: 0 0 20px 0;
+    line-height: 1.4;
 }
 .player-map-rutas-form {
     display: grid;
-    gap: 10px 16px;
-    margin-bottom: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 14px 20px;
+    margin-bottom: 20px;
 }
 .player-map-rutas-form label {
     color: #a89878;
     font-size: 0.9em;
+    display: block;
+    margin-bottom: 4px;
 }
 .player-ruta-select {
-    padding: 10px 12px;
-    background: rgba(0,0,0,0.4);
+    padding: 10px 14px;
+    background: rgba(0, 0, 0, 0.4);
     border: 1px solid #4a3c31;
     border-radius: 8px;
     color: #e5ddd4;
     font-size: 1em;
+    width: 100%;
+}
+.player-ruta-select:focus {
+    outline: none;
+    border-color: #8b5a2b;
 }
 .player-map-rutas-result {
-    padding: 14px 16px;
-    background: rgba(0,0,0,0.3);
-    border-radius: 8px;
+    padding: 16px 18px;
+    background: rgba(0, 0, 0, 0.35);
+    border-radius: 10px;
     color: #8b7355;
     font-style: italic;
+    border: 1px solid rgba(74, 60, 49, 0.6);
 }
 .player-map-rutas-result-ok {
     color: #c9a227;
     font-style: normal;
-    border: 1px solid rgba(201, 162, 39, 0.4);
+    border: 1px solid rgba(201, 162, 39, 0.5);
+    background: rgba(201, 162, 39, 0.08);
 }
 .player-map-rutas-noches {
     margin: 0;
@@ -1528,43 +1700,56 @@ body.app-bg-noise-warm {
     margin: 0;
 }
 .player-map-ruta-item {
-    padding: 10px 12px;
-    margin-bottom: 8px;
-    background: rgba(0,0,0,0.25);
-    border-radius: 6px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(74, 60, 49, 0.5);
+    border-radius: 8px;
     color: #e5ddd4;
     font-size: 0.95em;
 }
-.player-map-rutas-toggle.open,
-.player-map-bitacora-toggle.open {
-    border-color: #c9a227;
-    color: #f4e4b8;
-}
-.player-map-bitacora-toggle {
-    flex-shrink: 0;
-}
 .player-empezar-viaje-btn {
-    margin-top: 12px;
+    margin-top: 16px;
+    font-family: 'Cinzel', serif;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    padding: 12px 20px;
+    border-radius: 8px;
+    border: 1px solid #5a4a3a;
+    background: linear-gradient(180deg, #2a2522 0%, #1e1b18 100%);
+    color: #d4af37;
+    transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+.player-empezar-viaje-btn:hover {
+    border-color: #8b5a2b;
+    background: linear-gradient(180deg, #352f2a 0%, #2a2522 100%);
+    color: #f4e4b8;
 }
 
 /* Bitácora de viaje (jugador) */
 .player-map-bitacora {
-    margin-top: 12px;
-    padding: 20px;
-    background: rgba(26, 26, 26, 0.5);
-    border: 1px solid #4a3c31;
-    border-radius: 10px;
+    margin-top: 16px;
+    padding: 24px;
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(30, 28, 24, 0.95) 0%, rgba(22, 20, 18, 0.98) 100%);
+    border: 1px solid #5a4a3a;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 .player-bitacora-list {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 16px;
 }
 .player-bitacora-viaje {
-    padding: 16px;
-    background: rgba(0,0,0,0.25);
-    border: 1px solid #4a3c31;
+    padding: 18px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(74, 60, 49, 0.5);
     border-radius: 10px;
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+.player-bitacora-viaje:hover {
+    border-color: rgba(139, 90, 43, 0.6);
+    background: rgba(0, 0, 0, 0.35);
 }
 .player-bitacora-header-toggle {
     cursor: pointer;
@@ -1716,6 +1901,7 @@ body.app-bg-noise-warm {
 }
 .player-potion-product-card:hover { border-color: rgba(155,89,182,0.5); }
 .player-potion-product-card.común { border-color: rgba(46,204,113,0.4); }
+.player-potion-product-card.inusual,
 .player-potion-product-card.infrecuente { border-color: rgba(52,152,219,0.4); }
 .player-potion-product-card.rara { border-color: rgba(155,89,182,0.4); }
 .player-potion-product-card.legendaria { border-color: rgba(231,76,60,0.4); }
@@ -1730,8 +1916,9 @@ body.app-bg-noise-warm {
 .player-potion-cart-total-row { display: flex; justify-content: space-between; margin-bottom: 6px; padding-top: 10px; border-top: 1px solid rgba(255,215,0,0.2); }
 .player-potion-checkout-btn { width: 100%; margin-top: 12px; }
 
-/* Directorio de Comercios (estilo Mistfall) */
-.player-mistfall-page { position: relative; z-index: 2; max-width: 1000px; margin: 0 auto; padding: 20px 0; }
+/* Directorio de Comercios (estilo Mistfall) - mismo ancho que el resto de la app */
+.player-mistfall-page,
+#player-directorio-wrap { position: relative; z-index: 2; width: 100%; max-width: 100%; padding: 20px 0; box-sizing: border-box; }
 .player-mistfall-header { text-align: center; padding: 30px 20px; }
 .player-mistfall-emblem { font-size: 3em; margin-bottom: 10px; filter: drop-shadow(0 0 20px rgba(200,170,130,0.5)); }
 .player-mistfall-h1 {
@@ -1747,6 +1934,34 @@ body.app-bg-noise-warm {
     font-family: 'Cinzel', serif; text-align: center; color: #8a7a6a; font-size: 1.2em;
     letter-spacing: 4px; text-transform: uppercase; margin-bottom: 24px;
 }
+/* Botones del directorio: diseño fijo para que no pierdan estilo al entrar en ciudad */
+.player-directorio-tabs .player-directorio-tab {
+    font-family: 'Cinzel', serif;
+    font-size: 0.95em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 12px 20px;
+    min-height: 44px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 1px solid #8b5a2b;
+    background: linear-gradient(180deg, #2a2522 0%, #1e1b18 100%);
+    color: #d4af37;
+}
+.player-directorio-tabs .player-directorio-tab:hover {
+    background: linear-gradient(180deg, #352f2a 0%, #2a2522 100%);
+}
+.player-directorio-tabs .player-directorio-tab.active {
+    border-color: #8b5a2b;
+    color: #d4af37;
+    background: linear-gradient(180deg, #8b5a2b 0%, #6b4423 100%);
+    box-shadow: 0 0 8px rgba(139, 90, 43, 0.35);
+}
+.player-directorio-tabs .player-directorio-tab.active:hover {
+    background: linear-gradient(180deg, #a06830 0%, #8b5a2b 100%);
+}
+.player-directorio-panel { min-height: 120px; }
 .player-mistfall-shops-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
 .player-mistfall-shop-card {
     display: flex; align-items: center; gap: 18px; padding: 22px;
@@ -1761,8 +1976,8 @@ body.app-bg-noise-warm {
 }
 .player-mistfall-shop-icon { font-size: 2.2em; width: 54px; text-align: center; }
 .player-mistfall-shop-info { flex: 1; }
-.player-mistfall-shop-name { font-family: 'Cinzel', serif; font-size: 1.15em; color: var(--shop-accent, #c9a868); margin-bottom: 6px; }
-.player-mistfall-shop-desc { color: #7a6a5a; font-size: 0.9em; font-style: italic; }
+.player-mistfall-shop-name { font-family: 'Cinzel', serif; font-size: 1.15em; color: var(--shop-accent, #c9a868); margin-bottom: 6px; word-wrap: break-word; overflow-wrap: break-word; }
+.player-mistfall-shop-desc { color: #7a6a5a; font-size: 0.9em; font-style: italic; word-wrap: break-word; overflow-wrap: break-word; }
 .player-mistfall-shop-enter { font-family: 'Cinzel', serif; color: #c9a868; font-size: 0.85em; letter-spacing: 2px; margin-top: 10px; opacity: 0.8; }
 .player-mistfall-shop-card:hover .player-mistfall-shop-enter { opacity: 1; }
 /* Colores por tipo de tienda */
@@ -1811,8 +2026,8 @@ body.app-bg-noise-warm {
 }
 .player-mistfall-npc-icon { font-size: 2em; width: 54px; text-align: center; }
 .player-mistfall-npc-info { flex: 1; }
-.player-mistfall-npc-name { font-family: 'Cinzel', serif; font-size: 1.1em; color: #f4d03f; margin-bottom: 6px; font-weight: 600; }
-.player-mistfall-npc-rol { color: #d4c4a8; font-size: 0.9em; font-style: italic; margin-bottom: 8px; }
+.player-mistfall-npc-name { font-family: 'Cinzel', serif; font-size: 1.1em; color: #f4d03f; margin-bottom: 6px; font-weight: 600; word-wrap: break-word; overflow-wrap: break-word; }
+.player-mistfall-npc-rol { color: #d4c4a8; font-size: 0.9em; font-style: italic; margin-bottom: 8px; word-wrap: break-word; overflow-wrap: break-word; }
 .player-mistfall-npc-notes-section { margin-top: 12px; }
 .player-mistfall-npc-notes-input {
     width: 100%;
@@ -1968,6 +2183,197 @@ body.app-bg-noise-warm {
 .player-shop-receipt-close { width: 100%; margin-top: 20px; padding: 12px; background: #4a3a3a; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-family: inherit; }
 .player-shop-receipt-close:hover { background: #6a5a5a; }
 
+/* Búsqueda y filtros unificados en todas las tiendas */
+.player-shop-search-wrap {
+    display: block !important;
+    margin-bottom: 16px;
+    visibility: visible !important;
+}
+/* En todas las tiendas (app jugador): búsqueda desplegable en cualquier pantalla. El botón debe verse siempre. */
+.player-shop-search-toggle {
+    display: flex !important;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 14px;
+    background: #1a1a1a;
+    border: 1px solid #4a3c31;
+    border-radius: 6px;
+    color: #d4c4a8;
+    font-family: inherit;
+    font-size: 1em;
+    cursor: pointer;
+    text-align: left;
+    visibility: visible !important;
+    transition: border-color 0.2s, background 0.2s;
+}
+.player-shop-search-toggle:hover {
+    border-color: #8b7355;
+    background: rgba(0,0,0,0.4);
+}
+.player-shop-search-wrap .player-shop-search-row {
+    display: none;
+    margin-bottom: 0;
+    padding: 12px;
+    background: rgba(0,0,0,0.2);
+    border: 1px solid #4a3c31;
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+}
+.player-shop-search-wrap.expanded .player-shop-search-toggle {
+    border-radius: 6px 6px 0 0;
+    border-bottom-color: transparent;
+}
+.player-shop-search-wrap.expanded .player-shop-search-row {
+    display: block;
+}
+/* Filtros (TODAS, COMÚN, pestañas, etc.) dentro del wrap: ocultos por defecto, visibles al expandir */
+.player-shop-search-wrap .player-shop-filters {
+    display: none;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #4a3c31;
+}
+.player-shop-search-wrap.expanded .player-shop-filters {
+    display: flex;
+}
+/* Forja: "Nivel del grupo" también oculto hasta que se expanda (override de media query en móvil) */
+.player-shop-search-wrap:not(.expanded) .player-forge-levels {
+    display: none !important;
+}
+.player-shop-search-wrap.expanded .player-forge-levels {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+.player-shop-search-wrap.expanded .player-forge-levels > span {
+    grid-column: 1 / -1;
+}
+/* Fila de búsqueda vacía (ej. Taberna solo filtros): no mostrar */
+.player-shop-search-wrap .player-shop-search-row:empty {
+    display: none !important;
+}
+.player-shop-search-input {
+    width: 100%;
+    max-width: 100%;
+    padding: 10px 14px;
+    background: #1a1a1a;
+    border: 1px solid #4a3c31;
+    border-radius: 6px;
+    color: #d4c4a8;
+    font-family: inherit;
+    font-size: 1em;
+    box-sizing: border-box;
+}
+.player-shop-search-input::placeholder {
+    color: #8b7355;
+}
+.player-shop-search-input:focus {
+    outline: none;
+    border-color: #8b7355;
+}
+.player-shop-search-row .player-shop-search-input {
+    margin-bottom: 0;
+}
+
+.player-shop-filters {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+    align-items: center;
+}
+.player-shop-filters .btn {
+    min-height: 40px;
+    padding: 10px 14px;
+    font-size: 0.9em;
+    flex-shrink: 0;
+}
+.player-shop-filters.player-shop-filters-center {
+    justify-content: center;
+}
+
+/* Carrito oculto por defecto; botón "Ir al carrito" con badge */
+.player-shop-cart-toggle-row {
+    flex-basis: 100%;
+    width: 100%;
+    margin-bottom: 12px;
+}
+.player-shop-cart-toggle-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+.player-shop-cart-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    background: #c9a227;
+    color: #1a1a1a;
+    border-radius: 10px;
+    font-size: 0.8em;
+    font-weight: bold;
+}
+.player-shop-cart-badge.hidden,
+.player-shop-cart-badge[data-count="0"] {
+    display: none !important;
+}
+/* Carrito oculto hasta que se pulse "Ir al carrito"; al ver carrito solo se ve el carrito (el botón sigue en su sitio) */
+.player-shop-layout .player-shop-cart-wrap {
+    display: none;
+}
+.player-shop-layout.player-shop-cart-visible .player-shop-catalog-wrap {
+    display: none !important;
+}
+.player-shop-layout.player-shop-cart-visible .player-shop-cart-wrap {
+    display: block !important;
+    flex: 1 1 100%;
+    max-width: 100%;
+}
+/* Mismo botón: "Ir al carrito" o "Seguir comprando" según la vista */
+.player-shop-cart-toggle-label-back {
+    display: none;
+}
+.player-shop-layout.player-shop-cart-visible .player-shop-cart-toggle-label-default {
+    display: none;
+}
+.player-shop-layout.player-shop-cart-visible .player-shop-cart-toggle-label-back {
+    display: inline;
+}
+/* Posada: vista solo carrito; el botón "Ir al carrito" sigue visible y pasa a "Seguir comprando" */
+#player-posada-body.view-cart .player-posada-oro,
+#player-posada-body.view-cart .player-shop-search-wrap,
+#player-posada-body.view-cart .player-posada-cuartos {
+    display: none !important;
+}
+#player-posada-body.view-cart #player-posada-cart {
+    display: block !important;
+}
+#player-posada-body .player-shop-cart-toggle-label-back {
+    display: none;
+}
+#player-posada-body.view-cart .player-shop-cart-toggle-label-default {
+    display: none;
+}
+#player-posada-body.view-cart .player-shop-cart-toggle-label-back {
+    display: inline;
+}
+
+/* Taberna: ocultar búsqueda y tabs hasta que el jugador haya elegido una entrada (Normal/VIP). */
+#player-tavern-body.tavern-showing-entrada .player-tavern-search-wrap {
+    display: none !important;
+}
+/* Taberna: una sola búsqueda arriba (junto a los tabs). Ocultar las búsquedas dentro de Bebidas y Cocina. */
+#tavern-bebidas .player-shop-search-wrap,
+#tavern-cocina .player-shop-search-wrap {
+    display: none !important;
+}
+
 /* Santuario (todos iguales; no se suben items) */
 .player-santuario-dice { transition: transform 0.1s; }
 .player-santuario-dice.rolling { animation: playerSantuarioDiceRoll 0.15s infinite linear; }
@@ -2018,7 +2424,56 @@ body.app-bg-noise-warm {
 @media (max-width: 768px) {
     body { padding: 10px; }
 
-    .header { padding: 20px 10px; }
+    /* En móvil: header = barra fija arriba siempre; placa debajo en el contenido */
+    .header {
+        padding: 0;
+        margin-bottom: 24px;
+        position: relative;
+        background: none;
+        border-bottom: none;
+        padding-top: 56px;
+    }
+    .header-inner {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+    }
+    /* Barra del header: fija siempre en el tope (fixed), ancho completo */
+    .header-actions {
+        order: -1;
+        flex-shrink: 0;
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        min-height: 48px;
+        padding: 12px 16px;
+        background: linear-gradient(180deg, #1e1b18 0%, #1a1815 100%);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        z-index: 100;
+    }
+    /* Placa del jugador/DM: bloque separado en el contenido, debajo del header */
+    .header-inner .player-plaque,
+    .header-inner .dm-plaque {
+        order: 0;
+        margin-top: 20px;
+        margin-bottom: 16px;
+        padding: 20px 14px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    }
+    .header-inner .player-plaque .player-plaque-money-row {
+        margin-top: 8px;
+    }
+    .header-inner .player-plaque .metal-plaque-content,
+    .header-inner .dm-plaque .metal-plaque-content {
+        gap: 10px;
+    }
     .header h1 { font-size: 1.6em; }
     .header p { font-size: 0.95em; }
     .header::before, .header::after { display: none; }
@@ -2056,29 +2511,45 @@ body.app-bg-noise-warm {
     .nav-wrapper .nav-tab {
         width: 100%;
         justify-content: center;
+        align-items: center;
         padding: 14px 16px;
         font-size: 0.9em;
         min-height: 48px;
+        background: linear-gradient(180deg, #2a2522 0%, #1e1b18 100%) !important;
+        border: 1px solid #8b5a2b !important;
+        color: #d4af37 !important;
+        border-radius: 6px;
+        font-family: 'Cinzel', serif;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    .nav-wrapper .nav-tab:hover {
+        background: linear-gradient(180deg, #352f2a 0%, #2a2522 100%) !important;
+        border-color: #a06830 !important;
+        color: #e8d4a8 !important;
+    }
+    .nav-wrapper .nav-tab.active {
+        background: linear-gradient(180deg, #6b4423 0%, #8b5a2b 100%) !important;
+        border-color: #8b5a2b !important;
+        color: #f5e6c8 !important;
+        box-shadow: 0 0 10px rgba(139, 90, 43, 0.35);
+    }
+    .nav-wrapper .nav-tab-logout {
+        border-color: #6a4040 !important;
+        color: #d4a0a0 !important;
+        margin-top: 8px;
+    }
+    .nav-wrapper .nav-tab-logout:hover {
+        background: linear-gradient(180deg, #3a2525 0%, #2a1a1a 100%) !important;
+        border-color: #8b5050 !important;
+        color: #e8b0b0 !important;
     }
 
-    /* Hamburguesa siempre arriba a la derecha en celulares */
-    .header {
-        position: relative;
-    }
-    .header-actions {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        z-index: 15;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-    .header-title-wrap,
-    .player-plaque,
-    .dm-plaque {
-        padding-right: 56px;
+    /* En móvil la nav y la hamburguesa no se ocultan al entrar en ciudad (solo se ocultan en PC) */
+
+    .header-title-wrap {
         min-width: 0;
+        flex: 1 1 auto;
     }
     #player-view-container .header-inner .player-plaque,
     #main-container .header-inner .dm-plaque {
@@ -2144,6 +2615,26 @@ body.app-bg-noise-warm {
         flex: 1 1 auto;
         text-align: center;
     }
+
+    /* Directorio en móvil: botón "Menú" para mostrar/ocultar tabs */
+    .player-directorio-top-bar {
+        justify-content: center;
+        flex-direction: column;
+        gap: 12px;
+    }
+    .player-directorio-tabs-toggle {
+        display: flex;
+    }
+    .player-directorio-top-bar.directorio-tabs-collapsed .player-directorio-tabs {
+        display: none !important;
+    }
+    .player-directorio-top-bar .player-directorio-tabs {
+        justify-content: center !important;
+        flex: 0 1 auto;
+    }
+    .player-view-container.player-in-city-view .player-directorio-tabs {
+        justify-content: center !important;
+    }
     
     .section-header { 
         flex-direction: column; 
@@ -2202,6 +2693,153 @@ body.app-bg-noise-warm {
     .modal { 
         margin: 10px; 
         max-height: 95vh; 
+    }
+    /* Modales de tienda: overlay sin padding para pantalla completa */
+    #player-artesanias-modal.modal-overlay.active,
+    #player-emporio-modal.modal-overlay.active,
+    #player-forge-modal.modal-overlay.active,
+    #player-biblioteca-modal.modal-overlay.active,
+    #player-tavern-modal.modal-overlay.active,
+    #player-potion-shop-modal.modal-overlay.active,
+    #player-posada-modal.modal-overlay.active,
+    #player-batalla-modal.modal-overlay.active,
+    #player-shop-catalog-modal.modal-overlay.active {
+        padding: 0;
+        align-items: stretch;
+    }
+    /* Modales de tienda: pantalla completa en móvil */
+    #player-artesanias-modal .modal,
+    #player-emporio-modal .modal,
+    #player-forge-modal .modal,
+    #player-biblioteca-modal .modal,
+    #player-tavern-modal .modal,
+    #player-potion-shop-modal .modal,
+    #player-posada-modal .modal,
+    #player-batalla-modal .modal,
+    #player-shop-catalog-modal .modal {
+        width: 100%;
+        max-width: 100%;
+        height: 100%;
+        max-height: 100%;
+        margin: 0;
+        border-radius: 0;
+        border-left: none;
+        border-right: none;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    #player-artesanias-modal .modal-body,
+    #player-emporio-modal .modal-body,
+    #player-forge-modal .modal-body,
+    #player-biblioteca-modal .modal-body,
+    #player-tavern-modal .modal-body,
+    #player-potion-shop-modal .modal-body,
+    #player-posada-modal .modal-body,
+    #player-batalla-modal .modal-body,
+    #player-shop-catalog-modal .modal-body {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    /* Layout tiendas en móvil: una columna, carrito arriba */
+    .player-shop-layout {
+        flex-direction: column !important;
+        gap: 16px !important;
+    }
+    .player-shop-catalog-wrap,
+    .player-shop-cart-wrap {
+        min-width: 0 !important;
+        flex: 1 1 auto !important;
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+    .player-shop-cart-wrap {
+        max-height: 40vh !important;
+        min-height: 120px;
+    }
+    .player-shop-catalog-wrap {
+        order: 0;
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+    }
+    /* Grids de ítems en una columna */
+    .player-artesanias-grid,
+    .player-emporio-grid,
+    .player-forge-grid,
+    .player-biblio-grid,
+    .player-biblioteca-section.player-biblio-grid,
+    .player-tavern-products-grid,
+    .player-potion-products-grid {
+        grid-template-columns: 1fr !important;
+        max-height: none;
+    }
+    /* Forja: niveles del grupo en 2x2 */
+    .player-forge-levels {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
+    .player-forge-levels > span {
+        grid-column: 1 / -1;
+    }
+    .player-forge-level {
+        min-height: 44px;
+    }
+    /* Pestañas/filtros de tiendas: wrap y área táctil (igual en todas, incluida Biblioteca) */
+    .player-shop-filters {
+        gap: 8px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        flex-wrap: wrap;
+        justify-content: flex-start;
+    }
+    .player-shop-filters.player-shop-filters-center {
+        justify-content: flex-start;
+    }
+    .player-shop-filters .btn {
+        min-height: 44px;
+        padding: 10px 14px;
+        flex-shrink: 0;
+    }
+    /* Taberna: entrada en columna */
+    .player-tavern-entry-options {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .player-tavern-entry-card {
+        min-width: 0 !important;
+        max-width: none !important;
+        width: 100%;
+    }
+    /* Recibo en móvil */
+    .player-shop-receipt,
+    .player-biblio-receipt {
+        max-width: 100% !important;
+        padding: 16px !important;
+    }
+    /* Botones de tienda táctiles */
+    .player-artesanias-footer .btn,
+    .player-emporio-add-btn,
+    .player-forge-footer .btn,
+    .player-biblio-add-btn {
+        min-height: 44px;
+        padding: 10px 16px;
+    }
+    /* Búsqueda en móvil: el botón y el wrap deben verse siempre */
+    .player-shop-search-wrap {
+        display: block !important;
+        visibility: visible !important;
+    }
+    .player-shop-search-toggle {
+        display: flex !important;
+        min-height: 44px;
+        visibility: visible !important;
+    }
+    .player-shop-search-input {
+        max-width: 100%;
     }
     .modal-header h3 { font-size: 1.2em; }
     .modal-body { padding: 15px; }

@@ -124,8 +124,11 @@ function populateTransactionsFilters() {
     }
 }
 
+var _transactionsUnsubscribe = null;
+
 function loadTransactions() {
-    db.collection('transactions').orderBy('fecha', 'desc').limit(200).onSnapshot(snap => {
+    if (_transactionsUnsubscribe) return; // ya suscrito
+    _transactionsUnsubscribe = db.collection('transactions').orderBy('fecha', 'desc').limit(200).onSnapshot(snap => {
         const list = document.getElementById('transactions-list');
         if (snap.empty) {
             transactionsData = [];
@@ -151,5 +154,43 @@ function loadTransactions() {
     });
 }
 
-// Initialize
-loadTransactions();
+function stopTransactionsListener() {
+    if (_transactionsUnsubscribe) {
+        _transactionsUnsubscribe();
+        _transactionsUnsubscribe = null;
+    }
+}
+
+/** Borra todas las transacciones de la colección Firestore (por lotes de 500). */
+async function deleteAllTransactions() {
+    if (!confirm('¿Borrar TODAS las transacciones de la base de datos? Esta acción no se puede deshacer.')) return;
+    const btn = document.getElementById('transactions-delete-all');
+    if (btn) { btn.disabled = true; btn.textContent = 'Borrando…'; }
+    try {
+        const snap = await db.collection('transactions').get();
+        if (snap.empty) {
+            if (btn) { btn.disabled = false; btn.textContent = '🗑️ Borrar todas'; }
+            return;
+        }
+        const refs = [];
+        snap.forEach(doc => refs.push(doc.ref));
+        const BATCH_SIZE = 500;
+        for (let i = 0; i < refs.length; i += BATCH_SIZE) {
+            const batch = db.batch();
+            refs.slice(i, i + BATCH_SIZE).forEach(ref => batch.delete(ref));
+            await batch.commit();
+        }
+        transactionsData = [];
+        renderTransactionsPage();
+        if (typeof showToast === 'function') showToast('Transacciones borradas.');
+    } catch (e) {
+        console.error(e);
+        if (typeof showToast === 'function') showToast('Error al borrar: ' + (e.message || e), true);
+    }
+    if (btn) { btn.disabled = false; btn.textContent = '🗑️ Borrar todas'; }
+}
+
+// No cargar al inicio; se cargará al abrir la pestaña Historial (desde app.js).
+
+const deleteAllBtn = document.getElementById('transactions-delete-all');
+if (deleteAllBtn) deleteAllBtn.addEventListener('click', deleteAllTransactions);

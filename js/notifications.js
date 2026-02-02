@@ -56,7 +56,7 @@ function loadNotificationRecipients() {
             select.appendChild(option);
         });
     } else {
-        db.collection('players').get().then(snap => {
+        db.collection('players').limit(200).get().then(snap => {
             snap.forEach(doc => {
                 const player = doc.data();
                 const option = document.createElement('option');
@@ -332,186 +332,97 @@ function loadPlayerNotifications() {
     
     console.log('loadPlayerNotifications: Cargando notificaciones para playerId:', user.id);
     
-    // Cargar notificaciones no leídas
-    // Intentar con orderBy primero, si falla, cargar sin orderBy y ordenar en cliente
-    db.collection('notifications')
-        .where('playerId', '==', user.id)
-        .where('leida', '==', false)
-        .orderBy('fecha', 'desc')
-        .onSnapshot(snap => {
-            console.log('loadPlayerNotifications: Notificaciones no leídas recibidas:', snap.size);
-            let unreadHtml = '';
-            if (snap.empty) {
-                unreadHtml = '<p style="color:#8b7355; text-align:center; padding:30px; font-style:italic;">📭 No tienes cartas nuevas</p>';
-            } else {
-                unreadHtml = '<h3 style="font-family: \'Cinzel\', serif; color: #d4af37; font-size: 1.3em; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 2px; border-bottom: 2px solid #4a3c31; padding-bottom: 10px;">📬 Nuevas Cartas</h3>';
-                
-                snap.forEach(doc => {
-                    const notif = doc.data();
-                    const fecha = notif.fecha?.toDate?.() || new Date();
-                    const fechaStr = fecha.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
-                    const horaStr = fecha.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-                    const mensajeText = (notif.mensaje || 'Sin mensaje').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                    const preview = mensajeText.substring(0, 100) + (mensajeText.length > 100 ? '...' : '');
-                    
-                    unreadHtml += `
-                        <div class="mini-card" style="margin-bottom: 16px; cursor: pointer; border: 2px solid #8b5a2b; position: relative; transition: all 0.2s ease;" onmouseover="this.style.borderColor='#d4af37'; this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='#8b5a2b'; this.style.transform='translateY(0)'" onclick="openNotificationModal('${doc.id}')">
-                            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
-                                <div style="flex: 1; min-width: 0;">
-                                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-                                        <div class="mini-card-title" style="font-size: 1.15em; font-weight: 600;">📮 Carta del DM</div>
-                                        <div style="background: #8b5a2b; color: #fff; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 0.75em; font-weight: bold; flex-shrink: 0;">!</div>
-                                    </div>
-                                    <div style="color: #8b7355; font-size: 0.85em; margin-bottom: 10px;">${fechaStr} a las ${horaStr}</div>
-                                    <div style="color: #d4c4a8; line-height: 1.6; max-height: 48px; overflow: hidden;">${preview}</div>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                });
-            }
-            unreadContainer.innerHTML = unreadHtml;
-        }, error => {
-            console.error('Error cargando notificaciones no leídas:', error);
-            // Si falla por falta de índice, intentar sin orderBy
-            if (error.code === 'failed-precondition') {
-                console.log('Intentando cargar sin orderBy...');
-                db.collection('notifications')
-                    .where('playerId', '==', user.id)
-                    .where('leida', '==', false)
-                    .get()
-                    .then(snap => {
-                        const sorted = snap.docs.sort((a, b) => {
-                            const fechaA = a.data().fecha?.toDate?.() || new Date(0);
-                            const fechaB = b.data().fecha?.toDate?.() || new Date(0);
-                            return fechaB - fechaA;
-                        });
-                        let unreadHtml = '';
-                        if (sorted.length === 0) {
-                            unreadHtml = '<p style="color:#8b7355; text-align:center; padding:30px; font-style:italic;">📭 No tienes cartas nuevas</p>';
-                        } else {
-                            unreadHtml = '<h3 style="font-family: \'Cinzel\', serif; color: #d4af37; font-size: 1.3em; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 2px; border-bottom: 2px solid #4a3c31; padding-bottom: 10px;">📬 Nuevas Cartas</h3>';
-                            sorted.forEach(doc => {
-                                const notif = doc.data();
-                                const fecha = notif.fecha?.toDate?.() || new Date();
-                                const fechaStr = fecha.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
-                                const horaStr = fecha.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-                                const mensajeText = (notif.mensaje || 'Sin mensaje').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                                const preview = mensajeText.substring(0, 100) + (mensajeText.length > 100 ? '...' : '');
-                                
-                                unreadHtml += `
-                                    <div class="mini-card" style="margin-bottom: 16px; cursor: pointer; border: 2px solid #8b5a2b; position: relative; transition: all 0.2s ease;" onmouseover="this.style.borderColor='#d4af37'; this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='#8b5a2b'; this.style.transform='translateY(0)'" onclick="openNotificationModal('${doc.id}')">
-                                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
-                                            <div style="flex: 1; min-width: 0;">
-                                                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-                                                    <div class="mini-card-title" style="font-size: 1.15em; font-weight: 600;">📮 Carta del DM</div>
-                                                    <div style="background: #8b5a2b; color: #fff; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 0.75em; font-weight: bold; flex-shrink: 0;">!</div>
-                                                </div>
-                                                <div style="color: #8b7355; font-size: 0.85em; margin-bottom: 10px;">${fechaStr} a las ${horaStr}</div>
-                                                <div style="color: #d4c4a8; line-height: 1.6; max-height: 48px; overflow: hidden;">${preview}</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                `;
-                            });
-                        }
-                        unreadContainer.innerHTML = unreadHtml;
-                    })
-                    .catch(err => {
-                        console.error('Error cargando notificaciones sin orderBy:', err);
-                        unreadContainer.innerHTML = '<p style="color:#d4af37; text-align:center; padding:20px;">Error al cargar notificaciones. Por favor recarga la página.</p>';
-                    });
-            } else {
-                unreadContainer.innerHTML = '<p style="color:#d4af37; text-align:center; padding:20px;">Error al cargar notificaciones: ' + error.message + '</p>';
-            }
+    // Cargar notificaciones no leídas (sin orderBy para no requerir índice compuesto; ordenamos en cliente)
+    function renderUnread(docs) {
+        const sorted = docs.sort((a, b) => {
+            const fechaA = a.data().fecha?.toDate?.() || new Date(0);
+            const fechaB = b.data().fecha?.toDate?.() || new Date(0);
+            return fechaB - fechaA;
         });
-    
-    // Cargar notificaciones leídas (historial)
-    db.collection('notifications')
-        .where('playerId', '==', user.id)
-        .where('leida', '==', true)
-        .orderBy('fecha', 'desc')
-        .limit(50)
-        .onSnapshot(snap => {
-            console.log('loadPlayerNotifications: Notificaciones leídas recibidas:', snap.size);
-            if (snap.empty) {
-                readContainer.innerHTML = '<p style="color:#8b7355; text-align:center; padding:20px;">No hay cartas leídas</p>';
-                return;
-            }
-            
-            let readHtml = '';
-            snap.forEach(doc => {
+        let unreadHtml = '';
+        if (sorted.length === 0) {
+            unreadHtml = '<p style="color:#8b7355; text-align:center; padding:30px; font-style:italic;">📭 No tienes cartas nuevas</p>';
+        } else {
+            unreadHtml = '<h3 style="font-family: \'Cinzel\', serif; color: #d4af37; font-size: 1.3em; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 2px; border-bottom: 2px solid #4a3c31; padding-bottom: 10px;">📬 Nuevas Cartas</h3>';
+            sorted.forEach(doc => {
                 const notif = doc.data();
                 const fecha = notif.fecha?.toDate?.() || new Date();
                 const fechaStr = fecha.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
                 const horaStr = fecha.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
                 const mensajeText = (notif.mensaje || 'Sin mensaje').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                const preview = mensajeText.substring(0, 80) + (mensajeText.length > 80 ? '...' : '');
-                
-                                readHtml += `
-                                    <div class="mini-card" style="margin-bottom: 12px; opacity: 0.75; transition: all 0.2s ease; position: relative;" onmouseover="this.style.opacity='1'; this.style.borderColor='#8b5a2b'" onmouseout="this.style.opacity='0.75'; this.style.borderColor='#4a3c31'">
-                                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
-                                            <div style="flex: 1; min-width: 0; cursor: pointer;" onclick="openNotificationModal('${doc.id}')">
-                                                <div class="mini-card-title" style="font-size: 1em; margin-bottom: 6px; color: #a89878;">📮 Carta del DM</div>
-                                                <div style="color: #6b5a4a; font-size: 0.8em; margin-bottom: 8px;">${fechaStr} a las ${horaStr}</div>
-                                                <div style="color: #8b7355; line-height: 1.4;">${preview}</div>
-                                            </div>
-                                            <button onclick="deleteNotification('${doc.id}'); event.stopPropagation();" style="background: rgba(139, 90, 43, 0.3); border: 1px solid #8b5a2b; color: #d4af37; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 0.85em; transition: all 0.2s ease; flex-shrink: 0;" onmouseover="this.style.background='rgba(139, 90, 43, 0.5)'; this.style.borderColor='#d4af37'" onmouseout="this.style.background='rgba(139, 90, 43, 0.3)'; this.style.borderColor='#8b5a2b'" title="Eliminar carta">🗑️</button>
-                                        </div>
-                                    </div>
-                                `;
+                const preview = mensajeText.substring(0, 100) + (mensajeText.length > 100 ? '...' : '');
+                unreadHtml += `
+                    <div class="mini-card" style="margin-bottom: 16px; cursor: pointer; border: 2px solid #8b5a2b; position: relative; transition: all 0.2s ease;" onmouseover="this.style.borderColor='#d4af37'; this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='#8b5a2b'; this.style.transform='translateY(0)'" onclick="openNotificationModal('${doc.id}')">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                                    <div class="mini-card-title" style="font-size: 1.15em; font-weight: 600;">📮 Carta del DM</div>
+                                    <div style="background: #8b5a2b; color: #fff; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 0.75em; font-weight: bold; flex-shrink: 0;">!</div>
+                                </div>
+                                <div style="color: #8b7355; font-size: 0.85em; margin-bottom: 10px;">${fechaStr} a las ${horaStr}</div>
+                                <div style="color: #d4c4a8; line-height: 1.6; max-height: 48px; overflow: hidden;">${preview}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
             });
-            readContainer.innerHTML = readHtml;
+        }
+        unreadContainer.innerHTML = unreadHtml;
+    }
+    db.collection('notifications')
+        .where('playerId', '==', user.id)
+        .where('leida', '==', false)
+        .onSnapshot(snap => {
+            console.log('loadPlayerNotifications: Notificaciones no leídas recibidas:', snap.size);
+            renderUnread(snap.docs);
+        }, error => {
+            console.error('Error cargando notificaciones no leídas:', error);
+            unreadContainer.innerHTML = '<p style="color:#d4af37; text-align:center; padding:20px;">Error al cargar notificaciones. Por favor recarga la página.</p>';
+        });
+    
+    // Cargar notificaciones leídas (sin orderBy para no requerir índice compuesto; ordenamos en cliente)
+    function renderReadNotifications(docs) {
+        const sorted = docs.slice().sort((a, b) => {
+            const fechaA = a.data().fecha?.toDate?.() || new Date(0);
+            const fechaB = b.data().fecha?.toDate?.() || new Date(0);
+            return fechaB - fechaA;
+        }).slice(0, 50);
+        if (sorted.length === 0) {
+            readContainer.innerHTML = '<p style="color:#8b7355; text-align:center; padding:20px;">No hay cartas leídas</p>';
+            return;
+        }
+        let readHtml = '';
+        sorted.forEach(doc => {
+            const notif = doc.data();
+            const fecha = notif.fecha?.toDate?.() || new Date();
+            const fechaStr = fecha.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+            const horaStr = fecha.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+            const mensajeText = (notif.mensaje || 'Sin mensaje').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const preview = mensajeText.substring(0, 80) + (mensajeText.length > 80 ? '...' : '');
+            readHtml += `
+                <div class="mini-card" style="margin-bottom: 12px; opacity: 0.75; transition: all 0.2s ease; position: relative;" onmouseover="this.style.opacity='1'; this.style.borderColor='#8b5a2b'" onmouseout="this.style.opacity='0.75'; this.style.borderColor='#4a3c31'">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
+                        <div style="flex: 1; min-width: 0; cursor: pointer;" onclick="openNotificationModal('${doc.id}')">
+                            <div class="mini-card-title" style="font-size: 1em; margin-bottom: 6px; color: #a89878;">📮 Carta del DM</div>
+                            <div style="color: #6b5a4a; font-size: 0.8em; margin-bottom: 8px;">${fechaStr} a las ${horaStr}</div>
+                            <div style="color: #8b7355; line-height: 1.4;">${preview}</div>
+                        </div>
+                        <button onclick="deleteNotification('${doc.id}'); event.stopPropagation();" style="background: rgba(139, 90, 43, 0.3); border: 1px solid #8b5a2b; color: #d4af37; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 0.85em; transition: all 0.2s ease; flex-shrink: 0;" onmouseover="this.style.background='rgba(139, 90, 43, 0.5)'; this.style.borderColor='#d4af37'" onmouseout="this.style.background='rgba(139, 90, 43, 0.3)'; this.style.borderColor='#8b5a2b'" title="Eliminar carta">🗑️</button>
+                    </div>
+                </div>
+            `;
+        });
+        readContainer.innerHTML = readHtml;
+    }
+    db.collection('notifications')
+        .where('playerId', '==', user.id)
+        .where('leida', '==', true)
+        .onSnapshot(snap => {
+            console.log('loadPlayerNotifications: Notificaciones leídas recibidas:', snap.size);
+            renderReadNotifications(snap.docs);
         }, error => {
             console.error('Error cargando notificaciones leídas:', error);
-            // Si falla por falta de índice, intentar sin orderBy
-            if (error.code === 'failed-precondition') {
-                db.collection('notifications')
-                    .where('playerId', '==', user.id)
-                    .where('leida', '==', true)
-                    .get()
-                    .then(snap => {
-                        const sorted = snap.docs.sort((a, b) => {
-                            const fechaA = a.data().fecha?.toDate?.() || new Date(0);
-                            const fechaB = b.data().fecha?.toDate?.() || new Date(0);
-                            return fechaB - fechaA;
-                        }).slice(0, 50);
-                        
-                        let readHtml = '';
-                        if (sorted.length === 0) {
-                            readHtml = '<p style="color:#8b7355; text-align:center; padding:20px;">No hay cartas leídas</p>';
-                        } else {
-                            sorted.forEach(doc => {
-                                const notif = doc.data();
-                                const fecha = notif.fecha?.toDate?.() || new Date();
-                                const fechaStr = fecha.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
-                                const horaStr = fecha.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-                                const mensajeText = (notif.mensaje || 'Sin mensaje').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                                const preview = mensajeText.substring(0, 80) + (mensajeText.length > 80 ? '...' : '');
-                                
-                                readHtml += `
-                                    <div class="mini-card" style="margin-bottom: 12px; opacity: 0.75; transition: all 0.2s ease; position: relative;" onmouseover="this.style.opacity='1'; this.style.borderColor='#8b5a2b'" onmouseout="this.style.opacity='0.75'; this.style.borderColor='#4a3c31'">
-                                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
-                                            <div style="flex: 1; min-width: 0; cursor: pointer;" onclick="openNotificationModal('${doc.id}')">
-                                                <div class="mini-card-title" style="font-size: 1em; margin-bottom: 6px; color: #a89878;">📮 Carta del DM</div>
-                                                <div style="color: #6b5a4a; font-size: 0.8em; margin-bottom: 8px;">${fechaStr} a las ${horaStr}</div>
-                                                <div style="color: #8b7355; line-height: 1.4;">${preview}</div>
-                                            </div>
-                                            <button onclick="deleteNotification('${doc.id}'); event.stopPropagation();" style="background: rgba(139, 90, 43, 0.3); border: 1px solid #8b5a2b; color: #d4af37; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 0.85em; transition: all 0.2s ease; flex-shrink: 0;" onmouseover="this.style.background='rgba(139, 90, 43, 0.5)'; this.style.borderColor='#d4af37'" onmouseout="this.style.background='rgba(139, 90, 43, 0.3)'; this.style.borderColor='#8b5a2b'" title="Eliminar carta">🗑️</button>
-                                        </div>
-                                    </div>
-                                `;
-                            });
-                        }
-                        readContainer.innerHTML = readHtml;
-                    })
-                    .catch(err => {
-                        console.error('Error cargando notificaciones leídas sin orderBy:', err);
-                        readContainer.innerHTML = '<p style="color:#d4af37; text-align:center; padding:20px;">Error al cargar historial.</p>';
-                    });
-            } else {
-                readContainer.innerHTML = '<p style="color:#d4af37; text-align:center; padding:20px;">Error al cargar historial: ' + error.message + '</p>';
-            }
+            readContainer.innerHTML = '<p style="color:#d4af37; text-align:center; padding:20px;">Error al cargar historial. Por favor recarga la página.</p>';
         });
 }
 

@@ -106,7 +106,7 @@ function renderPlayer(data) {
 
     const list = document.getElementById('player-inventory-list');
     const items = data.inventario || [];
-    const rarityColors = { común: '#2ecc71', infrecuente: '#3498db', rara: '#9b59b6', legendaria: '#e74c3c' };
+    const rarityColors = { común: '#2ecc71', inusual: '#3498db', infrecuente: '#3498db', rara: '#9b59b6', legendaria: '#e74c3c' };
     if (items.length === 0) {
         list.innerHTML = '<p style="color:#8b7355; text-align:center; padding:20px;">Sin items</p>';
         return;

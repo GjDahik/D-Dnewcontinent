@@ -59,8 +59,8 @@ function loadWorld() {
     
     console.log('Iniciando snapshots de Firestore...');
     
-    // Cargar ciudades - usar el mismo patrón que funciona en loadPlayerWorld
-    db.collection('cities').onSnapshot(snap => {
+    // Cargar ciudades - limit() para evitar traer demasiados docs
+    db.collection('cities').limit(300).onSnapshot(snap => {
         console.log('=== SNAPSHOT DE CITIES RECIBIDO ===');
         console.log('Snapshot completo:', snap);
         console.log('Tamaño:', snap ? snap.size : 'null');
@@ -98,7 +98,7 @@ function loadWorld() {
     });
     
     // Cargar NPCs
-    db.collection('npcs').onSnapshot(snap => {
+    db.collection('npcs').limit(300).onSnapshot(snap => {
         if (snap && snap.docs) {
             npcsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
             window.npcsData = npcsData;
@@ -109,7 +109,7 @@ function loadWorld() {
     });
     
     // Cargar tiendas
-    db.collection('shops').onSnapshot(snap => {
+    db.collection('shops').limit(300).onSnapshot(snap => {
         if (snap && snap.docs) {
             shopsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
             window.shopsData = shopsData;
@@ -361,7 +361,7 @@ window.debugCities = function() {
     // Intentar cargar manualmente
     if (typeof loadWorld === 'function' && typeof db !== 'undefined') {
         console.log('Intentando cargar ciudades desde Firestore...');
-        db.collection('cities').get().then(snap => {
+        db.collection('cities').limit(300).get().then(snap => {
             console.log('Ciudades en Firestore:', snap.size);
             snap.forEach(doc => {
                 console.log('Ciudad:', doc.id, doc.data());
@@ -663,12 +663,14 @@ function openCityModal() {
         }
         
         const cityImagenUrlEl = document.getElementById('city-imagen-url');
+        const cityLoreEl = document.getElementById('city-lore');
         
         cityIdEl.value = '';
         cityNombreEl.value = '';
         cityNivelEl.value = '3';
         cityDescripcionEl.value = '';
         if (cityImagenUrlEl) cityImagenUrlEl.value = '';
+        if (cityLoreEl) cityLoreEl.value = '';
         cityVisibleEl.checked = true;
         cityModalTitleEl.textContent = '🏘️ Nueva Ciudad';
         
@@ -725,6 +727,8 @@ function editCity(id) {
     cityNivelEl.value = c.nivel;
     cityDescripcionEl.value = c.descripcion || '';
     if (cityImagenUrlEl) cityImagenUrlEl.value = c.imagenUrl || '';
+    const cityLoreEl = document.getElementById('city-lore');
+    if (cityLoreEl) cityLoreEl.value = c.lore || '';
     cityVisibleEl.checked = c.visibleToPlayers !== false;
     cityModalTitleEl.textContent = '✏️ Editar Ciudad';
     
@@ -746,6 +750,7 @@ function saveCity() {
         const nivelEl = document.getElementById('city-nivel');
         const descripcionEl = document.getElementById('city-descripcion');
         const imagenUrlEl = document.getElementById('city-imagen-url');
+        const loreEl = document.getElementById('city-lore');
         const visibleEl = document.getElementById('city-visible-jugadores');
         
         if (!nombreEl || !nivelEl || !descripcionEl || !visibleEl) {
@@ -758,6 +763,7 @@ function saveCity() {
             nivel: parseInt(nivelEl.value) || 3,
             descripcion: descripcionEl.value.trim(),
             imagenUrl: imagenUrlEl ? imagenUrlEl.value.trim() : '',
+            lore: loreEl ? loreEl.value.trim() : '',
             visibleToPlayers: visibleEl.checked
         };
         
@@ -1028,7 +1034,7 @@ function openBatallaConfigModal(shopId) {
     // Cargar oponentes ya configurados EN ESTA TIENDA
     const oponentes = (shop.batallaOponentes && Array.isArray(shop.batallaOponentes)) ? shop.batallaOponentes : [];
     batallaConfigOponentes = oponentes.slice();
-    renderBatallaOponentes(batallaConfigOponentes);
+    renderBatallaConfigOponentes(batallaConfigOponentes);
     openModal('batalla-config-modal');
 }
 
@@ -1066,7 +1072,7 @@ function addBatallaOponente() {
         isCustom: !npcId
     });
     
-    renderBatallaOponentes(batallaConfigOponentes);
+    renderBatallaConfigOponentes(batallaConfigOponentes);
     
     // Limpiar campos
     npcSelect.value = '';
@@ -1075,15 +1081,14 @@ function addBatallaOponente() {
 
 function removeBatallaOponente(index) {
     batallaConfigOponentes.splice(index, 1);
-    renderBatallaOponentes(batallaConfigOponentes);
+    renderBatallaConfigOponentes(batallaConfigOponentes);
 }
 
-function renderBatallaOponentes(oponentes) {
+function renderBatallaConfigOponentes(oponentes) {
     const listEl = document.getElementById('batalla-config-oponentes-list');
     if (!listEl) return;
-    
+    oponentes = oponentes || [];
     batallaConfigOponentes = oponentes;
-    
     if (oponentes.length === 0) {
         listEl.innerHTML = '<p style="color:#8b7355; text-align:center; padding:20px;">No hay oponentes configurados. Agrega algunos arriba.</p>';
         return;

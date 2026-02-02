@@ -15,6 +15,7 @@ function automationItemSignature(it) {
 async function automationGetRules(shopId) {
     const snap = await db.collection('automation_rules')
         .where('shopId', '==', shopId)
+        .limit(50)
         .get();
     return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
@@ -123,7 +124,7 @@ async function deleteAutomationRuleThenReload(ruleId) {
 
 /** Obtiene todas las reglas. */
 async function loadAllAutomationRules() {
-    const snap = await db.collection('automation_rules').get();
+    const snap = await db.collection('automation_rules').limit(100).get();
     const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     list.sort((a, b) => {
         const ta = a.createdAt && a.createdAt.toDate ? a.createdAt.toDate() : new Date(0);

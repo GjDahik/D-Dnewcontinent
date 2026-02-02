@@ -102,6 +102,7 @@ function renderInventoryList(shop) {
 
     const rarityColors = {
         'común': '#2ecc71',
+        'inusual': '#3498db',
         'infrecuente': '#3498db',
         'rara': '#9b59b6',
         'legendaria': '#e74c3c'
@@ -458,8 +459,8 @@ const CSV_TEMPLATES = {
         filename: '01_pociones_emporio_batalla.csv',
         content: `name,price,effect,avg,rarity
 Poción de Curación,50,Recupera 2d4+2 HP,7 HP,común
-Poción de Curación Superior,150,Recupera 4d4+4 HP,14 HP,infrecuente
-Espada +1,350,+1 a ataques y daño,,infrecuente
+Poción de Curación Superior,150,Recupera 4d4+4 HP,14 HP,inusual
+Espada +1,350,+1 a ataques y daño,,inusual
 Capa Élfica,2500,Ventaja en tiradas de Sigilo,,rara
 Anillo de Protección,5000,+1 a CA y tiradas de salvación,,legendaria
 `
@@ -524,7 +525,7 @@ Afilado de Cuchillas,10,service,servicios,,+1 daño hasta próximo descanso
         filename: '06_emporio.csv',
         content: `name,price,section,effect,rarity
 Polvo de diamante,50,materiales,Componente material para hechizos,común
-Incienso exótico,120,raros,Objeto importado de lejanas tierras,infrecuente
+Incienso exótico,120,raros,Objeto importado de lejanas tierras,inusual
 Mapa del Bosque Norte,25,mapas,Rutas y puntos de interés,común
 Caja de herramientas de viaje,15,otros,Equipo básico para aventureros,común
 Cristal de enfoque,200,raros,Aumenta poder de hechizos,rara
@@ -547,9 +548,9 @@ Atlas del Territorio Cercano,20,mapas,Ruta segura,2 DL,,Otorga
     jugadores: {
         filename: '07_items_jugadores.csv',
         content: `name,price,effect,rarity,quantity
-Espada Larga +1,350,+1 a ataques y daño,infrecuente,1
-Armadura de Cuero Mágica,200,+1 a CA,infrecuente,1
-Poción de Curación Superior,150,Recupera 4d4+4 HP,infrecuente,1
+Espada Larga +1,350,+1 a ataques y daño,inusual,1
+Armadura de Cuero Mágica,200,+1 a CA,inusual,1
+Poción de Curación Superior,150,Recupera 4d4+4 HP,inusual,1
 Hacha,25,Arma cuerpo a cuerpo,común,40
 Anillo de Protección,5000,+1 a CA y tiradas de salvación,legendaria,1
 Capa Élfica,2500,Ventaja en tiradas de Sigilo,rara,1
@@ -589,6 +590,7 @@ function downloadPlayerItemsTemplate() {
     XLSX.writeFile(wb, '07_items_jugadores.xlsx');
     if (typeof showToast === 'function') showToast('Descargado: 07_items_jugadores.xlsx');
 }
+window.downloadPlayerItemsTemplate = downloadPlayerItemsTemplate;
 
 function toggleTemplateSection() {
     const shopId = document.getElementById('inventory-shop-id').value;
@@ -788,7 +790,7 @@ function processCSVUpload() {
                 return;
             }
 
-            const validRarities = ['común', 'infrecuente', 'rara', 'legendaria'];
+            const validRarities = ['común', 'inusual', 'rara', 'legendaria'];
             const validTypes = ['drink', 'food'];
             const validCategorias = ['servir', 'llevar'];
             const validTiers = [1, 6, 11, 16];
@@ -877,11 +879,13 @@ function processCSVUpload() {
                     var sectionEmp = (sectionIdx >= 0 ? (values[sectionIdx] || 'otros') : 'otros').toLowerCase().trim();
                     if (validSectionsEmp.indexOf(sectionEmp) === -1) sectionEmp = 'otros';
                     var rarityEmp = (rarityIdx >= 0 ? (values[rarityIdx] || 'común') : 'común').toLowerCase().trim();
+                    if (rarityEmp === 'infrecuente') rarityEmp = 'inusual';
                     if (validRarities.indexOf(rarityEmp) === -1) rarityEmp = 'común';
                     item = { name: name, price: price, section: sectionEmp, effect: effect, rarity: rarityEmp };
                 } else {
                     var avg = (avgIdx !== -1 ? (values[avgIdx] || '').trim() : '') || (danoIdx !== -1 ? (values[danoIdx] || '').trim() : '') || (damageIdx >= 0 ? (values[damageIdx] || '').trim() : '');
                     var rarity = (rarityIdx !== -1 ? (values[rarityIdx] || 'común') : 'común').toLowerCase().trim();
+                    if (rarity === 'infrecuente') rarity = 'inusual';
                     if (validRarities.indexOf(rarity) === -1) rarity = 'común';
                     item = { name: name, price: price, effect: effect, avg: avg, rarity: rarity };
                 }

@@ -84,6 +84,11 @@
                 </div>
                 <div id="map-levels-list" class="map-levels-list"></div>
             </div>
+            <div class="player-map-level-nav" id="dm-map-level-nav">
+                <button type="button" class="btn btn-small player-map-level-btn" id="dm-map-level-down" onclick="dmMapLevelDown()" title="Nivel anterior" aria-label="Bajar de nivel">↑</button>
+                <span id="dm-map-level-name" class="player-map-level-name">—</span>
+                <button type="button" class="btn btn-small player-map-level-btn" id="dm-map-level-up" onclick="dmMapLevelUp()" title="Nivel siguiente" aria-label="Subir de nivel">↓</button>
+            </div>
             <div style="text-align:center; background: linear-gradient(180deg, rgba(42, 42, 62, 0.9) 0%, rgba(26, 26, 46, 0.95) 100%); border: 2px solid #c9a227; border-radius: 12px; padding: 20px;">
                 <img id="map-img" src="https://i.imgur.com/ppAIykX.png" alt="Mapa" style="max-width:100%; border-radius:10px;">
             </div>
@@ -263,6 +268,7 @@
                 <select id="transactions-filter-shop" class="searchbar" style="max-width: 200px; padding: 10px 12px; cursor: pointer;">
                     <option value="">Todas</option>
                 </select>
+                <button type="button" class="btn btn-secondary" id="transactions-delete-all" style="margin-left: auto;" title="Elimina todas las transacciones de Firestore">🗑️ Borrar todas</button>
             </div>
             <div id="transactions-list"></div>
             <div id="transactions-pagination" class="pagination-bar" style="margin-top: 16px; display: none;"></div>
@@ -270,7 +276,7 @@
     </div>
 
     <!-- Vista Personaje (mismo login, otro rol) -->
-    <div class="container" id="player-view-container" style="display: none;">
+    <div class="container player-view-container" id="player-view-container" style="display: none;">
         <header class="header">
             <div class="header-inner">
                 <div class="player-plaque metal-plaque">
@@ -358,42 +364,42 @@
                 <p style="color:#8b7355; margin-bottom:20px;">Ciudades que explora tu grupo. Entra en cada una para ver sus tiendas.</p>
                 <div id="player-cities-container" class="cards-grid"></div>
             </div>
-            <!-- Página Directorio (Comercios + NPCs, estilo Mistfall) -->
+            <!-- Página Directorio (tabs: Comercios, Historia, Mis notas, Habitantes) -->
             <div id="player-directorio-wrap" class="player-mistfall-page" style="display:none;">
-                <button type="button" class="btn btn-secondary btn-small" style="margin-bottom:20px;" onclick="playerDirectorioVolver()">← Volver a ciudades</button>
                 <header class="player-mistfall-header">
-                    <div class="player-mistfall-emblem">🏰</div>
                     <h1 class="player-mistfall-h1" id="player-directorio-city-name">—</h1>
                     <p class="player-mistfall-subtitle">Directorio de la Ciudad</p>
                 </header>
+                <div class="player-directorio-top-bar directorio-tabs-collapsed" id="player-directorio-top-bar">
+                    <button type="button" class="player-directorio-tabs-toggle" id="player-directorio-tabs-toggle" onclick="toggleDirectorioTabsMobile()" aria-expanded="false" aria-label="Mostrar u ocultar menú (Comercios, Historia, etc.)">Menú <span class="player-directorio-tabs-toggle-icon" aria-hidden="true">▼</span></button>
+                    <div class="player-directorio-tabs" id="player-directorio-tabs">
+                        <button type="button" class="btn btn-small player-directorio-tab active" data-tab="comercios" onclick="switchDirectorioTab('comercios')">🛒 Comercios y artesanos</button>
+                        <button type="button" class="btn btn-small btn-secondary player-directorio-tab" data-tab="historia" onclick="switchDirectorioTab('historia')">📜 Historia</button>
+                        <button type="button" class="btn btn-small btn-secondary player-directorio-tab" data-tab="notas" onclick="switchDirectorioTab('notas')">📝 Mis notas</button>
+                        <button type="button" class="btn btn-small btn-secondary player-directorio-tab" data-tab="habitantes" onclick="switchDirectorioTab('habitantes')">🎭 Habitantes</button>
+                    </div>
+                </div>
                 <div class="player-mistfall-divider">
                     <div class="player-mistfall-divider-line"></div>
                     <span class="player-mistfall-divider-icon">⚜️</span>
                     <div class="player-mistfall-divider-line"></div>
                 </div>
-                <div id="player-directorio-city-image-container" style="margin-bottom:30px;"></div>
-                <h3 class="player-mistfall-section-title">Comercios y Artesanos</h3>
-                <div id="player-directorio-shops-grid" class="player-mistfall-shops-grid"></div>
-                <div id="player-directorio-notes-block" style="margin-top:32px; padding:20px; background:rgba(26,26,26,0.6); border:1px solid #4a3c31; border-radius:8px;">
-                    <h3 style="font-family:'Cinzel', serif; color:#d4af37; font-size:1.1em; margin-bottom:10px;">📝 Mis notas</h3>
-                    <div id="player-directorio-note-preview" style="color:#a89878; font-size:0.95em; margin-bottom:12px; min-height:1.5em; white-space:pre-wrap; word-break:break-word;"></div>
-                    <button type="button" class="btn btn-small" onclick="openCityNotesModalFromDirectorio()">📝 Editar notas</button>
+                <div id="player-directorio-panel-comercios" class="player-directorio-panel">
+                    <div id="player-directorio-shops-grid" class="player-mistfall-shops-grid"></div>
                 </div>
-            </div>
-            <!-- Directorio de habitantes (solo lista de NPCs) -->
-            <div id="player-directorio-habitantes-wrap" class="player-mistfall-page" style="display:none;">
-                <button type="button" class="btn btn-secondary btn-small" style="margin-bottom:20px;" onclick="playerDirectorioHabitantesVolver()">← Volver al directorio</button>
-                <header class="player-mistfall-header">
-                    <div class="player-mistfall-emblem">🎭</div>
-                    <h1 class="player-mistfall-h1" id="player-directorio-habitantes-city-name">—</h1>
-                    <p class="player-mistfall-subtitle">Directorio de habitantes</p>
-                </header>
-                <div class="player-mistfall-divider">
-                    <div class="player-mistfall-divider-line"></div>
-                    <span class="player-mistfall-divider-icon">⚜️</span>
-                    <div class="player-mistfall-divider-line"></div>
+                <div id="player-directorio-panel-historia" class="player-directorio-panel" style="display:none;">
+                    <div id="player-directorio-historia-image" style="margin-bottom:20px;"></div>
+                    <div id="player-directorio-historia-lore" style="color:#a89878; font-size:1em; line-height:1.6; white-space:pre-wrap; word-break:break-word; padding:16px; background:rgba(26,26,26,0.4); border-radius:8px; border:1px solid #4a3c31;"></div>
                 </div>
-                <div id="player-directorio-habitantes-npcs-grid" class="player-mistfall-npcs-grid"></div>
+                <div id="player-directorio-panel-notas" class="player-directorio-panel" style="display:none;">
+                    <div style="padding:20px; background:rgba(26,26,26,0.6); border:1px solid #4a3c31; border-radius:8px;">
+                        <div id="player-directorio-note-preview" style="color:#a89878; font-size:0.95em; margin-bottom:12px; min-height:1.5em; white-space:pre-wrap; word-break:break-word;"></div>
+                        <button type="button" class="btn btn-small" onclick="openCityNotesModalFromDirectorio()">📝 Editar notas</button>
+                    </div>
+                </div>
+                <div id="player-directorio-panel-habitantes" class="player-directorio-panel" style="display:none;">
+                    <div id="player-directorio-habitantes-npcs-grid" class="player-mistfall-npcs-grid"></div>
+                </div>
             </div>
         </section>
         <section id="player-inventario" class="tab-content">
@@ -807,20 +813,31 @@
             <div class="modal-body" style="display:flex; flex-direction:column; gap:16px;">
                 <div id="player-batalla-body">
                     <p id="player-batalla-oro" class="gold-value" style="margin-bottom:16px; font-size:1em;">Tu oro: <strong>0</strong> GP</p>
-                    <p style="color:#8b7355; margin-bottom:16px; font-style:italic;">Selecciona los oponentes con los que deseas pelear. Cada batalla tiene un costo.</p>
-                    
-                    <div id="player-batalla-npcs-list" style="display:flex; flex-direction:column; gap:12px;"></div>
-                    
-                    <div id="player-batalla-selected" style="margin-top:20px; padding:16px; background:rgba(0,0,0,0.3); border:1px solid #4a3c31; border-radius:8px; display:none;">
-                        <h4 style="font-family:'Cinzel', serif; color:#d4af37; margin-bottom:12px; text-transform:uppercase; letter-spacing:1px;">⚔️ Oponentes Seleccionados</h4>
-                        <div id="player-batalla-selected-list" style="margin-bottom:12px;"></div>
-                        <div style="border-top:1px solid #4a3c31; padding-top:12px;">
-                            <div style="display:flex; justify-content:space-between;">
-                                <strong style="color:#d4af37; font-size:1.1em;">Total:</strong>
-                                <strong id="player-batalla-total" class="gold-value" style="font-size:1.1em;">0 GP</strong>
-                            </div>
+                    <div class="player-shop-layout" style="display:flex; flex-direction:column; gap:16px;">
+                        <div class="player-shop-cart-toggle-row">
+                            <button type="button" class="btn btn-small player-shop-cart-toggle-btn" onclick="toggleShopCart(this)" aria-label="Ver carrito"><span class="player-shop-cart-toggle-label-default">🛒 Ir al carrito <span class="player-shop-cart-badge" id="player-batalla-cart-badge" data-count="0">0</span></span><span class="player-shop-cart-toggle-label-back">Seguir comprando</span></button>
                         </div>
-                        <button class="btn" onclick="processBatallaPayment()" style="width:100%; margin-top:16px;">💳 Pagar y Comenzar Batalla</button>
+                        <div class="player-shop-catalog-wrap" style="flex:1;">
+                            <div class="player-shop-search-wrap">
+                                <button type="button" class="player-shop-search-toggle" aria-expanded="false" onclick="var w=this.closest('.player-shop-search-wrap'); w.classList.toggle('expanded'); this.setAttribute('aria-expanded', w.classList.contains('expanded'));">🔍 Búsqueda y filtros</button>
+                                <div class="player-shop-search-row">
+                                    <input type="text" class="player-shop-search-input" id="player-batalla-search" placeholder="Nombre del oponente...">
+                                </div>
+                            </div>
+                            <p style="color:#8b7355; margin-bottom:16px; font-style:italic;">Selecciona los oponentes con los que deseas pelear. Cada batalla tiene un costo.</p>
+                            <div id="player-batalla-npcs-list" style="display:flex; flex-direction:column; gap:12px;"></div>
+                        </div>
+                        <div id="player-batalla-selected" class="player-shop-cart-wrap" style="padding:16px; background:rgba(0,0,0,0.3); border:1px solid #4a3c31; border-radius:8px;">
+                            <div style="font-size:1.2em; color:#d4af37; margin-bottom:15px;">🛒 Oponentes elegidos</div>
+                            <div id="player-batalla-selected-list" style="margin-bottom:12px;"></div>
+                            <div style="border-top:1px solid #4a3c31; padding-top:12px;">
+                                <div style="display:flex; justify-content:space-between;">
+                                    <strong style="color:#d4af37; font-size:1.1em;">Total:</strong>
+                                    <strong id="player-batalla-total" class="gold-value" style="font-size:1.1em;">0 GP</strong>
+                                </div>
+                            </div>
+                            <button class="btn" onclick="processBatallaPayment()" style="width:100%; margin-top:16px;">💳 Pagar y Comenzar Batalla</button>
+                        </div>
                     </div>
                 </div>
                 <div id="player-batalla-receipt" style="display:none;"></div>
@@ -841,10 +858,18 @@
             <div class="modal-body" style="display:flex; flex-direction:column; gap:16px;">
                 <div id="player-posada-body">
                     <p id="player-posada-oro" class="gold-value" style="margin-bottom:16px; font-size:1em;">Tu oro: <strong>0</strong> GP</p>
-                    
-                    <!-- Carrito de compras -->
-                    <div id="player-posada-cart" style="margin-bottom:20px; padding:16px; background:rgba(0,0,0,0.3); border:1px solid #4a3c31; border-radius:8px; display:none;">
-                        <h4 style="font-family:'Cinzel', serif; color:#d4af37; margin-bottom:12px; text-transform:uppercase; letter-spacing:1px;">🛒 Carrito de Reservas</h4>
+                    <div class="player-shop-search-wrap">
+                        <button type="button" class="player-shop-search-toggle" aria-expanded="false" onclick="var w=this.closest('.player-shop-search-wrap'); w.classList.toggle('expanded'); this.setAttribute('aria-expanded', w.classList.contains('expanded'));">🔍 Búsqueda y filtros</button>
+                        <div class="player-shop-search-row">
+                            <input type="text" class="player-shop-search-input" id="player-posada-search" placeholder="Nombre del cuarto o descripción...">
+                        </div>
+                    </div>
+                    <div class="player-shop-cart-toggle-row" style="margin-bottom:12px;">
+                        <button type="button" class="btn btn-small player-shop-cart-toggle-btn" onclick="toggleShopCart(this)" data-cart-id="player-posada-cart" aria-label="Ver carrito"><span class="player-shop-cart-toggle-label-default">🛒 Ir al carrito <span class="player-shop-cart-badge" id="player-posada-cart-badge" data-count="0">0</span></span><span class="player-shop-cart-toggle-label-back">Seguir comprando</span></button>
+                    </div>
+                    <!-- Tu pedido -->
+                    <div id="player-posada-cart" class="player-posada-cart-panel" style="margin-bottom:20px; padding:16px; background:rgba(0,0,0,0.3); border:1px solid #4a3c31; border-radius:8px; display:none;">
+                        <h4 style="font-family:'Cinzel', serif; color:#d4af37; margin-bottom:12px; text-transform:uppercase; letter-spacing:1px;">🛒 Tu pedido</h4>
                         <div id="player-posada-cart-items" style="margin-bottom:12px;"></div>
                         <div style="border-top:1px solid #4a3c31; padding-top:12px;">
                             <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
@@ -861,8 +886,8 @@
                             </div>
                         </div>
                         <div style="margin-top:16px; display:flex; gap:8px;">
-                            <button class="btn btn-secondary btn-small" onclick="clearPosadaCart()" style="flex:1;">Vaciar Carrito</button>
-                            <button class="btn btn-small" onclick="checkoutPosada()" style="flex:1;">💳 Reservar</button>
+                            <button class="btn btn-secondary btn-small" onclick="clearPosadaCart()" style="flex:1;">Vaciar</button>
+                            <button class="btn btn-small" onclick="checkoutPosada()" style="flex:1;">Confirmar hospedaje</button>
                         </div>
                     </div>
                     
@@ -902,19 +927,28 @@
             <div class="modal-body">
                 <div id="player-artesanias-body">
                 <div class="player-artesanias-oro" style="margin-bottom:15px; padding:10px; background: rgba(26,42,26,0.6); border-radius:8px; color:#aed581; border:1px solid #4a7c4a;">Tu oro: <strong id="player-artesanias-oro-display">0</strong> GP</div>
-                <div class="player-artesanias-tabs" style="display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap;">
-                    <button type="button" class="btn btn-small player-artesanias-tab active" data-tab="flechas">🏹 Flechas</button>
-                    <button type="button" class="btn btn-small btn-secondary player-artesanias-tab" data-tab="ropa">👕 Ropa y Equipo</button>
-                    <button type="button" class="btn btn-small btn-secondary player-artesanias-tab" data-tab="servicios">🔧 Servicios</button>
+                <div class="player-shop-search-wrap">
+                    <button type="button" class="player-shop-search-toggle" aria-expanded="false" onclick="var w=this.closest('.player-shop-search-wrap'); w.classList.toggle('expanded'); this.setAttribute('aria-expanded', w.classList.contains('expanded'));">🔍 Búsqueda y filtros</button>
+                    <div class="player-shop-search-row">
+                        <input type="text" class="player-shop-search-input" id="player-artesanias-search" placeholder="Flechas, ropa, servicios...">
+                    </div>
+                    <div class="player-shop-filters player-artesanias-tabs">
+                        <button type="button" class="btn btn-small player-artesanias-tab active" data-tab="flechas">🏹 Flechas</button>
+                        <button type="button" class="btn btn-small btn-secondary player-artesanias-tab" data-tab="ropa">👕 Ropa y Equipo</button>
+                        <button type="button" class="btn btn-small btn-secondary player-artesanias-tab" data-tab="servicios">🔧 Servicios</button>
+                    </div>
                 </div>
-                <div style="display:flex; gap:25px; flex-wrap:wrap;">
-                    <div style="flex:2; min-width:300px;">
+                <div class="player-shop-layout" style="display:flex; gap:25px; flex-wrap:wrap;">
+                    <div class="player-shop-cart-toggle-row">
+                        <button type="button" class="btn btn-small player-shop-cart-toggle-btn" onclick="toggleShopCart(this)" aria-label="Ver carrito"><span class="player-shop-cart-toggle-label-default">🛒 Ir al carrito <span class="player-shop-cart-badge" id="player-artesanias-cart-badge" data-count="0">0</span></span><span class="player-shop-cart-toggle-label-back">Seguir comprando</span></button>
+                    </div>
+                    <div class="player-shop-catalog-wrap" style="flex:2; min-width:300px;">
                         <div id="player-artesanias-flechas-grid" class="player-artesanias-grid"></div>
                         <div id="player-artesanias-ropa-grid" class="player-artesanias-grid" style="display:none;"></div>
                         <div id="player-artesanias-servicios-grid" class="player-artesanias-grid" style="display:none;"></div>
                     </div>
-                    <div class="player-artesanias-cart-wrap" style="flex:1; min-width:280px; background: linear-gradient(180deg, rgba(61,92,61,0.5), rgba(10,21,10,0.9)); border-radius:12px; padding:20px; border:2px solid #4a7c4a; max-height:70vh; overflow-y:auto;">
-                        <div style="font-size:1.2em; color:#aed581; margin-bottom:15px;">🛒 Tu Pedido</div>
+                    <div class="player-artesanias-cart-wrap player-shop-cart-wrap" style="flex:1; min-width:280px; background: linear-gradient(180deg, rgba(61,92,61,0.5), rgba(10,21,10,0.9)); border-radius:12px; padding:20px; border:2px solid #4a7c4a; max-height:70vh; overflow-y:auto;">
+                        <div style="font-size:1.2em; color:#aed581; margin-bottom:15px;">🛒 Tu pedido</div>
                         <div id="player-artesanias-cart-items"></div>
                         <div id="player-artesanias-cart-total"></div>
                     </div>
@@ -938,20 +972,29 @@
             <div class="modal-body">
                 <div id="player-emporio-body">
                 <div class="player-emporio-oro" style="margin-bottom:15px; padding:10px; background: rgba(40,45,55,0.6); border-radius:8px; color:#9ca8b8; border:1px solid #6a7a8a;">Tu oro: <strong id="player-emporio-oro-display">0</strong> GP</div>
-                <div class="player-emporio-tabs" style="display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap;">
-                    <button type="button" class="btn btn-small player-emporio-tab active" data-section="materiales">🧪 Materiales para hechizos</button>
-                    <button type="button" class="btn btn-small btn-secondary player-emporio-tab" data-section="raros">💎 Objetos raros e importados</button>
-                    <button type="button" class="btn btn-small btn-secondary player-emporio-tab" data-section="mapas">🗺️ Mapas</button>
-                    <button type="button" class="btn btn-small btn-secondary player-emporio-tab" data-section="otros">📦 Otros</button>
+                <div class="player-shop-search-wrap">
+                    <button type="button" class="player-shop-search-toggle" aria-expanded="false" onclick="var w=this.closest('.player-shop-search-wrap'); w.classList.toggle('expanded'); this.setAttribute('aria-expanded', w.classList.contains('expanded'));">🔍 Búsqueda y filtros</button>
+                    <div class="player-shop-search-row">
+                        <input type="text" class="player-shop-search-input" id="player-emporio-search" placeholder="Materiales, mapas, objetos raros...">
+                    </div>
+                    <div class="player-shop-filters player-emporio-tabs">
+                        <button type="button" class="btn btn-small player-emporio-tab active" data-section="materiales">🧪 Materiales para hechizos</button>
+                        <button type="button" class="btn btn-small btn-secondary player-emporio-tab" data-section="raros">💎 Objetos raros e importados</button>
+                        <button type="button" class="btn btn-small btn-secondary player-emporio-tab" data-section="mapas">🗺️ Mapas</button>
+                        <button type="button" class="btn btn-small btn-secondary player-emporio-tab" data-section="otros">📦 Otros</button>
+                    </div>
                 </div>
-                <div style="display:flex; gap:25px; flex-wrap:wrap;">
-                    <div style="flex:2; min-width:300px;">
+                <div class="player-shop-layout" style="display:flex; gap:25px; flex-wrap:wrap;">
+                    <div class="player-shop-cart-toggle-row">
+                        <button type="button" class="btn btn-small player-shop-cart-toggle-btn" onclick="toggleShopCart(this)" aria-label="Ver carrito"><span class="player-shop-cart-toggle-label-default">🛒 Ir al carrito <span class="player-shop-cart-badge" id="player-emporio-cart-badge" data-count="0">0</span></span><span class="player-shop-cart-toggle-label-back">Seguir comprando</span></button>
+                    </div>
+                    <div class="player-shop-catalog-wrap" style="flex:2; min-width:300px;">
                         <div id="player-emporio-grid-materiales" class="player-emporio-grid"></div>
                         <div id="player-emporio-grid-raros" class="player-emporio-grid" style="display:none;"></div>
                         <div id="player-emporio-grid-mapas" class="player-emporio-grid" style="display:none;"></div>
                         <div id="player-emporio-grid-otros" class="player-emporio-grid" style="display:none;"></div>
                     </div>
-                    <div class="player-emporio-cart-wrap" style="flex:1; min-width:280px; background: linear-gradient(180deg, rgba(40,45,55,0.6), rgba(20,25,35,0.9)); border-radius:12px; padding:20px; border:2px solid #6a7a8a; max-height:70vh; overflow-y:auto;">
+                    <div class="player-emporio-cart-wrap player-shop-cart-wrap" style="flex:1; min-width:280px; background: linear-gradient(180deg, rgba(40,45,55,0.6), rgba(20,25,35,0.9)); border-radius:12px; padding:20px; border:2px solid #6a7a8a; max-height:70vh; overflow-y:auto;">
                         <div style="font-size:1.2em; color:#9ca8b8; margin-bottom:15px;">🛒 Tu pedido</div>
                         <div id="player-emporio-cart-items"></div>
                         <div id="player-emporio-cart-total"></div>
@@ -966,7 +1009,7 @@
         </div>
     </div>
 
-    <!-- Modal Forja (estilo Grimm: nivel, Tienda/Servicios, carrito, 10% grupo, anticipo 50%) -->
+    <!-- Modal Forja (estilo Grimm: Tienda/Servicios, nivel, carrito, 10% grupo) -->
     <div class="modal-overlay" id="player-forge-modal">
         <div class="modal" style="max-width: 1100px; width: 95%;">
             <div class="modal-header">
@@ -976,24 +1019,33 @@
             <div class="modal-body">
                 <div id="player-forge-body">
                 <div class="player-forge-oro" style="margin-bottom:15px; padding:10px; background: rgba(0,0,0,0.3); border-radius:8px; color:#f4d03f;">Tu oro: <strong id="player-forge-oro-display">0</strong> GP</div>
-                <div class="player-forge-levels" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:20px; padding:12px; background:rgba(0,0,0,0.3); border-radius:8px;">
-                    <span style="color:#8b7355;">Nivel del grupo:</span>
-                    <button type="button" class="btn btn-small player-forge-level active" data-level="1">⚪ Nv. 1-5</button>
-                    <button type="button" class="btn btn-small btn-secondary player-forge-level" data-level="6">🔵 Nv. 6-10</button>
-                    <button type="button" class="btn btn-small btn-secondary player-forge-level" data-level="11">🟣 Nv. 11-15</button>
-                    <button type="button" class="btn btn-small btn-secondary player-forge-level" data-level="16">🔥 Nv. 16-20</button>
+                <div class="player-shop-search-wrap">
+                    <button type="button" class="player-shop-search-toggle" aria-expanded="false" onclick="var w=this.closest('.player-shop-search-wrap'); w.classList.toggle('expanded'); this.setAttribute('aria-expanded', w.classList.contains('expanded'));">🔍 Búsqueda y filtros</button>
+                    <div class="player-shop-search-row">
+                        <input type="text" class="player-shop-search-input" id="player-forge-search" placeholder="Armas, armaduras, servicios...">
+                    </div>
+                    <div class="player-shop-filters player-forge-tabs">
+                        <button type="button" class="btn btn-small player-forge-tab active" data-tab="forge-shop">🛒 Tienda</button>
+                        <button type="button" class="btn btn-small btn-secondary player-forge-tab" data-tab="forge-services">🔧 Servicios</button>
+                    </div>
+                    <div class="player-forge-levels player-shop-tabs-row player-shop-filters" style="padding:12px; background:rgba(0,0,0,0.3); border-radius:8px;">
+                        <span style="color:#8b7355;">Nivel del grupo:</span>
+                        <button type="button" class="btn btn-small player-forge-level active" data-level="1">⚪ Nv. 1-5</button>
+                        <button type="button" class="btn btn-small btn-secondary player-forge-level" data-level="6">🔵 Nv. 6-10</button>
+                        <button type="button" class="btn btn-small btn-secondary player-forge-level" data-level="11">🟣 Nv. 11-15</button>
+                        <button type="button" class="btn btn-small btn-secondary player-forge-level" data-level="16">🔥 Nv. 16-20</button>
+                    </div>
                 </div>
-                <div class="player-forge-tabs" style="display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap;">
-                    <button type="button" class="btn btn-small player-forge-tab active" data-tab="forge-shop">🛒 Tienda</button>
-                    <button type="button" class="btn btn-small btn-secondary player-forge-tab" data-tab="forge-services">🔧 Servicios</button>
-                </div>
-                <div style="display:flex; gap:25px; flex-wrap:wrap;">
-                    <div style="flex:2; min-width:300px;">
+                <div class="player-shop-layout" style="display:flex; gap:25px; flex-wrap:wrap;">
+                    <div class="player-shop-cart-toggle-row">
+                        <button type="button" class="btn btn-small player-shop-cart-toggle-btn" onclick="toggleShopCart(this)" aria-label="Ver carrito"><span class="player-shop-cart-toggle-label-default">🛒 Ir al carrito <span class="player-shop-cart-badge" id="player-forge-cart-badge" data-count="0">0</span></span><span class="player-shop-cart-toggle-label-back">Seguir comprando</span></button>
+                    </div>
+                    <div class="player-shop-catalog-wrap" style="flex:2; min-width:300px;">
                         <div id="player-forge-shop-grid" class="player-forge-grid"></div>
                         <div id="player-forge-services-grid" class="player-forge-grid" style="display:none;"></div>
                     </div>
-                    <div class="player-forge-cart-wrap" style="flex:1; min-width:280px; background: linear-gradient(180deg, rgba(45,24,16,0.9), rgba(26,10,10,0.9)); border-radius:12px; padding:20px; border:2px solid #8b4513; max-height:70vh; overflow-y:auto;">
-                        <div style="font-size:1.2em; color:#ffcc00; margin-bottom:15px;">🛒 Pedido</div>
+                    <div class="player-forge-cart-wrap player-shop-cart-wrap" style="flex:1; min-width:280px; background: linear-gradient(180deg, rgba(45,24,16,0.9), rgba(26,10,10,0.9)); border-radius:12px; padding:20px; border:2px solid #8b4513; max-height:70vh; overflow-y:auto;">
+                        <div style="font-size:1.2em; color:#ffcc00; margin-bottom:15px;">🛒 Tu pedido</div>
                         <div id="player-forge-cart-items"></div>
                         <div id="player-forge-cart-total"></div>
                     </div>
@@ -1017,17 +1069,26 @@
             <div class="modal-body">
                 <div id="player-biblioteca-body">
                     <div class="player-biblioteca-oro" style="margin-bottom:15px; padding:10px; background: rgba(50,30,70,0.5); border-radius:8px; color:#c9a0dc; border:1px solid #6a4a8a;">Tu oro: <strong id="player-biblioteca-oro-display">0</strong> GP</div>
-                    <div class="player-biblioteca-tabs" style="display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap; justify-content:center;">
-                        <button type="button" class="btn btn-small player-biblioteca-tab active" data-section="magia">✨ Magia</button>
-                        <button type="button" class="btn btn-small btn-secondary player-biblioteca-tab" data-section="fabricacion">⚔️ Fabricación</button>
-                        <button type="button" class="btn btn-small btn-secondary player-biblioteca-tab" data-section="cocina">🍲 Cocina</button>
-                        <button type="button" class="btn btn-small btn-secondary player-biblioteca-tab" data-section="trampas">⚙️ Trampas</button>
-                        <button type="button" class="btn btn-small btn-secondary player-biblioteca-tab" data-section="alquimia">🧪 Alquimia</button>
-                        <button type="button" class="btn btn-small btn-secondary player-biblioteca-tab" data-section="mapas">🗺️ Mapas</button>
-                        <button type="button" class="btn btn-small btn-secondary player-biblioteca-tab" data-section="restringida">🔒 Restringida</button>
+                    <div class="player-shop-search-wrap">
+                        <button type="button" class="player-shop-search-toggle" aria-expanded="false" onclick="var w=this.closest('.player-shop-search-wrap'); w.classList.toggle('expanded'); this.setAttribute('aria-expanded', w.classList.contains('expanded'));">🔍 Búsqueda y filtros</button>
+                        <div class="player-shop-search-row">
+                            <input type="text" class="player-shop-search-input" id="player-biblioteca-search" placeholder="Título, categoría o autor...">
+                        </div>
+                        <div class="player-shop-filters player-shop-filters-center player-biblioteca-tabs">
+                            <button type="button" class="btn btn-small player-biblioteca-tab active" data-section="magia">✨ Magia</button>
+                            <button type="button" class="btn btn-small btn-secondary player-biblioteca-tab" data-section="fabricacion">⚔️ Fabricación</button>
+                            <button type="button" class="btn btn-small btn-secondary player-biblioteca-tab" data-section="cocina">🍲 Cocina</button>
+                            <button type="button" class="btn btn-small btn-secondary player-biblioteca-tab" data-section="trampas">⚙️ Trampas</button>
+                            <button type="button" class="btn btn-small btn-secondary player-biblioteca-tab" data-section="alquimia">🧪 Alquimia</button>
+                            <button type="button" class="btn btn-small btn-secondary player-biblioteca-tab" data-section="mapas">🗺️ Mapas</button>
+                            <button type="button" class="btn btn-small btn-secondary player-biblioteca-tab" data-section="restringida">🔒 Restringida</button>
+                        </div>
                     </div>
-                    <div style="display:flex; gap:25px; flex-wrap:wrap;">
-                        <div style="flex:2; min-width:300px;">
+                    <div class="player-shop-layout" style="display:flex; gap:25px; flex-wrap:wrap;">
+                        <div class="player-shop-cart-toggle-row">
+                            <button type="button" class="btn btn-small player-shop-cart-toggle-btn" onclick="toggleShopCart(this)" aria-label="Ver carrito"><span class="player-shop-cart-toggle-label-default">🛒 Ir al carrito <span class="player-shop-cart-badge" id="player-biblioteca-cart-badge" data-count="0">0</span></span><span class="player-shop-cart-toggle-label-back">Seguir comprando</span></button>
+                        </div>
+                        <div class="player-shop-catalog-wrap" style="flex:2; min-width:300px;">
                             <div id="player-biblio-grid-magia" class="player-biblioteca-section player-biblio-grid" style="display:block;"></div>
                             <div id="player-biblio-grid-fabricacion" class="player-biblioteca-section player-biblio-grid" style="display:none;"></div>
                             <div id="player-biblio-grid-cocina" class="player-biblioteca-section player-biblio-grid" style="display:none;"></div>
@@ -1036,8 +1097,8 @@
                             <div id="player-biblio-grid-mapas" class="player-biblioteca-section player-biblio-grid" style="display:none;"></div>
                             <div id="player-biblio-grid-restringida" class="player-biblioteca-section player-biblio-grid" style="display:none;"></div>
                         </div>
-                        <div class="player-biblioteca-cart-wrap" style="flex:1; min-width:280px; background: linear-gradient(180deg, rgba(40,25,55,0.6), rgba(20,10,30,0.9)); border-radius:12px; padding:20px; border:2px solid #6a4a8a; max-height:70vh; overflow-y:auto;">
-                            <div style="font-size:1.2em; color:#c9a0dc; margin-bottom:15px;">🛒 Libros seleccionados</div>
+                        <div class="player-biblioteca-cart-wrap player-shop-cart-wrap" style="flex:1; min-width:280px; background: linear-gradient(180deg, rgba(40,25,55,0.6), rgba(20,10,30,0.9)); border-radius:12px; padding:20px; border:2px solid #6a4a8a; max-height:70vh; overflow-y:auto;">
+                            <div style="font-size:1.2em; color:#c9a0dc; margin-bottom:15px;">🛒 Tu pedido</div>
                             <div id="player-biblioteca-cart-items"></div>
                             <div id="player-biblioteca-cart-total"></div>
                         </div>
@@ -1059,14 +1120,20 @@
                 <button class="modal-close" onclick="closeModal('player-tavern-modal')">&times;</button>
             </div>
             <div class="modal-body">
-                <div id="player-tavern-body">
+                <div id="player-tavern-body" class="tavern-showing-entrada">
                 <div class="player-tavern-oro" style="margin-bottom:15px; padding:10px; background: rgba(0,0,0,0.3); border-radius:8px; color:#f4d03f;">
                     <strong>Tu oro:</strong> <span id="player-tavern-oro-display">0</span> GP
                 </div>
-                <div class="player-tavern-tabs" style="display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap;">
-                    <button type="button" class="btn btn-small player-tavern-tab active" data-tab="tavern-entrada">🚪 Entrada</button>
-                    <button type="button" class="btn btn-small btn-secondary player-tavern-tab" data-tab="tavern-bebidas">🍺 Bebidas</button>
-                    <button type="button" class="btn btn-small btn-secondary player-tavern-tab" data-tab="tavern-cocina">👨‍🍳 Cocina</button>
+                <div class="player-shop-search-wrap player-tavern-search-wrap">
+                    <button type="button" class="player-shop-search-toggle" aria-expanded="false" onclick="var w=this.closest('.player-shop-search-wrap'); w.classList.toggle('expanded'); this.setAttribute('aria-expanded', w.classList.contains('expanded'));">🔍 Búsqueda y filtros</button>
+                    <div class="player-shop-search-row">
+                        <input type="text" class="player-shop-search-input" id="player-tavern-search" placeholder="Buscar en bebidas y cocina...">
+                    </div>
+                    <div class="player-shop-filters player-tavern-tabs">
+                        <button type="button" class="btn btn-small player-tavern-tab active" data-tab="tavern-entrada">🚪 Entrada</button>
+                        <button type="button" class="btn btn-small btn-secondary player-tavern-tab" data-tab="tavern-bebidas">🍺 Bebidas</button>
+                        <button type="button" class="btn btn-small btn-secondary player-tavern-tab" data-tab="tavern-cocina">👨‍🍳 Cocina</button>
+                    </div>
                 </div>
                 <div id="tavern-entrada" class="player-tavern-tab-content" style="display:block;">
                     <div class="player-tavern-entry-options" style="display:flex; gap:20px; flex-wrap:wrap; justify-content:center;">
@@ -1087,24 +1154,42 @@
                     </div>
                 </div>
                 <div id="tavern-bebidas" class="player-tavern-tab-content" style="display:none;">
-                    <div style="display:flex; gap:20px; flex-wrap:wrap;">
-                        <div style="flex:2; min-width:280px;">
+                    <div class="player-shop-search-wrap">
+                        <button type="button" class="player-shop-search-toggle" aria-expanded="false" onclick="var w=this.closest('.player-shop-search-wrap'); w.classList.toggle('expanded'); this.setAttribute('aria-expanded', w.classList.contains('expanded'));">🔍 Búsqueda</button>
+                        <div class="player-shop-search-row">
+                            <input type="text" class="player-shop-search-input" id="player-tavern-bebidas-search" placeholder="Nombre de la bebida...">
+                        </div>
+                    </div>
+                    <div class="player-shop-layout" style="display:flex; gap:20px; flex-wrap:wrap;">
+                        <div class="player-shop-cart-toggle-row">
+                            <button type="button" class="btn btn-small player-shop-cart-toggle-btn" onclick="toggleShopCart(this)" aria-label="Ver carrito"><span class="player-shop-cart-toggle-label-default">🛒 Ir al carrito <span class="player-shop-cart-badge" id="player-tavern-bebidas-cart-badge" data-count="0">0</span></span><span class="player-shop-cart-toggle-label-back">Seguir comprando</span></button>
+                        </div>
+                        <div class="player-shop-catalog-wrap" style="flex:2; min-width:280px;">
                             <div id="player-tavern-bebidas-grid" class="player-tavern-products-grid"></div>
                         </div>
-                        <div class="player-tavern-cart-wrap" style="flex:1; min-width:260px;">
-                            <div style="font-family:'Cinzel',serif; color:#f4d03f; margin-bottom:12px;">🧾 Tu Cuenta</div>
+                        <div class="player-tavern-cart-wrap player-shop-cart-wrap" style="flex:1; min-width:260px;">
+                            <div style="font-family:'Cinzel',serif; color:#f4d03f; margin-bottom:12px;">🛒 Tu pedido</div>
                             <div id="player-tavern-cart-items"></div>
                             <div id="player-tavern-cart-total"></div>
                         </div>
                     </div>
                 </div>
                 <div id="tavern-cocina" class="player-tavern-tab-content" style="display:none;">
-                    <div style="display:flex; gap:20px; flex-wrap:wrap;">
-                        <div style="flex:2; min-width:280px;">
+                    <div class="player-shop-search-wrap">
+                        <button type="button" class="player-shop-search-toggle" aria-expanded="false" onclick="var w=this.closest('.player-shop-search-wrap'); w.classList.toggle('expanded'); this.setAttribute('aria-expanded', w.classList.contains('expanded'));">🔍 Búsqueda</button>
+                        <div class="player-shop-search-row">
+                            <input type="text" class="player-shop-search-input" id="player-tavern-cocina-search" placeholder="Nombre del plato...">
+                        </div>
+                    </div>
+                    <div class="player-shop-layout" style="display:flex; gap:20px; flex-wrap:wrap;">
+                        <div class="player-shop-cart-toggle-row">
+                            <button type="button" class="btn btn-small player-shop-cart-toggle-btn" onclick="toggleShopCart(this)" aria-label="Ver carrito"><span class="player-shop-cart-toggle-label-default">🛒 Ir al carrito <span class="player-shop-cart-badge" id="player-tavern-cocina-cart-badge" data-count="0">0</span></span><span class="player-shop-cart-toggle-label-back">Seguir comprando</span></button>
+                        </div>
+                        <div class="player-shop-catalog-wrap" style="flex:2; min-width:280px;">
                             <div id="player-tavern-cocina-grid" class="player-tavern-products-grid"></div>
                         </div>
-                        <div class="player-tavern-cart-wrap" style="flex:1; min-width:260px;">
-                            <div style="font-family:'Cinzel',serif; color:#f4d03f; margin-bottom:12px;">🧾 Tu Cuenta</div>
+                        <div class="player-tavern-cart-wrap player-shop-cart-wrap" style="flex:1; min-width:260px;">
+                            <div style="font-family:'Cinzel',serif; color:#f4d03f; margin-bottom:12px;">🛒 Tu pedido</div>
                             <div id="player-tavern-cart-items-cocina"></div>
                             <div id="player-tavern-cart-total-cocina"></div>
                         </div>
@@ -1131,22 +1216,28 @@
                 <div class="player-potion-shop-oro" style="margin-bottom:15px; padding:10px; background: rgba(0,0,0,0.3); border-radius:8px; color:#f1c40f;">
                     <strong>Tu oro:</strong> <span id="player-potion-shop-oro-display">0</span> GP
                 </div>
-                <div class="player-potion-controls" style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:15px;">
-                    <input type="text" class="form-group input" id="player-potion-search" placeholder="🔍 Buscar pociones..." style="flex:1; min-width:180px; padding:10px 14px; background:#1a1a1a; border:1px solid #4a3c31; border-radius:6px; color:#d4c4a8;">
-                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <div class="player-shop-search-wrap">
+                    <button type="button" class="player-shop-search-toggle" aria-expanded="false" onclick="var w=this.closest('.player-shop-search-wrap'); w.classList.toggle('expanded'); this.setAttribute('aria-expanded', w.classList.contains('expanded'));">🔍 Búsqueda y filtros</button>
+                    <div class="player-shop-search-row">
+                        <input type="text" class="player-shop-search-input" id="player-potion-search" placeholder="Nombre o efecto de la poción...">
+                    </div>
+                    <div class="player-shop-filters">
                         <button type="button" class="btn btn-small btn-secondary player-potion-filter active" data-rarity="all">Todas</button>
                         <button type="button" class="btn btn-small btn-secondary player-potion-filter" data-rarity="común">🟢 Común</button>
-                        <button type="button" class="btn btn-small btn-secondary player-potion-filter" data-rarity="infrecuente">🔵 Infrecuente</button>
+                        <button type="button" class="btn btn-small btn-secondary player-potion-filter" data-rarity="inusual">🔵 Inusual</button>
                         <button type="button" class="btn btn-small btn-secondary player-potion-filter" data-rarity="rara">🟣 Rara</button>
                         <button type="button" class="btn btn-small btn-secondary player-potion-filter" data-rarity="legendaria">🔥 Legendaria</button>
                     </div>
                 </div>
-                <div style="display:flex; gap:20px; flex-wrap:wrap;">
-                    <div style="flex:2; min-width:280px;">
+                <div class="player-shop-layout" style="display:flex; gap:20px; flex-wrap:wrap;">
+                    <div class="player-shop-cart-toggle-row">
+                        <button type="button" class="btn btn-small player-shop-cart-toggle-btn" onclick="toggleShopCart(this)" aria-label="Ver carrito"><span class="player-shop-cart-toggle-label-default">🛒 Ir al carrito <span class="player-shop-cart-badge" id="player-potion-cart-badge" data-count="0">0</span></span><span class="player-shop-cart-toggle-label-back">Seguir comprando</span></button>
+                    </div>
+                    <div class="player-shop-catalog-wrap" style="flex:2; min-width:280px;">
                         <div id="player-potion-products" class="player-potion-products-grid"></div>
                     </div>
-                    <div class="player-potion-cart" style="flex:1; min-width:260px; background:rgba(0,0,0,0.3); border:1px solid rgba(255,215,0,0.2); border-radius:12px; padding:16px; max-height:400px; overflow-y:auto;">
-                        <div style="font-family:'Cinzel',serif; color:#f1c40f; margin-bottom:12px;">🛒 Carrito</div>
+                    <div class="player-potion-cart player-shop-cart-wrap" style="flex:1; min-width:260px; background:rgba(0,0,0,0.3); border:1px solid rgba(255,215,0,0.2); border-radius:12px; padding:16px; max-height:400px; overflow-y:auto;">
+                        <div style="font-family:'Cinzel',serif; color:#f1c40f; margin-bottom:12px;">🛒 Tu pedido</div>
                         <div id="player-potion-cart-items"></div>
                         <div id="player-potion-cart-total"></div>
                     </div>
@@ -1411,6 +1502,11 @@
                     <p style="color:#8b7355; font-size:0.85em; margin-top:4px;">URL de la imagen que se mostrará para esta ciudad.</p>
                 </div>
                 <div class="form-group">
+                    <label>📜 Historia / Lore</label>
+                    <textarea id="city-lore" rows="6" placeholder="Historia, leyendas y lore de la ciudad para que lo lean los jugadores..."></textarea>
+                    <p style="color:#8b7355; font-size:0.85em; margin-top:4px;">Aparece en la pestaña «Historia» cuando el jugador entra en la ciudad.</p>
+                </div>
+                <div class="form-group">
                     <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
                         <input type="checkbox" id="city-visible-jugadores" checked>
                         <span>👁️ Visible para jugadores</span>
@@ -1656,7 +1752,7 @@
                 <div style="background: rgba(0,0,0,0.2); border-left: 3px solid #8b5a2b; border-radius: 4px; padding: 12px; margin-bottom: 16px;">
                     <p style="color: #8b7355; font-size: 0.85em; margin: 0; line-height: 1.5;">
                         <strong style="color: #d4af37;">📋 Formato CSV:</strong> <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px; color: #d4c4a8;">name</code>, <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px; color: #d4c4a8;">price</code>, <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px; color: #d4c4a8;">effect</code>, <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px; color: #d4c4a8;">rarity</code>, <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px; color: #d4c4a8;">quantity</code> (opcional, por defecto 1) 
-                        <span style="color: #a89878;">— rarity: común, infrecuente, rara, legendaria</span>
+                        <span style="color: #a89878;">— rarity: común, inusual, rara, legendaria</span>
                     </p>
                 </div>
 
@@ -1693,7 +1789,7 @@
                         <label style="color: #d4af37; font-weight: 600; margin-bottom: 6px; display: block;">Rareza</label>
                         <select id="give-item-rarity" style="width: 100%;">
                             <option value="común">🟢 Común</option>
-                            <option value="infrecuente">🔵 Infrecuente</option>
+                            <option value="inusual">🔵 Inusual</option>
                             <option value="rara">🟣 Rara</option>
                             <option value="legendaria">🔥 Legendaria</option>
                         </select>
@@ -1920,14 +2016,14 @@
                                     <td style="border: 1px solid #4a3c31; padding: 8px;">150</td>
                                     <td style="border: 1px solid #4a3c31; padding: 8px;">Recupera 4d4+4 HP</td>
                                     <td style="border: 1px solid #4a3c31; padding: 8px;">14 HP</td>
-                                    <td style="border: 1px solid #4a3c31; padding: 8px;">infrecuente</td>
+                                    <td style="border: 1px solid #4a3c31; padding: 8px;">inusual</td>
                                 </tr>
                                 <tr>
                                     <td style="border: 1px solid #4a3c31; padding: 8px;">Espada +1</td>
                                     <td style="border: 1px solid #4a3c31; padding: 8px;">350</td>
                                     <td style="border: 1px solid #4a3c31; padding: 8px;">+1 a ataques y daño</td>
                                     <td style="border: 1px solid #4a3c31; padding: 8px;"></td>
-                                    <td style="border: 1px solid #4a3c31; padding: 8px;">infrecuente</td>
+                                    <td style="border: 1px solid #4a3c31; padding: 8px;">inusual</td>
                                 </tr>
                                 <tr>
                                     <td style="border: 1px solid #4a3c31; padding: 8px;">Capa Élfica</td>
@@ -1947,7 +2043,7 @@
                         </table>
                     </div>
                     <p style="color: #8b7355; margin-top: 10px; font-size: 0.8em;">
-                        <strong>Rarezas válidas:</strong> común, infrecuente, rara, legendaria
+                        <strong>Rarezas válidas:</strong> común, inusual, rara, legendaria
                     </p>
                 </div>
 
@@ -2226,7 +2322,7 @@
                                     <td style="border: 1px solid #4a3c31; padding: 8px;">120</td>
                                     <td style="border: 1px solid #4a3c31; padding: 8px;">raros</td>
                                     <td style="border: 1px solid #4a3c31; padding: 8px;">Objeto importado de lejanas tierras</td>
-                                    <td style="border: 1px solid #4a3c31; padding: 8px;">infrecuente</td>
+                                    <td style="border: 1px solid #4a3c31; padding: 8px;">inusual</td>
                                 </tr>
                                 <tr>
                                     <td style="border: 1px solid #4a3c31; padding: 8px;">Mapa del Bosque Norte</td>
@@ -2246,7 +2342,7 @@
                         </table>
                     </div>
                     <p style="color: #8b7355; margin-top: 10px; font-size: 0.8em;">
-                        <strong>section:</strong> materiales, raros, mapas u otros. <strong>rarity:</strong> común, infrecuente, rara, legendaria.
+                        <strong>section:</strong> materiales, raros, mapas u otros. <strong>rarity:</strong> común, inusual, rara, legendaria.
                     </p>
                 </div>
 
@@ -2413,7 +2509,7 @@
                             <label>Rareza</label>
                             <select id="item-rarity">
                                 <option value="común">🟢 Común</option>
-                                <option value="infrecuente">🔵 Infrecuente</option>
+                                <option value="inusual">🔵 Inusual</option>
                                 <option value="rara">🟣 Rara</option>
                                 <option value="legendaria">🔥 Legendaria</option>
                             </select>
