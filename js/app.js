@@ -4294,6 +4294,18 @@ async function showDashboard() {
     }
 }
 
+/** Actualiza todas las listas del DM (ciudades, tiendas, NPCs, jugadores, misiones, notificaciones) con un clic. Solo tiene efecto si estás logueado como DM. */
+function refreshDMData() {
+    if (!isDM()) return;
+    if (typeof showToast === 'function') showToast('Actualizando datos…', false);
+    if (typeof loadWorld === 'function') loadWorld();
+    if (typeof loadPlayers === 'function') loadPlayers();
+    if (typeof loadDMMissions === 'function') loadDMMissions();
+    if (typeof loadDMNotifications === 'function') loadDMNotifications();
+    if (typeof renderCities === 'function') setTimeout(function () { renderCities(); }, 300);
+    if (typeof showToast === 'function') setTimeout(function () { showToast('Datos del dashboard actualizados'); }, 800);
+}
+
 
 // ==================== INITIALIZE ====================
 document.addEventListener('DOMContentLoaded', function() {

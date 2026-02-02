@@ -767,6 +767,7 @@ function saveCity() {
                 if (typeof closeModal === 'function') {
                     closeModal('city-modal');
                 }
+                if (typeof loadWorld === 'function') loadWorld();
             })
             .catch(error => {
                 console.error('Error guardando ciudad:', error);
@@ -790,7 +791,10 @@ function deleteCity(id, nombre) {
         batch.delete(db.collection('cities').doc(id));
         npcs.filter(n => n.ciudadId === id).forEach(n => batch.delete(db.collection('npcs').doc(n.id)));
         shops.filter(s => s.ciudadId === id).forEach(s => batch.delete(db.collection('shops').doc(s.id)));
-        batch.commit().then(() => showToast('Ciudad eliminada')).catch(e => {
+        batch.commit().then(() => {
+            showToast('Ciudad eliminada');
+            if (typeof loadWorld === 'function') loadWorld();
+        }).catch(e => {
             console.error('Error eliminando ciudad:', e);
             showToast('Error al eliminar: ' + e.message, true);
         });
@@ -838,12 +842,12 @@ function saveNpc() {
     };
     if (!data.nombre) { showToast('Nombre requerido', true); return; }
     (id ? db.collection('npcs').doc(id).update(data) : db.collection('npcs').add(data))
-        .then(() => { showToast(id ? 'NPC actualizado' : 'NPC creado'); closeModal('npc-modal'); });
+        .then(() => { showToast(id ? 'NPC actualizado' : 'NPC creado'); closeModal('npc-modal'); if (typeof loadWorld === 'function') loadWorld(); });
 }
 
 function deleteNpc(id, nombre) {
     if (confirm(`¿Eliminar a ${nombre}?`))
-        db.collection('npcs').doc(id).delete().then(() => showToast('NPC eliminado'));
+        db.collection('npcs').doc(id).delete().then(() => { showToast('NPC eliminado'); if (typeof loadWorld === 'function') loadWorld(); });
 }
 
 // Shop CRUD
@@ -930,12 +934,12 @@ function saveShop() {
     if (!id) data.inventario = [];
     if (!data.nombre) { showToast('Nombre requerido', true); return; }
     (id ? db.collection('shops').doc(id).update(data) : db.collection('shops').add(data))
-        .then(() => { showToast(id ? 'Tienda actualizada' : 'Tienda creada'); closeModal('shop-modal'); });
+        .then(() => { showToast(id ? 'Tienda actualizada' : 'Tienda creada'); closeModal('shop-modal'); if (typeof loadWorld === 'function') loadWorld(); });
 }
 
 function deleteShop(id, nombre) {
     if (confirm(`¿Eliminar ${nombre}?`))
-        db.collection('shops').doc(id).delete().then(() => showToast('Tienda eliminada'));
+        db.collection('shops').doc(id).delete().then(() => { showToast('Tienda eliminada'); if (typeof loadWorld === 'function') loadWorld(); });
 }
 
 function deleteAllShopsFromCity(cityId, cityNombre) {

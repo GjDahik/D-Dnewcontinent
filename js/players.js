@@ -94,13 +94,13 @@ function savePlayer() {
     }
     if (!data.nombre || !data.pin) { showToast('Nombre y PIN requeridos', true); return; }
     (id ? db.collection('players').doc(id).update(data) : db.collection('players').add(data))
-        .then(() => { showToast(id ? 'Jugador actualizado' : 'Jugador creado'); closeModal('player-modal'); })
+        .then(() => { showToast(id ? 'Jugador actualizado' : 'Jugador creado'); closeModal('player-modal'); loadPlayers(); })
         .catch(e => showToast('Error: ' + e.message, true));
 }
 
 function deletePlayer(id, nombre) {
     if (confirm(`¿Eliminar a ${nombre}?`))
-        db.collection('players').doc(id).delete().then(() => showToast('Jugador eliminado'));
+        db.collection('players').doc(id).delete().then(() => { showToast('Jugador eliminado'); loadPlayers(); });
 }
 
 function openGoldModal(id, nombre, oro) {

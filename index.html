@@ -358,8 +358,11 @@
         <section id="player-ciudades" class="tab-content">
             <!-- Lista de ciudades -->
             <div id="player-cities-list-wrap">
-                <div class="section-header">
-                    <h2>🏘️ Ciudades y Pueblos</h2>
+                <div class="section-header" style="display:flex; flex-wrap:wrap; align-items:center; gap:12px; justify-content:space-between;">
+                    <div>
+                        <h2>🏘️ Ciudades y Pueblos</h2>
+                    </div>
+                    <button type="button" class="btn btn-small btn-secondary" onclick="if(typeof refreshPlayerWorld==='function'){refreshPlayerWorld(); typeof showToast==='function'&&showToast('Ciudades y tiendas actualizados');}" title="Actualizar lista de ciudades y tiendas (por si el DM añadió o cambió algo)">🔄 Refrescar mundo</button>
                 </div>
                 <p style="color:#8b7355; margin-bottom:20px;">Ciudades que explora tu grupo. Entra en cada una para ver sus tiendas.</p>
                 <div id="player-cities-container" class="cards-grid"></div>

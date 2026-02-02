@@ -267,7 +267,7 @@ function saveMission() {
         db.collection('missions').doc(missionId).update(payload).then(() => {
             showToast('Misión actualizada');
             closeModal('mission-modal');
-            renderDMMissionsList(document.getElementById('dm-missions-historial-panel')?.style.display === 'block' ? 'historial' : 'activas');
+            if (typeof loadDMMissions === 'function') loadDMMissions();
         }).catch(e => {
             showToast('Error: ' + e.message, true);
         });
@@ -277,7 +277,7 @@ function saveMission() {
         db.collection('missions').add(payload).then(() => {
             showToast('Misión creada');
             closeModal('mission-modal');
-            renderDMMissionsList('activas');
+            if (typeof loadDMMissions === 'function') loadDMMissions();
         }).catch(e => {
             showToast('Error: ' + e.message, true);
         });
@@ -296,7 +296,7 @@ function setMissionStatus(missionId, status) {
     db.collection('missions').doc(missionId).update(updates).then(() => {
         const msg = status === MISSION_STATUS.visible ? 'Misión reabierta (visible para jugadores)' : status === MISSION_STATUS.completed ? 'Misión marcada como completada (se actualizará en la app del jugador)' : 'Misión archivada';
         showToast(msg);
-        renderDMMissionsList(document.getElementById('dm-missions-historial-panel')?.style.display === 'block' ? 'historial' : 'activas');
+        if (typeof loadDMMissions === 'function') loadDMMissions();
     }).catch(e => showToast('Error: ' + e.message, true));
 }
 
@@ -304,9 +304,7 @@ function deleteMission(missionId) {
     if (!missionId || !confirm('¿Eliminar esta misión?')) return;
     db.collection('missions').doc(missionId).delete().then(() => {
         showToast('Misión eliminada');
-        const rechazadasOn = document.getElementById('dm-missions-rechazadas-panel')?.style.display !== 'none';
-        const historialOn = document.getElementById('dm-missions-historial-panel')?.style.display !== 'none';
-        renderDMMissionsList(rechazadasOn ? 'rechazadas' : (historialOn ? 'historial' : 'activas'));
+        if (typeof loadDMMissions === 'function') loadDMMissions();
     }).catch(e => showToast('Error: ' + e.message, true));
 }
 

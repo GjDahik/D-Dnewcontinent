@@ -369,6 +369,7 @@ function saveItem() {
             closeModal('item-modal');
             shop.inventario = inventario;
             renderInventoryList(shop);
+            if (typeof loadWorld === 'function') loadWorld();
         })
         .catch(function(e) { showToast('Error: ' + e.message, true); });
 }
@@ -387,6 +388,7 @@ function deleteItem(index) {
             showToast('Item eliminado');
             shop.inventario = inventario;
             renderInventoryList(shop);
+            if (typeof loadWorld === 'function') loadWorld();
         })
         .catch(e => showToast('Error: ' + e.message, true));
 }
@@ -412,6 +414,7 @@ function deleteAllItems() {
             showToast('Se borraron todos los items (' + count + ')');
             shop.inventario = inventario;
             renderInventoryList(shop);
+            if (typeof loadWorld === 'function') loadWorld();
         })
         .catch(e => showToast('Error: ' + e.message, true));
 }
@@ -907,13 +910,12 @@ function processCSVUpload() {
                     showToast(count + ' items importados exitosamente' + (errors.length > 0 ? ' (con ' + errors.length + ' errores)' : ''));
                     shop.inventario = inventario;
                     renderInventoryList(shop);
-                    
+                    if (typeof loadWorld === 'function') loadWorld();
                     // Resetear el formulario
                     document.getElementById('csv-file-input').value = '';
                     document.getElementById('csv-file-preview').style.display = 'none';
                     document.getElementById('csv-upload-btn').style.display = 'none';
                     document.getElementById('csv-import-section').style.display = 'none';
-                    
                     if (errors.length > 0) {
                         console.warn('Errores durante la importación:', errors);
                     }
