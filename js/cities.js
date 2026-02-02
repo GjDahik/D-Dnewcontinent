@@ -42,81 +42,66 @@ function isOldMistfallCity(cityOrNombre) {
     return ('' + n).trim().toLowerCase() === OLD_MISTFALL_CITY_NAME.toLowerCase();
 }
 
+// FIRESTORE REALTIME REMOVED: replaced with manual refresh (getDocs)
+function fetchCitiesDM() {
+    if (!db) return Promise.resolve();
+    return db.collection('cities').limit(300).get()
+        .then(snap => {
+            if (snap && snap.docs && snap.docs.length > 0) {
+                citiesData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            } else {
+                citiesData = [];
+            }
+            window.citiesData = citiesData;
+            if (typeof populateTransactionsFilters === 'function') populateTransactionsFilters();
+            if (typeof renderCities === 'function') renderCities();
+        })
+        .catch(err => {
+            console.error('Error al cargar ciudades:', err);
+            if (typeof showToast === 'function') showToast('Error al cargar ciudades: ' + (err.message || err), true);
+        });
+}
+
+// FIRESTORE REALTIME REMOVED: replaced with manual refresh (getDocs)
+function fetchNpcsDM() {
+    if (!db) return Promise.resolve();
+    return db.collection('npcs').limit(300).get()
+        .then(snap => {
+            npcsData = snap && snap.docs ? snap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+            window.npcsData = npcsData;
+            if (typeof renderCities === 'function') renderCities();
+        })
+        .catch(err => {
+            console.error('Error en snapshot de npcs:', err);
+        });
+}
+
+// FIRESTORE REALTIME REMOVED: replaced with manual refresh (getDocs)
+function fetchShopsDM() {
+    if (!db) return Promise.resolve();
+    return db.collection('shops').limit(300).get()
+        .then(snap => {
+            shopsData = snap && snap.docs ? snap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+            window.shopsData = shopsData;
+            if (typeof renderCities === 'function') renderCities();
+        })
+        .catch(err => {
+            console.error('Error en snapshot de shops:', err);
+        });
+}
+
 function loadWorld() {
-    console.log('loadWorld llamado');
-    
     if (!db) {
         console.error('Error: db no está definido');
         return;
     }
-    
-    // Prevenir múltiples suscripciones
-    if (window._worldSubscribed) {
-        console.log('loadWorld ya estaba suscrito, omitiendo...');
-        return;
-    }
-    window._worldSubscribed = true;
-    
-    console.log('Iniciando snapshots de Firestore...');
-    
-    // Cargar ciudades - limit() para evitar traer demasiados docs
-    db.collection('cities').limit(300).onSnapshot(snap => {
-        console.log('=== SNAPSHOT DE CITIES RECIBIDO ===');
-        console.log('Snapshot completo:', snap);
-        console.log('Tamaño:', snap ? snap.size : 'null');
-        console.log('Docs:', snap ? snap.docs : 'null');
-        
-        if (snap && snap.docs && snap.docs.length > 0) {
-            citiesData = snap.docs.map(d => {
-                const data = { id: d.id, ...d.data() };
-                console.log('Ciudad mapeada:', data.nombre);
-                return data;
-            });
-            window.citiesData = citiesData;
-            console.log('Total ciudades en citiesData:', citiesData.length);
-            console.log('Ciudades:', citiesData.map(c => c.nombre));
-            if (typeof populateTransactionsFilters === 'function') populateTransactionsFilters();
-            
-            // Forzar renderizado inmediatamente y también después de un delay
-            renderCities();
-            setTimeout(function() {
-                renderCities();
-            }, 500);
-        } else {
-            console.warn('No hay documentos en el snapshot o snap está vacío');
-            citiesData = [];
-            window.citiesData = citiesData;
-            if (typeof populateTransactionsFilters === 'function') populateTransactionsFilters();
-            renderCities();
-        }
-    }, error => {
-        console.error('ERROR en snapshot de cities:', error);
-        console.error('Detalles del error:', error.code, error.message);
-        if (typeof showToast === 'function') {
-            showToast('Error al cargar ciudades: ' + error.message, true);
-        }
-    });
-    
-    // Cargar NPCs
-    db.collection('npcs').limit(300).onSnapshot(snap => {
-        if (snap && snap.docs) {
-            npcsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            window.npcsData = npcsData;
-            renderCities();
-        }
-    }, error => {
-        console.error('Error en snapshot de npcs:', error);
-    });
-    
-    // Cargar tiendas
-    db.collection('shops').limit(300).onSnapshot(snap => {
-        if (snap && snap.docs) {
-            shopsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            window.shopsData = shopsData;
-            renderCities();
-        }
-    }, error => {
-        console.error('Error en snapshot de shops:', error);
+    // FIRESTORE REALTIME REMOVED: replaced with manual refresh (getDocs)
+    Promise.all([
+        fetchCitiesDM(),
+        fetchNpcsDM(),
+        fetchShopsDM()
+    ]).then(() => {
+        if (typeof renderCities === 'function') renderCities();
     });
 }
 
@@ -965,7 +950,7 @@ function deleteAllShopsFromCity(cityId, cityNombre) {
     
     showToast('Eliminando tiendas de ' + cityNombre + '...', false);
     
-    db.collection('shops').where('ciudadId', '==', cityId).get().then(snapshot => {
+    db.collection('shops').where('ciudadId', '==', cityId).limit(50).get().then(snapshot => {
         if (snapshot.empty) {
             showToast('No hay tiendas en esta ciudad para eliminar');
             return;

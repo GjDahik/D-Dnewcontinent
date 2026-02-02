@@ -1,10 +1,12 @@
 // ==================== PLAYERS ====================
 function loadPlayers() {
-    db.collection('players').limit(200).onSnapshot(snap => {
+    var unsub = db.collection('players').limit(200).onSnapshot(snap => {
         playersData = [];
         snap.forEach(doc => playersData.push({ id: doc.id, ...doc.data() }));
         renderPlayers();
     });
+    // FIRESTORE LISTENER FIX
+    if (typeof registerUnsub === 'function') registerUnsub('dm', 'players', unsub);
 }
 
 function renderPlayers() {

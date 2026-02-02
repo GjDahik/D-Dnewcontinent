@@ -1053,6 +1053,13 @@ function showPlayerView() {
         showLoginModal();
         return;
     }
+    // FIRESTORE LISTENER FIX: cerrar player y tab; DM solo si realmente se abandona la vista DM
+    if (typeof closeAll === 'function') {
+        closeAll('player');
+        closeAll('tab', 'transactions');
+        if (window.__currentMode === 'dm') closeAll('dm');
+    }
+    window.__currentMode = 'player';
     document.getElementById('main-container').style.display = 'none';
     document.getElementById('player-view-container').style.display = 'block';
     document.getElementById('login-modal').classList.remove('active');
@@ -1060,9 +1067,11 @@ function showPlayerView() {
     db.collection('players').doc(user.id).get().then(doc => {
         if (doc.exists) renderPlayerView(doc.data());
     });
-    db.collection('players').doc(user.id).onSnapshot(doc => {
+    var unsubPlayerDoc = db.collection('players').doc(user.id).onSnapshot(doc => {
         if (doc.exists) renderPlayerView(doc.data());
     });
+    // FIRESTORE LISTENER FIX
+    if (typeof registerUnsub === 'function') registerUnsub('player', null, unsubPlayerDoc);
     if (!window._playerInventorySearchListeners) {
         window._playerInventorySearchListeners = true;
         const onInvFilter = () => { if (lastPlayerViewData) renderPlayerView(lastPlayerViewData); };
@@ -1081,32 +1090,52 @@ function showPlayerView() {
     }, 500);
 }
 
+// FIRESTORE REALTIME REMOVED: replaced with manual refresh (getDocs)
+function fetchPlayerCities() {
+    if (!db) return Promise.resolve();
+    return db.collection('cities').limit(300).get()
+        .then(snap => {
+            playerCitiesData = snap && snap.docs ? snap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+            if (typeof renderPlayerCities === 'function') renderPlayerCities();
+        })
+        .catch(err => { console.error('Error cargando ciudades (player):', err); });
+}
+
+// FIRESTORE REALTIME REMOVED: replaced with manual refresh (getDocs)
+function fetchPlayerShops() {
+    if (!db) return Promise.resolve();
+    return db.collection('shops').limit(300).get()
+        .then(snap => {
+            playerShopsData = snap && snap.docs ? snap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+            if (typeof renderPlayerCities === 'function') renderPlayerCities();
+        })
+        .catch(err => { console.error('Error cargando tiendas (player):', err); });
+}
+
+// FIRESTORE REALTIME REMOVED: replaced with manual refresh (getDocs)
+function fetchPlayerNpcs() {
+    if (!db) return Promise.resolve();
+    return db.collection('npcs').limit(300).get()
+        .then(snap => {
+            playerNpcsData = snap && snap.docs ? snap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+            if (typeof renderPlayerCities === 'function') renderPlayerCities();
+            var wrap = document.getElementById('player-directorio-wrap');
+            if (playerDirectorioCityId && wrap && wrap.style.display !== 'none') {
+                openPlayerCityShops(playerDirectorioCityId, playerDirectorioCityNombre);
+            }
+        })
+        .catch(err => { console.error('Error cargando NPCs (player):', err); });
+}
+
+/** Refresca cities/shops/npcs del jugador (getDocs). Llamar al entrar, al cambiar de ciudad o desde botón "Refrescar mundo". */
+function refreshPlayerWorld() {
+    Promise.all([fetchPlayerCities(), fetchPlayerShops(), fetchPlayerNpcs()]).then(function () {
+        if (typeof renderPlayerCities === 'function') renderPlayerCities();
+    });
+}
+
 function loadPlayerWorld() {
-    if (window._playerWorldSubscribed) return;
-    window._playerWorldSubscribed = true;
-    var unsubCities = db.collection('cities').limit(300).onSnapshot(snap => {
-        playerCitiesData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        renderPlayerCities();
-    });
-    var unsubShops = db.collection('shops').limit(300).onSnapshot(snap => {
-        playerShopsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        renderPlayerCities();
-    });
-    var unsubNpcs = db.collection('npcs').limit(300).onSnapshot(snap => {
-        playerNpcsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        renderPlayerCities();
-        const wrap = document.getElementById('player-directorio-wrap');
-        if (playerDirectorioCityId && wrap && wrap.style.display !== 'none') {
-            openPlayerCityShops(playerDirectorioCityId, playerDirectorioCityNombre);
-        }
-    });
-    window._playerWorldUnsubscribes = function () {
-        if (unsubCities) unsubCities();
-        if (unsubShops) unsubShops();
-        if (unsubNpcs) unsubNpcs();
-        window._playerWorldSubscribed = false;
-        window._playerWorldUnsubscribes = null;
-    };
+    refreshPlayerWorld();
     if (typeof loadRutasConocidas === 'function') loadRutasConocidas();
 }
 
@@ -1177,6 +1206,8 @@ function loadRutasConocidas() {
         if (isPlayer()) renderPlayerRutas();
     });
     window._rutasUnsubscribe = function () { unsub(); window._rutasSubscribed = false; window._rutasUnsubscribe = null; };
+    // FIRESTORE LISTENER FIX
+    if (typeof registerUnsub === 'function') registerUnsub('dm', 'rutas', function () { unsub(); window._rutasSubscribed = false; window._rutasUnsubscribe = null; });
 }
 
 function renderDMRutas() {
@@ -1430,7 +1461,7 @@ function loadBitacora() {
     const listEl = document.getElementById('player-bitacora-list');
     if (!listEl) return;
     listEl.innerHTML = '<p style="color:#8b7355; padding:16px;">Cargando bitácora...</p>';
-    db.collection('bitacora_viajes').where('playerId', '==', user.id).get().then(snap => {
+    db.collection('bitacora_viajes').where('playerId', '==', user.id).limit(200).get().then(snap => {
         const viajes = (snap.docs || []).map(d => ({ id: d.id, ...d.data() }));
         viajes.sort((a, b) => {
             const ta = a.fecha && typeof a.fecha.toDate === 'function' ? a.fecha.toDate().getTime() : 0;
@@ -1618,6 +1649,7 @@ function saveCityNotesFromModal() {
 let playerDirectorioCityId = null, playerDirectorioCityNombre = null;
 
 function openPlayerCityShops(cityId, cityNombre) {
+    if (cityId !== playerDirectorioCityId && typeof refreshPlayerWorld === 'function') refreshPlayerWorld();
     const shops = playerShopsData.filter(s => s.ciudadId === cityId);
     const city = playerCitiesData.find(c => c.id === cityId);
     const recomendadoId = city && city.establecimientoRecomendadoId;
@@ -4200,10 +4232,15 @@ async function playerTavernCheckout() {
 async function showDashboard() {
     const user = getCurrentUser();
     if (user && isDM()) {
+        // FIRESTORE LISTENER FIX: al entrar DM solo cerrar player y tabs; no cerrar dm ni doble-cerrar
+        if (typeof closeAll === 'function') {
+            closeAll('player');
+            closeAll('tab', 'transactions');
+        }
         document.getElementById('player-view-container').style.display = 'none';
         document.getElementById('main-container').style.display = 'block';
-        if (typeof window._playerWorldUnsubscribes === 'function') { window._playerWorldUnsubscribes(); }
         document.getElementById('login-modal').classList.remove('active');
+        window.__currentMode = 'dm';
         const dmNameEl = document.getElementById('dm-header-name');
         if (dmNameEl) dmNameEl.textContent = user.nombre || '—';
         if (typeof loadPlayers === 'function') loadPlayers();
@@ -4343,7 +4380,7 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
         if (tab.dataset.tab === 'transactions') {
             if (typeof loadTransactions === 'function') loadTransactions();
         } else {
-            if (typeof stopTransactionsListener === 'function') stopTransactionsListener();
+            if (typeof closeAll === 'function') closeAll('tab', 'transactions');
         }
         
         // Si se hace clic en el tab de ciudades, forzar renderizado
@@ -4649,3 +4686,6 @@ window.saveMiCasaNotesFromModal = function() {
 function togglePlayersCard() {
     document.getElementById('players-card').classList.toggle('expanded');
 }
+
+// FIXED: DM not closed routinely on player entry
+// FIXED: showDashboard cleanup order and no double-close

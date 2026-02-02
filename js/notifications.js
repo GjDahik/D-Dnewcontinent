@@ -31,12 +31,15 @@ function startUnreadMailBadge() {
     _unreadBadgeUnsubscribe = db.collection('notifications')
         .where('playerId', '==', user.id)
         .where('leida', '==', false)
+        .limit(100)
         .onSnapshot(snap => {
             _updateMailBadges(snap.size);
         }, err => {
             console.error('Unread badge:', err);
             _updateMailBadges(0);
         });
+    // FIRESTORE LISTENER FIX
+    if (typeof registerUnsub === 'function') registerUnsub('player', 'mailBadge', _unreadBadgeUnsubscribe);
 }
 
 // Cargar lista de jugadores en el selector de destinatarios
@@ -73,8 +76,7 @@ function loadDMNotifications() {
     const container = document.getElementById('dm-notifications-list');
     if (!container) return;
     
-    // Cargar todas las notificaciones ordenadas por fecha
-    db.collection('notifications')
+    var unsub = db.collection('notifications')
         .orderBy('fecha', 'desc')
         .limit(100)
         .onSnapshot(snap => {
@@ -140,6 +142,7 @@ function loadDMNotifications() {
             // Si falla por falta de índice, intentar sin orderBy
             if (error.code === 'failed-precondition') {
                 db.collection('notifications')
+                    .limit(500)
                     .get()
                     .then(snap => {
                         const sorted = snap.docs.sort((a, b) => {
@@ -208,6 +211,8 @@ function loadDMNotifications() {
                 container.innerHTML = '<p style="color:#d4af37; text-align:center; padding:20px;">Error al cargar notificaciones: ' + error.message + '</p>';
             }
         });
+    // FIRESTORE LISTENER FIX
+    if (typeof registerUnsub === 'function') registerUnsub('dm', 'dmNotifications', unsub);
 }
 
 // Eliminar notificación desde el DM
@@ -266,8 +271,8 @@ async function sendNotification() {
         };
         
         if (recipientId === 'all') {
-            // Enviar a todos los jugadores
-            const playersSnap = await db.collection('players').get();
+            // Enviar a todos los jugadores (limit para no traer miles)
+            const playersSnap = await db.collection('players').limit(200).get();
             const batch = db.batch();
             let count = 0;
             
@@ -369,9 +374,10 @@ function loadPlayerNotifications() {
         }
         unreadContainer.innerHTML = unreadHtml;
     }
-    db.collection('notifications')
+    var unsubUnread = db.collection('notifications')
         .where('playerId', '==', user.id)
         .where('leida', '==', false)
+        .limit(100)
         .onSnapshot(snap => {
             console.log('loadPlayerNotifications: Notificaciones no leídas recibidas:', snap.size);
             renderUnread(snap.docs);
@@ -379,6 +385,8 @@ function loadPlayerNotifications() {
             console.error('Error cargando notificaciones no leídas:', error);
             unreadContainer.innerHTML = '<p style="color:#d4af37; text-align:center; padding:20px;">Error al cargar notificaciones. Por favor recarga la página.</p>';
         });
+    // FIRESTORE LISTENER FIX
+    if (typeof registerUnsub === 'function') registerUnsub('player', 'notifUnread', unsubUnread);
     
     // Cargar notificaciones leídas (sin orderBy para no requerir índice compuesto; ordenamos en cliente)
     function renderReadNotifications(docs) {
@@ -414,9 +422,10 @@ function loadPlayerNotifications() {
         });
         readContainer.innerHTML = readHtml;
     }
-    db.collection('notifications')
+    var unsubRead = db.collection('notifications')
         .where('playerId', '==', user.id)
         .where('leida', '==', true)
+        .limit(100)
         .onSnapshot(snap => {
             console.log('loadPlayerNotifications: Notificaciones leídas recibidas:', snap.size);
             renderReadNotifications(snap.docs);
@@ -424,6 +433,8 @@ function loadPlayerNotifications() {
             console.error('Error cargando notificaciones leídas:', error);
             readContainer.innerHTML = '<p style="color:#d4af37; text-align:center; padding:20px;">Error al cargar historial. Por favor recarga la página.</p>';
         });
+    // FIRESTORE LISTENER FIX
+    if (typeof registerUnsub === 'function') registerUnsub('player', 'notifRead', unsubRead);
 }
 
 // Abrir modal de notificación

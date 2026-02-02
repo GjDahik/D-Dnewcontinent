@@ -152,6 +152,10 @@ function loadTransactions() {
         currentTransactionsPage = 1;
         renderTransactionsPage();
     });
+    // FIRESTORE LISTENER FIX
+    if (typeof registerUnsub === 'function') registerUnsub('tab', 'transactions', function () {
+        if (_transactionsUnsubscribe) { _transactionsUnsubscribe(); _transactionsUnsubscribe = null; }
+    });
 }
 
 function stopTransactionsListener() {

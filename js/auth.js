@@ -83,6 +83,7 @@ async function loginPlayer(nombre, pin) {
 
 // ==================== LOGOUT ====================
 function logout() {
+    if (typeof closeAllSubscriptions === 'function') closeAllSubscriptions();
     currentUser = null;
     userType = null;
     sessionStorage.removeItem('currentUser');

@@ -61,7 +61,12 @@ async function playerLogin() {
 }
 
 // ==================== PLAYER LOGOUT ====================
+// FIRESTORE LISTENER FIX: close player doc listener on logout
 function playerLogout() {
+    if (typeof _playerDocUnsubscribe === 'function') {
+        _playerDocUnsubscribe();
+        _playerDocUnsubscribe = null;
+    }
     currentPlayerId = null;
     sessionStorage.removeItem('playerId');
     showToast('Sesión cerrada');
@@ -262,9 +267,15 @@ async function playerSellItemStack(indicesStr, qtyOrButton) {
 }
 
 // ==================== LIVE UPDATES ====================
+// FIRESTORE LISTENER FIX
+var _playerDocUnsubscribe = null;
 function subscribeToPlayer() {
     if (!currentPlayerId) return;
-    db.collection('players').doc(currentPlayerId).onSnapshot(doc => {
+    if (typeof _playerDocUnsubscribe === 'function') {
+        _playerDocUnsubscribe();
+        _playerDocUnsubscribe = null;
+    }
+    _playerDocUnsubscribe = db.collection('players').doc(currentPlayerId).onSnapshot(doc => {
         if (doc.exists) renderPlayer(doc.data());
     });
 }

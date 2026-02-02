@@ -32,7 +32,7 @@ function switchDMMissionsSubtab(subtabId) {
 }
 
 function loadDMMissions() {
-    db.collection('missions')
+    var unsub = db.collection('missions')
         .orderBy('createdAt', 'desc')
         .limit(200)
         .onSnapshot(snap => {
@@ -47,6 +47,8 @@ function loadDMMissions() {
             missionsData = [];
             renderDMMissionsList('activas');
         });
+    // FIRESTORE LISTENER FIX
+    if (typeof registerUnsub === 'function') registerUnsub('dm', 'dmMissions', unsub);
 }
 
 function renderDMMissionsList(filter) {
@@ -403,6 +405,8 @@ function startMissionsPendingBadge() {
         console.error('Missions badge:', err);
         updateMissionsPendingBadge(0);
     });
+    // FIRESTORE LISTENER FIX
+    if (typeof registerUnsub === 'function') registerUnsub('player', 'missionsBadge', _missionsBadgeUnsubscribe);
 }
 
 function loadPlayerMissions(subtab) {
@@ -423,6 +427,7 @@ function loadPlayerMissions(subtab) {
         return ids.some(pid => String(pid) === String(user.id));
     }
 
+    // FIRESTORE LISTENER FIX: cleanup primero; un solo onSnapshot, no crear listener en catch
     if (typeof _playerMissionsUnsubscribe === 'function') {
         _playerMissionsUnsubscribe();
         _playerMissionsUnsubscribe = null;
@@ -478,15 +483,7 @@ function loadPlayerMissions(subtab) {
         renderPlayerMissionsLists(activas, completedOrArchived, user.id, subtab, playerNamesMap || {});
     }
 
-    db.collection('players').limit(200).get().then(playersSnap => {
-        const playerNamesMap = {};
-        playersSnap.docs.forEach(d => {
-            const data = d.data();
-            const nombre = (data.nombre || data.name || '').toString().trim();
-            playerNamesMap[d.id] = nombre;
-            playerNamesMap[String(d.id)] = nombre;
-        });
-
+    function attachListener(playerNamesMap) {
         _playerMissionsUnsubscribe = db.collection('missions').limit(200).onSnapshot(snap => {
             runMissionsSnapshot(snap, playerNamesMap);
         }, err => {
@@ -494,15 +491,24 @@ function loadPlayerMissions(subtab) {
             activasContainer.innerHTML = '<p style="color:#8b7355; text-align:center; padding:30px;">No se pudieron cargar las misiones.</p>';
             historialContainer.innerHTML = '<p style="color:#8b7355; text-align:center; padding:30px;">No se pudo cargar el historial.</p>';
         });
-    }).catch(() => {
-        _playerMissionsUnsubscribe = db.collection('missions').limit(200).onSnapshot(snap => {
-            runMissionsSnapshot(snap, {});
-        }, err => {
-            console.error('Player missions:', err);
-            activasContainer.innerHTML = '<p style="color:#8b7355; text-align:center; padding:30px;">No se pudieron cargar las misiones.</p>';
-            historialContainer.innerHTML = '<p style="color:#8b7355; text-align:center; padding:30px;">No se pudo cargar el historial.</p>';
+        if (typeof registerUnsub === 'function') registerUnsub('player', 'playerMissions', _playerMissionsUnsubscribe);
+    }
+
+    db.collection('players').limit(200).get()
+        .then(playersSnap => {
+            const playerNamesMap = {};
+            playersSnap.docs.forEach(d => {
+                const data = d.data();
+                const nombre = (data.nombre || data.name || '').toString().trim();
+                playerNamesMap[d.id] = nombre;
+                playerNamesMap[String(d.id)] = nombre;
+            });
+            attachListener(playerNamesMap);
+        })
+        .catch(err => {
+            console.error('Player missions: could not load player names', err);
+            attachListener({});
         });
-    });
 }
 
 function renderPlayerMissionsLists(activas, historial, playerId, subtab, playerNamesMap) {
@@ -724,6 +730,7 @@ function loadLegendTracks() {
             console.error('Legend load:', err);
             container.innerHTML = '<p style="color:#8b7355; text-align:center; padding:30px;">No se pudieron cargar los audios.</p>';
         });
+    if (typeof registerUnsub === 'function') registerUnsub('dm', 'legend', _legendUnsubscribe);
 }
 
 function renderLegendList(container, tracks, isDM) {
@@ -859,4 +866,7 @@ function loadPlayerLegendTracks() {
             console.error('Player legend load:', err);
             container.innerHTML = '<p style="color:#8b7355; text-align:center; padding:30px;">No se pudieron cargar los audios.</p>';
         });
+    if (typeof registerUnsub === 'function') registerUnsub('player', 'legend', _playerLegendUnsubscribe);
 }
+
+// FIXED: loadPlayerMissions single listener, no catch listener
