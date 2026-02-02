@@ -1,12 +1,18 @@
 // ==================== PLAYERS ====================
+// OPTIMIZACIÓN READS: get() al mostrar dashboard, sin listener permanente
 function loadPlayers() {
-    var unsub = db.collection('players').limit(200).onSnapshot(snap => {
-        playersData = [];
-        snap.forEach(doc => playersData.push({ id: doc.id, ...doc.data() }));
-        renderPlayers();
-    });
-    // FIRESTORE LISTENER FIX
-    if (typeof registerUnsub === 'function') registerUnsub('dm', 'players', unsub);
+    db.collection('players').limit(200).get()
+        .then(snap => {
+            playersData = [];
+            snap.forEach(doc => playersData.push({ id: doc.id, ...doc.data() }));
+            window.playersData = playersData;
+            renderPlayers();
+        })
+        .catch(err => {
+            console.error('Error cargando jugadores:', err);
+            playersData = [];
+            renderPlayers();
+        });
 }
 
 function renderPlayers() {
@@ -664,5 +670,4 @@ window.migratePlayerInventoriesInfrecuenteToInusual = async function() {
     }
 };
 
-// Initialize
-loadPlayers();
+// OPTIMIZACIÓN: loadPlayers() se llama solo desde showDashboard() en app.js (una get() al entrar como DM)

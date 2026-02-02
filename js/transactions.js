@@ -126,36 +126,38 @@ function populateTransactionsFilters() {
 
 var _transactionsUnsubscribe = null;
 
+// OPTIMIZACIÓN READS: get() al abrir pestaña Historial, sin listener permanente
 function loadTransactions() {
-    if (_transactionsUnsubscribe) return; // ya suscrito
-    _transactionsUnsubscribe = db.collection('transactions').orderBy('fecha', 'desc').limit(200).onSnapshot(snap => {
-        const list = document.getElementById('transactions-list');
-        if (snap.empty) {
+    const list = document.getElementById('transactions-list');
+    if (!list) return;
+    list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📜</div><p>Cargando transacciones...</p></div>';
+    db.collection('transactions').orderBy('fecha', 'desc').limit(200).get()
+        .then(snap => {
+            if (snap.empty) {
+                transactionsData = [];
+                list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📜</div><p>No hay transacciones</p></div>';
+                const paginationEl = document.getElementById('transactions-pagination');
+                if (paginationEl) paginationEl.style.display = 'none';
+                return;
+            }
             transactionsData = [];
-            list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📜</div><p>No hay transacciones</p></div>';
-            const paginationEl = document.getElementById('transactions-pagination');
-            if (paginationEl) paginationEl.style.display = 'none';
-            return;
-        }
-        transactionsData = [];
-        snap.forEach(doc => transactionsData.push({ id: doc.id, ...doc.data() }));
-        transactionsData.sort((a, b) => (a.itemName || '').localeCompare(b.itemName || '', 'es'));
-        populateTransactionsFilters();
-
-        const searchEl = document.getElementById('transactions-search');
-        const filterPlayerEl = document.getElementById('transactions-filter-player');
-        const filterShopEl = document.getElementById('transactions-filter-shop');
-        const applyFilters = () => { currentTransactionsPage = 1; renderTransactionsPage(); };
-        if (searchEl && !searchEl.oninput) searchEl.oninput = applyFilters;
-        if (filterPlayerEl && !filterPlayerEl._bound) { filterPlayerEl._bound = true; filterPlayerEl.onchange = applyFilters; }
-        if (filterShopEl && !filterShopEl._bound) { filterShopEl._bound = true; filterShopEl.onchange = applyFilters; }
-        currentTransactionsPage = 1;
-        renderTransactionsPage();
-    });
-    // FIRESTORE LISTENER FIX
-    if (typeof registerUnsub === 'function') registerUnsub('tab', 'transactions', function () {
-        if (_transactionsUnsubscribe) { _transactionsUnsubscribe(); _transactionsUnsubscribe = null; }
-    });
+            snap.forEach(doc => transactionsData.push({ id: doc.id, ...doc.data() }));
+            transactionsData.sort((a, b) => (a.itemName || '').localeCompare(b.itemName || '', 'es'));
+            populateTransactionsFilters();
+            const searchEl = document.getElementById('transactions-search');
+            const filterPlayerEl = document.getElementById('transactions-filter-player');
+            const filterShopEl = document.getElementById('transactions-filter-shop');
+            const applyFilters = () => { currentTransactionsPage = 1; renderTransactionsPage(); };
+            if (searchEl && !searchEl.oninput) searchEl.oninput = applyFilters;
+            if (filterPlayerEl && !filterPlayerEl._bound) { filterPlayerEl._bound = true; filterPlayerEl.onchange = applyFilters; }
+            if (filterShopEl && !filterShopEl._bound) { filterShopEl._bound = true; filterShopEl.onchange = applyFilters; }
+            currentTransactionsPage = 1;
+            renderTransactionsPage();
+        })
+        .catch(err => {
+            console.error('Error cargando transacciones:', err);
+            list.innerHTML = '<div class="empty-state"><p style="color:#d4af37;">Error al cargar transacciones.</p></div>';
+        });
 }
 
 function stopTransactionsListener() {

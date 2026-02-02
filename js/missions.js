@@ -31,24 +31,25 @@ function switchDMMissionsSubtab(subtabId) {
     if (subtabId === 'leyenda') loadLegendTracks();
 }
 
+// OPTIMIZACIÓN READS: get() al cargar/refrescar, sin listener permanente
 function loadDMMissions() {
-    var unsub = db.collection('missions')
+    db.collection('missions')
         .orderBy('createdAt', 'desc')
         .limit(200)
-        .onSnapshot(snap => {
+        .get()
+        .then(snap => {
             missionsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
             const activasOn = document.getElementById('dm-missions-activas-panel')?.style.display !== 'none';
             const rechazadasOn = document.getElementById('dm-missions-rechazadas-panel')?.style.display !== 'none';
             const historialOn = document.getElementById('dm-missions-historial-panel')?.style.display !== 'none';
-            const filter = activasOn ? 'activas' : (rechazadasOn ? 'rechazadas' : (historialOn ? 'historial' : null));
-            if (filter) renderDMMissionsList(filter);
-        }, err => {
+            const filter = activasOn ? 'activas' : (rechazadasOn ? 'rechazadas' : (historialOn ? 'historial' : 'activas'));
+            renderDMMissionsList(filter);
+        })
+        .catch(err => {
             console.error('Missions load:', err);
             missionsData = [];
             renderDMMissionsList('activas');
         });
-    // FIRESTORE LISTENER FIX
-    if (typeof registerUnsub === 'function') registerUnsub('dm', 'dmMissions', unsub);
 }
 
 function renderDMMissionsList(filter) {
@@ -712,25 +713,37 @@ function updatePlayerMissionProgress(missionId, status) {
 const LEGEND_COLLECTION = 'legend_audio';
 let _legendUnsubscribe = null;
 let _playerLegendUnsubscribe = null;
+/** Cache de pistas de leyenda (DM): evita .get() cada vez que se abre la pestaña. null = aún no cargado. */
+let legendTracksData = null;
+/** Cache de pistas de leyenda (jugador): igual, una carga por sesión al abrir Leyenda. */
+let playerLegendTracksData = null;
 
-function loadLegendTracks() {
+function loadLegendTracks(forceRefresh) {
     const container = document.getElementById('dm-legend-list');
     if (!container) return;
+    if (!forceRefresh && legendTracksData !== null) {
+        renderLegendList(container, legendTracksData, true);
+        return;
+    }
     if (typeof _legendUnsubscribe === 'function') {
         _legendUnsubscribe();
         _legendUnsubscribe = null;
     }
-    _legendUnsubscribe = db.collection(LEGEND_COLLECTION)
+    container.innerHTML = '<p style="color:#8b7355; text-align:center; padding:20px;">Cargando...</p>';
+    db.collection(LEGEND_COLLECTION)
         .orderBy('createdAt', 'desc')
         .limit(100)
-        .onSnapshot(snap => {
+        .get()
+        .then(snap => {
             const tracks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            legendTracksData = tracks;
             renderLegendList(container, tracks, true);
-        }, err => {
+        })
+        .catch(err => {
             console.error('Legend load:', err);
+            legendTracksData = [];
             container.innerHTML = '<p style="color:#8b7355; text-align:center; padding:30px;">No se pudieron cargar los audios.</p>';
         });
-    if (typeof registerUnsub === 'function') registerUnsub('dm', 'legend', _legendUnsubscribe);
 }
 
 function renderLegendList(container, tracks, isDM) {
@@ -792,6 +805,7 @@ function addLegendTrack() {
         if (urlInput) urlInput.value = '';
         if (titleInput) titleInput.value = '';
         if (descInput) descInput.value = '';
+        loadLegendTracks(true);
     }).catch(e => showToast('Error: ' + e.message, true));
 }
 
@@ -839,6 +853,7 @@ function saveLegendTrack() {
         showToast('Audio actualizado');
         closeModal('legend-edit-modal');
         delete modal.dataset.trackId;
+        loadLegendTracks(true);
     }).catch(e => showToast('Error: ' + e.message, true));
 }
 
@@ -846,27 +861,41 @@ function deleteLegendTrack(id) {
     if (!id || !confirm('¿Eliminar este audio?')) return;
     db.collection(LEGEND_COLLECTION).doc(id).delete().then(() => {
         showToast('Audio eliminado');
+        loadLegendTracks(true);
     }).catch(e => showToast('Error: ' + e.message, true));
 }
 
-function loadPlayerLegendTracks() {
+function loadPlayerLegendTracks(forceRefresh) {
     const container = document.getElementById('player-legend-list');
     if (!container) return;
+    if (!forceRefresh && playerLegendTracksData !== null) {
+        renderLegendList(container, playerLegendTracksData, false);
+        return;
+    }
     if (typeof _playerLegendUnsubscribe === 'function') {
         _playerLegendUnsubscribe();
         _playerLegendUnsubscribe = null;
     }
-    _playerLegendUnsubscribe = db.collection(LEGEND_COLLECTION)
+    container.innerHTML = '<p style="color:#8b7355; text-align:center; padding:20px;">Cargando...</p>';
+    db.collection(LEGEND_COLLECTION)
         .orderBy('createdAt', 'desc')
         .limit(100)
-        .onSnapshot(snap => {
+        .get()
+        .then(snap => {
             const tracks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            playerLegendTracksData = tracks;
             renderLegendList(container, tracks, false);
-        }, err => {
+        })
+        .catch(err => {
             console.error('Player legend load:', err);
+            playerLegendTracksData = [];
             container.innerHTML = '<p style="color:#8b7355; text-align:center; padding:30px;">No se pudieron cargar los audios.</p>';
         });
-    if (typeof registerUnsub === 'function') registerUnsub('player', 'legend', _playerLegendUnsubscribe);
+}
+
+/** Invalida la caché de Leyenda del jugador (p. ej. al entrar a vista jugador) para que la próxima apertura de Leyenda traiga datos frescos. */
+function invalidatePlayerLegendCache() {
+    playerLegendTracksData = null;
 }
 
 // FIXED: loadPlayerMissions single listener, no catch listener

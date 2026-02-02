@@ -21,7 +21,27 @@ function debounce(fn, ms) {
 var citiesData = [], npcsData = [], shopsData = [], playersData = [];
 var playerCitiesData = [], playerShopsData = [], playerNpcsData = [];
 var rutasConocidasData = [];
+/** Cache del documento del jugador actual (vista jugador). Evita N× players.doc(id).get() → menos reads. */
+var _playerDocCache = null;
 var currentRutaParaViaje = null;
+
+/**
+ * Obtiene el documento del jugador actual (vista jugador). Usa caché si está disponible para reducir reads.
+ * @returns {Promise<{exists: boolean, data: function}>} Objeto tipo snapshot: .exists y .data() para compatibilidad con código existente.
+ */
+function getCurrentPlayerDoc() {
+    var user = getCurrentUser();
+    if (!user || !user.id) return Promise.resolve({ exists: false, data: function () { return null; } });
+    if (isPlayer() && _playerDocCache !== undefined && _playerDocCache !== null)
+        return Promise.resolve({ exists: true, data: function () { return _playerDocCache; } });
+    if (isPlayer() && _playerDocCache === null)
+        return Promise.resolve({ exists: false, data: function () { return null; } });
+    return db.collection('players').doc(user.id).get().then(function (doc) {
+        if (isPlayer() && doc.exists) _playerDocCache = doc.data();
+        else if (isPlayer() && !doc.exists) _playerDocCache = null;
+        return { exists: doc.exists, data: function () { return doc.exists ? doc.data() : null; } };
+    });
+}
 
 // Temas de fondo (DM elige en Mapa → Fondo de la app; se guarda en settings/app)
 var APP_BACKGROUND_THEMES = ['default', 'parchment', 'dungeon', 'tavern', 'map-grid', 'minimal', 'warm', 'noise-warm'];
@@ -869,7 +889,7 @@ async function playerUseItem(index) {
     if (!user || !isPlayer() || index == null) return;
     try {
         const ref = db.collection('players').doc(user.id);
-        const snap = await ref.get();
+        const snap = await getCurrentPlayerDoc();
         if (!snap.exists) { showToast('Personaje no encontrado', true); return; }
         const data = snap.data();
         const inventario = (data.inventario || []).slice();
@@ -891,7 +911,7 @@ async function playerUseItem(index) {
             lastPlayerViewData.inventario = inventario;
             renderPlayerView(lastPlayerViewData);
         } else {
-            ref.get().then(doc => { if (doc.exists) renderPlayerView(doc.data()); });
+            getCurrentPlayerDoc().then(doc => { if (doc.exists) renderPlayerView(doc.data()); });
         }
     } catch (e) {
         showToast('Error: ' + e.message, true);
@@ -919,7 +939,7 @@ async function playerUseItemStack(indicesStr, qtyOrButton) {
     if (indices.length === 0) return;
     try {
         const ref = db.collection('players').doc(user.id);
-        const snap = await ref.get();
+        const snap = await getCurrentPlayerDoc();
         if (!snap.exists) { showToast('Personaje no encontrado', true); return; }
         const data = snap.data();
         const inventario = (data.inventario || []).slice();
@@ -946,7 +966,7 @@ async function playerUseItemStack(indicesStr, qtyOrButton) {
             lastPlayerViewData.inventario = inventario;
             renderPlayerView(lastPlayerViewData);
         } else {
-            ref.get().then(doc => { if (doc.exists) renderPlayerView(doc.data()); });
+            getCurrentPlayerDoc().then(doc => { if (doc.exists) renderPlayerView(doc.data()); });
         }
     } catch (e) {
         showToast('Error: ' + e.message, true);
@@ -958,7 +978,7 @@ async function playerSellItem(index) {
     if (!user || !isPlayer() || index == null) return;
     try {
         const ref = db.collection('players').doc(user.id);
-        const snap = await ref.get();
+        const snap = await getCurrentPlayerDoc();
         if (!snap.exists) { showToast('Personaje no encontrado', true); return; }
         const data = snap.data();
         const inventario = (data.inventario || []).slice();
@@ -984,7 +1004,7 @@ async function playerSellItem(index) {
             lastPlayerViewData.inventario = inventario;
             renderPlayerView(lastPlayerViewData);
         } else {
-            ref.get().then(doc => { if (doc.exists) renderPlayerView(doc.data()); });
+            getCurrentPlayerDoc().then(doc => { if (doc.exists) renderPlayerView(doc.data()); });
         }
     } catch (e) {
         showToast('Error: ' + e.message, true);
@@ -1012,7 +1032,7 @@ async function playerSellItemStack(indicesStr, qtyOrButton) {
     if (indices.length === 0) return;
     try {
         const ref = db.collection('players').doc(user.id);
-        const snap = await ref.get();
+        const snap = await getCurrentPlayerDoc();
         if (!snap.exists) { showToast('Personaje no encontrado', true); return; }
         const data = snap.data();
         const inventario = (data.inventario || []).slice();
@@ -1040,7 +1060,7 @@ async function playerSellItemStack(indicesStr, qtyOrButton) {
             lastPlayerViewData.inventario = nuevoInv;
             renderPlayerView(lastPlayerViewData);
         } else {
-            ref.get().then(doc => { if (doc.exists) renderPlayerView(doc.data()); });
+            getCurrentPlayerDoc().then(doc => { if (doc.exists) renderPlayerView(doc.data()); });
         }
     } catch (e) {
         showToast('Error: ' + e.message, true);
@@ -1064,11 +1084,15 @@ function showPlayerView() {
     document.getElementById('player-view-container').style.display = 'block';
     document.getElementById('login-modal').classList.remove('active');
     loadMapImage();
-    db.collection('players').doc(user.id).get().then(doc => {
-        if (doc.exists) renderPlayerView(doc.data());
-    });
-    var unsubPlayerDoc = db.collection('players').doc(user.id).onSnapshot(doc => {
-        if (doc.exists) renderPlayerView(doc.data());
+    _playerDocCache = undefined;
+    if (typeof invalidatePlayerLegendCache === 'function') invalidatePlayerLegendCache();
+    var unsubPlayerDoc = db.collection('players').doc(user.id).onSnapshot(function (doc) {
+        if (doc.exists) {
+            _playerDocCache = doc.data();
+            renderPlayerView(doc.data());
+        } else {
+            _playerDocCache = null;
+        }
     });
     // FIRESTORE LISTENER FIX
     if (typeof registerUnsub === 'function') registerUnsub('player', null, unsubPlayerDoc);
@@ -1797,7 +1821,7 @@ async function openPlayerHabitantesModal(cityId, cityNombre) {
     // Cargar notas del jugador
     let playerNpcNotes = {};
     try {
-        const playerDoc = await db.collection('players').doc(user.id).get();
+        const playerDoc = await getCurrentPlayerDoc();
         if (playerDoc.exists) {
             playerNpcNotes = playerDoc.data().npcNotes || {};
         }
@@ -1841,7 +1865,7 @@ function openNpcNotesModal(npcId, npcName) {
     modal.dataset.npcId = npcId;
     titleEl.textContent = '📝 Mis notas — ' + (npcName || 'Personaje');
     inputEl.value = '';
-    db.collection('players').doc(user.id).get()
+    getCurrentPlayerDoc()
         .then(doc => {
             const data = doc.exists ? doc.data() : {};
             const npcNotes = data.npcNotes || {};
@@ -1860,7 +1884,7 @@ function saveNpcNotesFromModal() {
     const inputEl = document.getElementById('player-npc-notes-modal-input');
     if (!npcId || !inputEl) return;
     const notes = inputEl.value.trim();
-    db.collection('players').doc(user.id).get()
+    getCurrentPlayerDoc()
         .then(doc => {
             const currentData = doc.exists ? doc.data() : {};
             const npcNotes = currentData.npcNotes || {};
@@ -1884,7 +1908,7 @@ async function savePlayerNpcNote(npcId, notes) {
     
     try {
         const playerRef = db.collection('players').doc(user.id);
-        const playerDoc = await playerRef.get();
+        const playerDoc = await getCurrentPlayerDoc();
         const currentData = playerDoc.exists ? playerDoc.data() : {};
         const npcNotes = currentData.npcNotes || {};
         npcNotes[npcId] = notes.trim();
@@ -1907,7 +1931,7 @@ async function renderPlayerDirectorioHabitantes(cityId, cityNombre) {
     // Cargar notas del jugador
     let playerNpcNotes = {};
     try {
-        const playerDoc = await db.collection('players').doc(user.id).get();
+        const playerDoc = await getCurrentPlayerDoc();
         if (playerDoc.exists) {
             playerNpcNotes = playerDoc.data().npcNotes || {};
         }
@@ -1974,7 +1998,7 @@ function openPlayerSanctuaryModal(shopId) {
     document.getElementById('player-santuario-locked').style.display = locked ? 'block' : 'none';
     const user = getCurrentUser();
     if (user && user.id) {
-        db.collection('players').doc(user.id).get().then(doc => {
+        getCurrentPlayerDoc().then(doc => {
             const oro = (doc.exists && doc.data().oro != null) ? doc.data().oro : 0;
             document.getElementById('player-santuario-oro-display').textContent = oro.toLocaleString();
         });
@@ -2005,7 +2029,7 @@ async function performPlayerSanctuaryOffering() {
     const deityKey = document.getElementById('player-santuario-deity').value;
     const deityData = SANCTUARY_DEITIES[deityKey];
     if (!deityData) return;
-    const doc = await db.collection('players').doc(user.id).get();
+    const doc = await getCurrentPlayerDoc();
     if (!doc.exists) { showToast('No se encontró el personaje', true); return; }
     const data = doc.data();
     const oro = (data.oro != null ? data.oro : 0);
@@ -2083,7 +2107,7 @@ function openPlayerBancoModal(shopId) {
     document.getElementById('player-banco-amount').value = '';
     const user = getCurrentUser();
     if (user && user.id) {
-        db.collection('players').doc(user.id).get().then(doc => {
+        getCurrentPlayerDoc().then(doc => {
             const data = doc.exists ? doc.data() : {};
             const oro = (data.oro != null ? data.oro : 0);
             // Balance global del banco (mismo en todas las ciudades)
@@ -2103,7 +2127,7 @@ async function doPlayerBancoDeposit() {
     const amount = parseInt(document.getElementById('player-banco-amount').value, 10);
     if (!amount || amount < 1) { showToast('Indica una cantidad válida (≥ 1 GP)', true); return; }
     const docRef = db.collection('players').doc(user.id);
-    const doc = await docRef.get();
+    const doc = await getCurrentPlayerDoc();
     if (!doc.exists) { showToast('No se encontró el personaje', true); return; }
     const data = doc.data();
     const oro = (data.oro != null ? data.oro : 0);
@@ -2143,7 +2167,7 @@ async function doPlayerBancoWithdraw() {
     const fee = Math.ceil(amount * (BANCO_RETIRO_COMISION_PORCENTAJE / 100));
     const totalDeducir = amount + fee;
     const docRef = db.collection('players').doc(user.id);
-    const doc = await docRef.get();
+    const doc = await getCurrentPlayerDoc();
     if (!doc.exists) { showToast('No se encontró el personaje', true); return; }
     const data = doc.data();
     // Balance global del banco (mismo en todas las ciudades)
@@ -2205,7 +2229,7 @@ function openPlayerPosadaModal(shopId) {
         posadaSearchEl.addEventListener('input', debounce(function () { playerPosadaSearchTerm = (posadaSearchEl.value || '').toLowerCase().trim(); renderPlayerPosadaCuartos(); }, 250));
     }
     if (user && user.id) {
-        db.collection('players').doc(user.id).get().then(doc => {
+        getCurrentPlayerDoc().then(doc => {
             const oro = (doc.exists && doc.data().oro != null) ? doc.data().oro : 0;
             renderOro(oro);
         });
@@ -2390,7 +2414,7 @@ function openPlayerBatallaModal(shopId) {
     if (oponentes.length === 0) {
         npcsListEl.innerHTML = '<div style="text-align:center; padding:40px; background:rgba(0,0,0,0.3); border-radius:8px; border:2px dashed #4a3c31;"><p style="color:#8b7355; font-size:1.1em; margin-bottom:8px;">🥊</p><p style="color:#8b7355; font-size:1em; margin-bottom:4px;">No hay oponentes disponibles</p><p style="color:#6b5d4a; font-size:0.9em; font-style:italic;">El DM debe configurar los oponentes de batalla desde el dashboard.</p></div>';
         if (user && user.id) {
-            db.collection('players').doc(user.id).get().then(doc => {
+            getCurrentPlayerDoc().then(doc => {
                 const oro = (doc.exists && doc.data().oro != null) ? doc.data().oro : 0;
                 renderOro(oro);
             });
@@ -2416,7 +2440,7 @@ function openPlayerBatallaModal(shopId) {
         if (npcsListEl) npcsListEl.innerHTML = '<div style="color:#9c4a4a; padding:16px;">Error al cargar oponentes. Revisa la consola.</div>';
     }
     if (user && user.id) {
-        db.collection('players').doc(user.id).get().then(doc => {
+        getCurrentPlayerDoc().then(doc => {
             const oro = (doc.exists && doc.data().oro != null) ? doc.data().oro : 0;
             renderOro(oro);
         });
@@ -2562,7 +2586,7 @@ async function processBatallaPayment() {
     
     // Verificar oro
     const docRef = db.collection('players').doc(user.id);
-    const doc = await docRef.get();
+    const doc = await getCurrentPlayerDoc();
     if (!doc.exists) {
         showToast('No se encontró el personaje', true);
         return;
@@ -2674,7 +2698,7 @@ window.checkoutPosada = async function() {
     
     // Verificar oro
     const docRef = db.collection('players').doc(user.id);
-    const doc = await docRef.get();
+    const doc = await getCurrentPlayerDoc();
     if (!doc.exists) {
         showToast('No se encontró el personaje', true);
         return;
@@ -2819,7 +2843,7 @@ function openPlayerArtesaniasModal(shopId) {
     document.getElementById('player-artesanias-servicios-grid').style.display = 'none';
     const user = getCurrentUser();
     if (user && user.id) {
-        db.collection('players').doc(user.id).get().then(doc => {
+        getCurrentPlayerDoc().then(doc => {
             const oro = (doc.exists && doc.data().oro != null) ? doc.data().oro : 0;
             document.getElementById('player-artesanias-oro-display').textContent = oro.toLocaleString();
         });
@@ -2923,7 +2947,7 @@ async function playerArtesaniasCheckout() {
     if (!shop || !playerArtesaniasCart.length) { showToast('Añade algo a tu carrito para continuar', true); return; }
     const inventario = shop.inventario || [];
     const total = playerArtesaniasCart.reduce((sum, e) => sum + (inventario[e.inventarioIndex] ? (inventario[e.inventarioIndex].price || 0) : 0) * e.qty, 0);
-    const doc = await db.collection('players').doc(user.id).get();
+    const doc = await getCurrentPlayerDoc();
     if (!doc.exists) { showToast('No se encontró el personaje', true); return; }
     const data = doc.data();
     const oro = (data.oro != null ? data.oro : 0);
@@ -3024,7 +3048,7 @@ function openPlayerEmporioModal(shopId) {
     });
     const user = getCurrentUser();
     if (user && user.id) {
-        db.collection('players').doc(user.id).get().then(doc => {
+        getCurrentPlayerDoc().then(doc => {
             const oro = (doc.exists && doc.data().oro != null) ? doc.data().oro : 0;
             document.getElementById('player-emporio-oro-display').textContent = oro.toLocaleString();
         });
@@ -3133,7 +3157,7 @@ async function playerEmporioCheckout() {
     if (!shop || !playerEmporioCart.length) { showToast('Añade algo a tu carrito para continuar', true); return; }
     const inventario = shop.inventario || [];
     const total = playerEmporioCart.reduce((sum, e) => sum + (inventario[e.inventarioIndex] ? (inventario[e.inventarioIndex].price || 0) : 0) * e.qty, 0);
-    const doc = await db.collection('players').doc(user.id).get();
+    const doc = await getCurrentPlayerDoc();
     if (!doc.exists) { showToast('No se encontró el personaje', true); return; }
     const data = doc.data();
     const oro = (data.oro != null ? data.oro : 0);
@@ -3224,7 +3248,7 @@ function openPlayerBibliotecaModal(shopId) {
     if (receipt) receipt.style.display = 'none';
     const user = getCurrentUser();
     if (user && user.id) {
-        db.collection('players').doc(user.id).get().then(doc => {
+        getCurrentPlayerDoc().then(doc => {
             const oro = (doc.exists && doc.data().oro != null) ? doc.data().oro : 0;
             const el = document.getElementById('player-biblioteca-oro-display');
             if (el) el.textContent = oro.toLocaleString();
@@ -3324,7 +3348,7 @@ async function playerBibliotecaCheckout() {
     if (!shop || !playerBibliotecaCart.length) { showToast('Añade algo a tu carrito para continuar', true); return; }
     const inventario = shop.inventario || [];
     const total = playerBibliotecaCart.reduce((sum, e) => sum + (inventario[e.inventarioIndex] ? (inventario[e.inventarioIndex].price != null ? inventario[e.inventarioIndex].price : 0) : e.price), 0);
-    const doc = await db.collection('players').doc(user.id).get();
+    const doc = await getCurrentPlayerDoc();
     if (!doc.exists) { showToast('No se encontró el personaje', true); return; }
     const data = doc.data();
     const oro = (data.oro != null ? data.oro : 0);
@@ -3439,7 +3463,7 @@ function openPlayerForgeModal(shopId) {
     document.getElementById('player-forge-services-grid').style.display = 'none';
     const user = getCurrentUser();
     if (user && user.id) {
-        db.collection('players').doc(user.id).get().then(doc => {
+        getCurrentPlayerDoc().then(doc => {
             const oro = (doc.exists && doc.data().oro != null) ? doc.data().oro : 0;
             document.getElementById('player-forge-oro-display').textContent = oro.toLocaleString();
         });
@@ -3578,7 +3602,7 @@ async function playerForgeCheckout() {
     const totalItems = playerForgeCart.reduce((s, e) => s + e.qty, 0);
     const discount = totalItems >= 4 ? Math.floor(subtotal * 0.1) : 0;
     const total = subtotal - discount;
-    const doc = await db.collection('players').doc(user.id).get();
+    const doc = await getCurrentPlayerDoc();
     if (!doc.exists) { showToast('No se encontró el personaje', true); return; }
     const data = doc.data();
     const oro = (data.oro != null ? data.oro : 0);
@@ -3701,7 +3725,7 @@ function openPlayerPotionShop(shopId) {
     document.querySelectorAll('.player-potion-filter').forEach(b => { b.classList.toggle('active', b.dataset.rarity === 'all'); });
     const user = getCurrentUser();
     if (user && user.id) {
-        db.collection('players').doc(user.id).get().then(doc => {
+        getCurrentPlayerDoc().then(doc => {
             const oro = (doc.exists && doc.data().oro != null) ? doc.data().oro : 0;
             document.getElementById('player-potion-shop-oro-display').textContent = oro.toLocaleString();
         });
@@ -3850,7 +3874,7 @@ async function playerPotionCheckout() {
         showToast('Añade algo a tu carrito para continuar', true);
         return;
     }
-    const doc = await db.collection('players').doc(user.id).get();
+    const doc = await getCurrentPlayerDoc();
     if (!doc.exists) {
         showToast('No se encontró el personaje', true);
         return;
@@ -3963,7 +3987,7 @@ function openPlayerTavernShop(shopId) {
     if (bodyEl) bodyEl.classList.add('tavern-showing-entrada');
     const user = getCurrentUser();
     if (user && user.id) {
-        db.collection('players').doc(user.id).get().then(doc => {
+        getCurrentPlayerDoc().then(doc => {
             const oro = (doc.exists && doc.data().oro != null) ? doc.data().oro : 0;
             document.getElementById('player-tavern-oro-display').textContent = oro.toLocaleString();
         });
@@ -4154,7 +4178,7 @@ async function playerTavernCheckout() {
         return;
     }
     const shop = playerShopsData.find(s => s.id === playerTavernShopId);
-    const doc = await db.collection('players').doc(user.id).get();
+    const doc = await getCurrentPlayerDoc();
     if (!doc.exists) {
         showToast('No se encontró el personaje', true);
         return;
@@ -4241,6 +4265,7 @@ async function showDashboard() {
         document.getElementById('main-container').style.display = 'block';
         document.getElementById('login-modal').classList.remove('active');
         window.__currentMode = 'dm';
+        _playerDocCache = null;
         const dmNameEl = document.getElementById('dm-header-name');
         if (dmNameEl) dmNameEl.textContent = user.nombre || '—';
         if (typeof loadPlayers === 'function') loadPlayers();
@@ -4509,7 +4534,7 @@ function loadPlayerCartasDestino() {
     list.innerHTML = '<p style="color:#8b7355; text-align:center; padding:20px;">Cargando cartas...</p>';
     if (mensajeEl) mensajeEl.innerHTML = '';
     if (victoryEl) victoryEl.style.display = 'none';
-    db.collection('players').doc(user.id).get().then(doc => {
+    getCurrentPlayerDoc().then(doc => {
         const data = doc.exists ? doc.data() : {};
         const cartas = Array.isArray(data.cartasDestino) ? data.cartasDestino : [];
         const completadas = Array.isArray(data.cartasDestinoCompletadas) ? data.cartasDestinoCompletadas : [];
@@ -4570,7 +4595,7 @@ function toggleCartasDestinoCompletada(index) {
     const user = getCurrentUser();
     if (!user || !user.id || !isPlayer()) return;
     const ref = db.collection('players').doc(user.id);
-    ref.get().then(doc => {
+    getCurrentPlayerDoc().then(doc => {
         const data = doc.exists ? doc.data() : {};
         const completadas = Array.isArray(data.cartasDestinoCompletadas) ? data.cartasDestinoCompletadas.slice() : [];
         const pos = completadas.indexOf(index);
@@ -4592,7 +4617,7 @@ function loadMiCasaContent() {
         showToast('Debes estar logueado como aventurero', true);
         return Promise.reject();
     }
-    return db.collection('players').doc(user.id).get().then(doc => {
+    return getCurrentPlayerDoc().then(doc => {
         const playerData = doc.exists ? doc.data() : {};
         const casaInfo = playerData.casa || {};
         const imagenContainer = document.getElementById('mi-casa-imagen-container');
@@ -4644,7 +4669,7 @@ window.openMiCasaNotesModal = function() {
     const inputEl = document.getElementById('player-mi-casa-notes-modal-input');
     if (!inputEl) return;
     inputEl.value = '';
-    db.collection('players').doc(user.id).get()
+    getCurrentPlayerDoc()
         .then(doc => {
             const data = doc.exists ? doc.data() : {};
             const casa = data.casa || {};
@@ -4661,7 +4686,7 @@ window.saveMiCasaNotesFromModal = function() {
     const inputEl = document.getElementById('player-mi-casa-notes-modal-input');
     if (!inputEl) return;
     const notasPersonales = inputEl.value.trim();
-    db.collection('players').doc(user.id).get().then(doc => {
+    getCurrentPlayerDoc().then(doc => {
         const playerData = doc.exists ? doc.data() : {};
         const casaExistente = playerData.casa || {};
         const casaData = {

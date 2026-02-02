@@ -71,148 +71,81 @@ function loadNotificationRecipients() {
     }
 }
 
-// Cargar historial de notificaciones enviadas (DM)
+// OPTIMIZACIÓN READS: una sola lectura al cargar/refrescar; sin listener permanente
+function _renderDMNotificationsList(docs) {
+    const container = document.getElementById('dm-notifications-list');
+    if (!container) return;
+    if (!docs || docs.length === 0) {
+        container.innerHTML = '<p style="color:#8b7355; text-align:center; padding:30px; font-style:italic;">No hay notificaciones enviadas</p>';
+        return;
+    }
+    const grouped = {};
+    docs.forEach(doc => {
+        const notif = doc.data();
+        const fecha = notif.fecha?.toDate?.() || new Date();
+        const fechaKey = fecha.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+        const horaStr = fecha.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+        const mensaje = notif.mensaje || 'Sin mensaje';
+        const key = `${mensaje.substring(0, 50)}_${fechaKey}`;
+        if (!grouped[key]) {
+            grouped[key] = { mensaje: mensaje, fecha: fechaKey, hora: horaStr, destinatarios: [], ids: [] };
+        }
+        grouped[key].destinatarios.push(notif.playerName || 'Jugador desconocido');
+        grouped[key].ids.push(doc.id);
+    });
+    let html = '';
+    Object.values(grouped).forEach(group => {
+        const mensajeText = group.mensaje.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const preview = mensajeText.substring(0, 150) + (mensajeText.length > 150 ? '...' : '');
+        const destinatariosText = group.destinatarios.length === 1 ? group.destinatarios[0] : `${group.destinatarios.length} jugadores`;
+        html += `
+            <div class="mini-card" style="margin-bottom: 16px; border: 1px solid #4a3c31;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+                            <div class="mini-card-title" style="font-size: 1.1em; font-weight: 600;">📮 Notificación</div>
+                            <div style="color: #8b7355; font-size: 0.85em;">${group.fecha} a las ${group.hora}</div>
+                        </div>
+                        <div style="color: #d4c4a8; line-height: 1.6; margin-bottom: 10px; white-space: pre-wrap;">${preview}</div>
+                        <div style="color: #8b7355; font-size: 0.9em;"><strong>Para:</strong> ${destinatariosText}</div>
+                    </div>
+                    <button onclick="deleteDMNotification(['${group.ids.join("','")}'])" style="background: rgba(139, 90, 43, 0.3); border: 1px solid #8b5a2b; color: #d4af37; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 0.9em; flex-shrink: 0; white-space: nowrap;" title="Eliminar notificación">🗑️ Eliminar</button>
+                </div>
+            </div>`;
+    });
+    container.innerHTML = html;
+}
+
+// Cargar historial de notificaciones enviadas (DM) — get() una vez, sin listener
 function loadDMNotifications() {
     const container = document.getElementById('dm-notifications-list');
     if (!container) return;
-    
-    var unsub = db.collection('notifications')
+    container.innerHTML = '<p style="color:#8b7355; text-align:center; padding:20px;">Cargando...</p>';
+    db.collection('notifications')
         .orderBy('fecha', 'desc')
         .limit(100)
-        .onSnapshot(snap => {
-            if (snap.empty) {
-                container.innerHTML = '<p style="color:#8b7355; text-align:center; padding:30px; font-style:italic;">No hay notificaciones enviadas</p>';
-                return;
-            }
-            
-            // Agrupar por fecha y mensaje para mostrar mejor
-            const grouped = {};
-            snap.forEach(doc => {
-                const notif = doc.data();
-                const fecha = notif.fecha?.toDate?.() || new Date();
-                const fechaKey = fecha.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
-                const horaStr = fecha.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-                const mensaje = notif.mensaje || 'Sin mensaje';
-                const key = `${mensaje.substring(0, 50)}_${fechaKey}`;
-                
-                if (!grouped[key]) {
-                    grouped[key] = {
-                        mensaje: mensaje,
-                        fecha: fechaKey,
-                        hora: horaStr,
-                        destinatarios: [],
-                        ids: []
-                    };
-                }
-                
-                grouped[key].destinatarios.push(notif.playerName || 'Jugador desconocido');
-                grouped[key].ids.push(doc.id);
-            });
-            
-            let html = '';
-            Object.values(grouped).forEach(group => {
-                const mensajeText = group.mensaje.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                const preview = mensajeText.substring(0, 150) + (mensajeText.length > 150 ? '...' : '');
-                const destinatariosText = group.destinatarios.length === 1 
-                    ? group.destinatarios[0]
-                    : `${group.destinatarios.length} jugadores`;
-                
-                html += `
-                    <div class="mini-card" style="margin-bottom: 16px; border: 1px solid #4a3c31;">
-                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
-                            <div style="flex: 1; min-width: 0;">
-                                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
-                                    <div class="mini-card-title" style="font-size: 1.1em; font-weight: 600;">📮 Notificación</div>
-                                    <div style="color: #8b7355; font-size: 0.85em;">${group.fecha} a las ${group.hora}</div>
-                                </div>
-                                <div style="color: #d4c4a8; line-height: 1.6; margin-bottom: 10px; white-space: pre-wrap;">${preview}</div>
-                                <div style="color: #8b7355; font-size: 0.9em;">
-                                    <strong>Para:</strong> ${destinatariosText}
-                                </div>
-                            </div>
-                            <button onclick="deleteDMNotification(['${group.ids.join("','")}'])" style="background: rgba(139, 90, 43, 0.3); border: 1px solid #8b5a2b; color: #d4af37; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 0.9em; transition: all 0.2s ease; flex-shrink: 0; white-space: nowrap;" onmouseover="this.style.background='rgba(139, 90, 43, 0.5)'; this.style.borderColor='#d4af37'" onmouseout="this.style.background='rgba(139, 90, 43, 0.3)'; this.style.borderColor='#8b5a2b'" title="Eliminar notificación">🗑️ Eliminar</button>
-                        </div>
-                    </div>
-                `;
-            });
-            
-            container.innerHTML = html;
-        }, error => {
+        .get()
+        .then(snap => _renderDMNotificationsList(snap.docs))
+        .catch(error => {
             console.error('Error cargando notificaciones del DM:', error);
-            // Si falla por falta de índice, intentar sin orderBy
             if (error.code === 'failed-precondition') {
-                db.collection('notifications')
-                    .limit(500)
-                    .get()
+                db.collection('notifications').limit(500).get()
                     .then(snap => {
                         const sorted = snap.docs.sort((a, b) => {
                             const fechaA = a.data().fecha?.toDate?.() || new Date(0);
                             const fechaB = b.data().fecha?.toDate?.() || new Date(0);
                             return fechaB - fechaA;
                         }).slice(0, 100);
-                        
-                        const grouped = {};
-                        sorted.forEach(doc => {
-                            const notif = doc.data();
-                            const fecha = notif.fecha?.toDate?.() || new Date();
-                            const fechaKey = fecha.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
-                            const horaStr = fecha.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-                            const mensaje = notif.mensaje || 'Sin mensaje';
-                            const key = `${mensaje.substring(0, 50)}_${fechaKey}`;
-                            
-                            if (!grouped[key]) {
-                                grouped[key] = {
-                                    mensaje: mensaje,
-                                    fecha: fechaKey,
-                                    hora: horaStr,
-                                    destinatarios: [],
-                                    ids: []
-                                };
-                            }
-                            
-                            grouped[key].destinatarios.push(notif.playerName || 'Jugador desconocido');
-                            grouped[key].ids.push(doc.id);
-                        });
-                        
-                        let html = '';
-                        Object.values(grouped).forEach(group => {
-                            const mensajeText = group.mensaje.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                            const preview = mensajeText.substring(0, 150) + (mensajeText.length > 150 ? '...' : '');
-                            const destinatariosText = group.destinatarios.length === 1 
-                                ? group.destinatarios[0]
-                                : `${group.destinatarios.length} jugadores`;
-                            
-                            html += `
-                                <div class="mini-card" style="margin-bottom: 16px; border: 1px solid #4a3c31;">
-                                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
-                                        <div style="flex: 1; min-width: 0;">
-                                            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
-                                                <div class="mini-card-title" style="font-size: 1.1em; font-weight: 600;">📮 Notificación</div>
-                                                <div style="color: #8b7355; font-size: 0.85em;">${group.fecha} a las ${group.hora}</div>
-                                            </div>
-                                            <div style="color: #d4c4a8; line-height: 1.6; margin-bottom: 10px; white-space: pre-wrap;">${preview}</div>
-                                            <div style="color: #8b7355; font-size: 0.9em;">
-                                                <strong>Para:</strong> ${destinatariosText}
-                                            </div>
-                                        </div>
-                                        <button onclick="deleteDMNotification(['${group.ids.join("','")}'])" style="background: rgba(139, 90, 43, 0.3); border: 1px solid #8b5a2b; color: #d4af37; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 0.9em; transition: all 0.2s ease; flex-shrink: 0; white-space: nowrap;" onmouseover="this.style.background='rgba(139, 90, 43, 0.5)'; this.style.borderColor='#d4af37'" onmouseout="this.style.background='rgba(139, 90, 43, 0.3)'; this.style.borderColor='#8b5a2b'" title="Eliminar notificación">🗑️ Eliminar</button>
-                                    </div>
-                                </div>
-                            `;
-                        });
-                        
-                        container.innerHTML = html;
+                        _renderDMNotificationsList(sorted);
                     })
                     .catch(err => {
                         console.error('Error cargando notificaciones sin orderBy:', err);
                         container.innerHTML = '<p style="color:#d4af37; text-align:center; padding:20px;">Error al cargar notificaciones.</p>';
                     });
             } else {
-                container.innerHTML = '<p style="color:#d4af37; text-align:center; padding:20px;">Error al cargar notificaciones: ' + error.message + '</p>';
+                container.innerHTML = '<p style="color:#d4af37; text-align:center; padding:20px;">Error: ' + (error.message || '') + '</p>';
             }
         });
-    // FIRESTORE LISTENER FIX
-    if (typeof registerUnsub === 'function') registerUnsub('dm', 'dmNotifications', unsub);
 }
 
 // Eliminar notificación desde el DM
