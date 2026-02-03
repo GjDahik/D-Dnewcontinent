@@ -1,4 +1,11 @@
 // ==================== PLAYERS ====================
+/** Jugadores visibles para transacciones, notificaciones y asignación (DM). undefined/true = visible, false = oculto */
+function getVisiblePlayers() {
+    const list = window.playersData || [];
+    return list.filter(p => p.visible !== false);
+}
+if (typeof window !== 'undefined') window.getVisiblePlayers = getVisiblePlayers;
+
 // OPTIMIZACIÓN READS: get() al mostrar dashboard, sin listener permanente
 function loadPlayers() {
     db.collection('players').limit(200).get()
@@ -28,8 +35,12 @@ function renderPlayers() {
     sorted.forEach(p => {
         const bancoBalance = (p.bancoBalance != null ? p.bancoBalance : 0);
         const nombreEsc = (p.nombre || '').replace(/'/g, "\\'");
+        const isVisible = p.visible !== false;
+        const visibilityTitle = isVisible ? 'Visible en listas y transacciones (clic para ocultar)' : 'Oculto en listas y transacciones (clic para mostrar)';
+        const visibilityLabel = isVisible ? '👁 Visible' : '🙈 Oculto';
+        const visibilityClass = isVisible ? 'player-visibility-visible' : 'player-visibility-hidden';
         container.innerHTML += `
-            <div class="mini-card">
+            <div class="mini-card ${isVisible ? '' : 'mini-card-player-hidden'}">
                 <div class="mini-card-header-row">
                     <div class="mini-card-title">⚔️ ${p.nombre}</div>
                     <button type="button" class="btn btn-small btn-danger mini-card-delete-btn" onclick="deletePlayer('${p.id}', '${nombreEsc}')" title="Eliminar jugador">🗑️</button>
@@ -41,6 +52,7 @@ function renderPlayers() {
                 <div class="mini-card-info">🎒 Items: ${(p.inventario || []).length}</div>
                 <div style="margin-top:10px;font-size:0.85em;color:#a89a8c;">${p.notas || 'Sin notas'}</div>
                 <div class="mini-card-actions" style="margin-top:10px;">
+                    <button type="button" class="btn btn-small ${visibilityClass}" onclick="togglePlayerVisibility('${p.id}')" title="${visibilityTitle}">${visibilityLabel}</button>
                     <button class="btn btn-small" onclick="openGoldModal('${p.id}', '${p.nombre}', ${p.oro})">💰</button>
                     <button class="btn btn-small" onclick="openBancoModal('${p.id}', '${p.nombre}', ${bancoBalance})" style="background:linear-gradient(180deg, #5a8a5a 0%, #4a7a4a 100%);">🏦</button>
                     <button class="btn btn-small" onclick="openCartasDestinoModal('${p.id}', '${nombreEsc}')" style="background:linear-gradient(180deg, #6b4a6b 0%, #4a3a4a 100%);" title="Cartas del destino">🃏</button>
@@ -91,6 +103,7 @@ function savePlayer() {
     if (!id) {
         data.inventario = [];
         data.bancoBalance = 0; // Inicializar balance del banco en 0 para nuevos jugadores
+        data.visible = true; // Visible en listas y transacciones por defecto
     }
     if (!data.nombre || !data.pin) { showToast('Nombre y PIN requeridos', true); return; }
     (id ? db.collection('players').doc(id).update(data) : db.collection('players').add(data))
@@ -101,6 +114,20 @@ function savePlayer() {
 function deletePlayer(id, nombre) {
     if (confirm(`¿Eliminar a ${nombre}?`))
         db.collection('players').doc(id).delete().then(() => { showToast('Jugador eliminado'); loadPlayers(); });
+}
+
+/** Alternar visibilidad del jugador en listas/transacciones/notificaciones (solo DM). */
+function togglePlayerVisibility(playerId) {
+    const p = playersData.find(x => x.id === playerId);
+    if (!p) return;
+    const nextVisible = p.visible === false;
+    db.collection('players').doc(playerId).update({ visible: nextVisible })
+        .then(() => {
+            showToast(nextVisible ? 'Jugador visible en listas y transacciones' : 'Jugador oculto de listas y transacciones');
+            loadPlayers();
+            if (typeof loadNotificationRecipients === 'function') loadNotificationRecipients();
+        })
+        .catch(e => showToast('Error: ' + e.message, true));
 }
 
 function openGoldModal(id, nombre, oro) {
@@ -273,7 +300,10 @@ function openPlayerInventory(playerId) {
     document.getElementById('player-inventory-name').textContent = player.nombre;
     document.getElementById('player-inventory-gold').textContent = '💰 ' + (player.oro != null ? player.oro : 0).toLocaleString() + ' GP';
     var items = player.inventario || [];
-    var totalValue = items.reduce(function(sum, it) { return sum + (Number(it.price) || 0); }, 0);
+    var totalValue = items.reduce(function(sum, it) {
+        var qty = (it.quantity != null && it.quantity >= 1) ? it.quantity : 1;
+        return sum + (Number(it.price) || 0) * qty;
+    }, 0);
     var totalValEl = document.getElementById('player-inventory-total-value');
     if (totalValEl) totalValEl.textContent = 'Valor total pertenencias: ' + totalValue.toLocaleString() + ' GP';
     document.getElementById('player-inventory-title').textContent = '🎒 Inventario - ' + player.nombre;
@@ -286,16 +316,21 @@ function groupPlayerInventoryItems(items) {
     var map = {};
     (items || []).forEach(function(item, i) {
         var key = (item.name || '') + '|' + (item.effect || '') + '|' + (item.price != null ? item.price : '') + '|' + (item.rarity || '');
-        if (!map[key]) map[key] = { item: item, indices: [] };
+        var qty = (item.quantity != null && item.quantity >= 1) ? item.quantity : 1;
+        if (!map[key]) map[key] = { item: item, indices: [], count: 0 };
         map[key].indices.push(i);
+        map[key].count += qty;
     });
-    return Object.keys(map).map(function(k) { var g = map[k]; return { item: g.item, count: g.indices.length, indices: g.indices }; });
+    return Object.keys(map).map(function(k) { var g = map[k]; return { item: g.item, count: g.count, indices: g.indices }; });
 }
 
 function renderPlayerInventory(player) {
     const list = document.getElementById('player-inventory-list');
     const items = player.inventario || [];
-    var totalValue = items.reduce(function(sum, it) { return sum + (Number(it.price) || 0); }, 0);
+    var totalValue = items.reduce(function(sum, it) {
+        var qty = (it.quantity != null && it.quantity >= 1) ? it.quantity : 1;
+        return sum + (Number(it.price) || 0) * qty;
+    }, 0);
     var totalValEl = document.getElementById('player-inventory-total-value');
     if (totalValEl) totalValEl.textContent = 'Valor total pertenencias: ' + totalValue.toLocaleString() + ' GP';
 
@@ -354,6 +389,8 @@ function renderPlayerInventory(player) {
 function openGiveItemModal() {
     document.getElementById('give-item-name').value = '';
     document.getElementById('give-item-price').value = 0;
+    var giveQtyEl = document.getElementById('give-item-quantity');
+    if (giveQtyEl) giveQtyEl.value = 1;
     document.getElementById('give-item-effect').value = '';
     document.getElementById('give-item-rarity').value = 'común';
     openModal('give-item-modal');
@@ -361,12 +398,14 @@ function openGiveItemModal() {
 
 async function giveItemToPlayer() {
     const playerId = document.getElementById('player-inventory-id').value;
+    const quantity = Math.max(1, parseInt(document.getElementById('give-item-quantity').value, 10) || 1);
     const item = {
         name: document.getElementById('give-item-name').value,
         price: parseInt(document.getElementById('give-item-price').value) || 0,
         effect: document.getElementById('give-item-effect').value,
         rarity: document.getElementById('give-item-rarity').value
     };
+    if (quantity > 1) item.quantity = quantity;
 
     if (!item.name) {
         showToast('El nombre es requerido', true);
@@ -429,8 +468,13 @@ function removeItemFromPlayer(index) {
     const playerId = document.getElementById('player-inventory-id').value;
     const player = playersData.find(p => p.id === playerId);
     let inventario = player.inventario || [];
-    
-    inventario.splice(index, 1);
+    const item = inventario[index];
+    const qty = (item && item.quantity != null && item.quantity >= 1) ? item.quantity : 1;
+    if (qty > 1) {
+        inventario[index] = { ...item, quantity: item.quantity - 1 };
+    } else {
+        inventario.splice(index, 1);
+    }
 
     db.collection('players').doc(playerId).update({ inventario })
         .then(() => {
@@ -513,11 +557,9 @@ function importPlayerItemsCSV(event) {
                     effect: effect,
                     rarity: rarity
                 };
-
-                for (var q = 0; q < quantity; q++) {
-                    inventario.push(item);
-                    count++;
-                }
+                if (quantity > 1) item.quantity = quantity;
+                inventario.push(item);
+                count++;
             }
 
             if (count === 0) {

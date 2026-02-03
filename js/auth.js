@@ -57,6 +57,10 @@ async function loginPlayer(nombre, pin) {
 
         const playerDoc = playersSnapshot.docs[0];
         const playerData = playerDoc.data();
+        if (playerData.visible === false) {
+            showToast('Este personaje no está disponible. Contacta al DM.', true);
+            return false;
+        }
         
         currentUser = {
             id: playerDoc.id,

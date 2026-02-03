@@ -43,42 +43,6 @@ function getCurrentPlayerDoc() {
     });
 }
 
-// Temas de fondo (DM elige en Mapa → Fondo de la app; se guarda en settings/app)
-var APP_BACKGROUND_THEMES = ['default', 'parchment', 'dungeon', 'tavern', 'map-grid', 'minimal', 'warm', 'noise-warm'];
-
-function applyAppBackgroundClass(themeId) {
-    if (!APP_BACKGROUND_THEMES.includes(themeId)) themeId = 'default';
-    APP_BACKGROUND_THEMES.forEach(function(t) { document.body.classList.remove('app-bg-' + t); });
-    document.body.classList.add('app-bg-' + themeId);
-}
-
-async function loadAppBackgroundTheme() {
-    try {
-        var snap = await db.collection('settings').doc('app').get();
-        var themeId = (snap.exists && snap.data().backgroundTheme) ? snap.data().backgroundTheme : 'default';
-        if (!APP_BACKGROUND_THEMES.includes(themeId)) themeId = 'default';
-        applyAppBackgroundClass(themeId);
-        var sel = document.getElementById('app-background-select');
-        if (sel) sel.value = themeId;
-    } catch (e) {
-        applyAppBackgroundClass('default');
-    }
-}
-
-function setAppBackgroundTheme(themeId) {
-    if (!APP_BACKGROUND_THEMES.includes(themeId)) themeId = 'default';
-    db.collection('settings').doc('app').set({ backgroundTheme: themeId }, { merge: true })
-        .then(function() {
-            applyAppBackgroundClass(themeId);
-            var sel = document.getElementById('app-background-select');
-            if (sel) sel.value = themeId;
-            showToast('Fondo actualizado');
-        })
-        .catch(function(e) {
-            showToast('Error al guardar el fondo: ' + e.message, true);
-        });
-}
-
 function getCityInfoForShop(shop) {
     if (!shop || !shop.ciudadId) return { cityId: '', cityName: '' };
     const city = playerCitiesData.find(c => c.id === shop.ciudadId);
@@ -106,6 +70,100 @@ const POSADA_CUARTOS = [
     { id: 'viento', nombre: 'Cuarto del Enigma del Viento', precio: 120, efecto: 'Aumenta la velocidad de movimiento del aventurero. Durante 1 hora, su velocidad de movimiento se incrementa en 10 pies y obtiene ventaja en las tiradas de salvación contra efectos de control de movimiento (como estar paralizado, atado, etc.).' }
 ];
 if (typeof window !== 'undefined') window.POSADA_CUARTOS = POSADA_CUARTOS;
+
+/** Cantidad de un ítem: si tiene quantity >= 1 se usa; si no, 1 (compatibilidad con datos antiguos). */
+function getItemQuantity(item) {
+    if (!item) return 1;
+    const q = item.quantity;
+    if (q != null && typeof q === 'number' && q >= 1) return Math.floor(q);
+    return 1;
+}
+
+/** Firma de un ítem para agrupar duplicados (ignora quantity). */
+function getItemSignature(item) {
+    if (!item || typeof item !== 'object') return '';
+    const keys = Object.keys(item).filter(function (k) { return k !== 'quantity'; }).sort();
+    const o = {};
+    keys.forEach(function (k) { o[k] = item[k]; });
+    return JSON.stringify(o);
+}
+
+/** Consolida ítems duplicados en una entrada con quantity. Devuelve nuevo array. */
+function mergeItemsByQuantity(items) {
+    if (!items || !Array.isArray(items) || items.length === 0) return items.slice();
+    const map = {};
+    items.forEach(function (item) {
+        var sig = getItemSignature(item);
+        if (!map[sig]) map[sig] = { item: item, total: 0 };
+        map[sig].total += getItemQuantity(item);
+    });
+    return Object.keys(map).map(function (sig) {
+        var g = map[sig];
+        var entry = g.item && typeof g.item === 'object' ? Object.assign({}, g.item) : g.item;
+        if (g.total > 1) entry.quantity = g.total;
+        else if (entry && typeof entry === 'object' && entry.hasOwnProperty('quantity')) delete entry.quantity;
+        return entry;
+    });
+}
+
+/** Migración: consolida ítems duplicados en tiendas y jugadores (una entrada con quantity). */
+async function runQuantityMigration() {
+    var btn = document.getElementById('migrate-quantity-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Migrando…'; }
+    if (typeof showToast === 'function') showToast('Migrando ítems a cantidad…', false);
+    var shopsUpdated = 0;
+    var playersUpdated = 0;
+    var itemsConsolidated = 0;
+    try {
+        var shopsSnap = await db.collection('shops').get();
+        for (var i = 0; i < shopsSnap.docs.length; i++) {
+            var doc = shopsSnap.docs[i];
+            var data = doc.data();
+            var inv = data.inventario;
+            if (!inv || !Array.isArray(inv)) continue;
+            var merged = mergeItemsByQuantity(inv);
+            if (merged.length < inv.length) {
+                itemsConsolidated += inv.length - merged.length;
+                await db.collection('shops').doc(doc.id).update({ inventario: merged });
+                shopsUpdated++;
+            }
+        }
+        var playersSnap = await db.collection('players').get();
+        for (var j = 0; j < playersSnap.docs.length; j++) {
+            var pDoc = playersSnap.docs[j];
+            var pData = pDoc.data();
+            var pInv = pData.inventario;
+            if (!pInv || !Array.isArray(pInv)) continue;
+            var pMerged = mergeItemsByQuantity(pInv);
+            if (pMerged.length < pInv.length) {
+                itemsConsolidated += pInv.length - pMerged.length;
+                await db.collection('players').doc(pDoc.id).update({ inventario: pMerged });
+                playersUpdated++;
+            }
+        }
+        var msg = 'Migración lista.';
+        if (shopsUpdated > 0 || playersUpdated > 0) {
+            msg = 'Migrados ' + shopsUpdated + ' tienda(s), ' + playersUpdated + ' jugador(es). ' + itemsConsolidated + ' ítem(s) consolidados.';
+            if (typeof loadWorld === 'function') loadWorld();
+            if (window._cityDataCache && typeof window._cityDataCache === 'object') {
+                Object.keys(window._cityDataCache).forEach(function (k) { delete window._cityDataCache[k]; });
+            }
+            if (typeof loadPlayers === 'function') loadPlayers();
+        } else {
+            msg = 'No había ítems duplicados que consolidar.';
+        }
+        if (typeof showToast === 'function') showToast(msg);
+    } catch (e) {
+        console.error('Error en migración quantity:', e);
+        if (typeof showToast === 'function') showToast('Error: ' + (e.message || e), true);
+    }
+    if (btn) { btn.disabled = false; btn.textContent = '🔧 Migrar ítems a cantidad'; }
+}
+if (typeof window !== 'undefined') {
+    window.runQuantityMigration = runQuantityMigration;
+    window.mergeItemsByQuantity = mergeItemsByQuantity;
+    window.getItemSignature = getItemSignature;
+}
 
 /** Devuelve el texto de descripción/efecto de un ítem (lo que sube el DM desde el dashboard) */
 function getItemDesc(obj) {
@@ -181,7 +239,10 @@ async function loadLoginPlayers() {
     sel.innerHTML = '<option value="">— Cargando… —</option>';
     try {
         const snap = await db.collection('players').limit(200).get();
-        const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
+        const list = snap.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .filter(p => p.visible !== false)
+            .sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
         sel.innerHTML = '<option value="">— Selecciona tu aventurero —</option>';
         list.forEach(p => {
             const opt = document.createElement('option');
@@ -583,14 +644,17 @@ async function setDefaultMapLevel(index) {
 function toggleMapEditMode() {
     if (!isDM()) return;
     const row = document.getElementById('map-config-row');
+    const optionsRow = document.getElementById('map-edit-options');
     const btn = document.getElementById('map-edit-toggle-btn');
     if (!row || !btn) return;
     const isEditing = row.style.display === 'flex';
     if (isEditing) {
         row.style.display = 'none';
+        if (optionsRow) optionsRow.style.display = 'none';
         btn.textContent = '✏️ Editar mapa';
         btn.title = 'Mostrar configuración del mapa';
     } else {
+        if (optionsRow) optionsRow.style.display = 'block';
         row.style.display = 'flex';
         btn.textContent = '✔️ Ocultar configuración';
         btn.title = 'Volver al modo solo ver';
@@ -613,10 +677,74 @@ function groupInventoryItems(items) {
     const map = {};
     (items || []).forEach((item, i) => {
         const key = (item.name || '') + '|' + (item.effect || '') + '|' + (item.price ?? '') + '|' + (item.rarity || '');
-        if (!map[key]) map[key] = { item, indices: [] };
+        const qty = getItemQuantity(item);
+        if (!map[key]) map[key] = { item, indices: [], count: 0 };
         map[key].indices.push(i);
+        map[key].count += qty;
     });
-    return Object.values(map).map(g => ({ item: g.item, count: g.indices.length, indices: g.indices }));
+    return Object.values(map).map(g => ({ item: g.item, count: g.count, indices: g.indices }));
+}
+
+var _playerInvSortBy = 'name';
+var _playerInvSortDir = 'asc';
+
+function setPlayerInventorySort(column) {
+    if (_playerInvSortBy === column) {
+        _playerInvSortDir = _playerInvSortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+        _playerInvSortBy = column;
+        _playerInvSortDir = 'asc';
+    }
+    syncPlayerInventorySortSelect();
+    if (lastPlayerViewData) renderPlayerView(lastPlayerViewData);
+}
+
+function setPlayerInventorySortFromSelect(value) {
+    if (!value || value.indexOf('_') === -1) return;
+    var parts = value.split('_');
+    _playerInvSortBy = parts[0];
+    _playerInvSortDir = parts[1] === 'desc' ? 'desc' : 'asc';
+    if (lastPlayerViewData) renderPlayerView(lastPlayerViewData);
+}
+
+function syncPlayerInventorySortSelect() {
+    var sel = document.getElementById('player-inventory-sort');
+    if (sel) sel.value = _playerInvSortBy + '_' + _playerInvSortDir;
+}
+
+function sortPlayerInventoryGroups(groups) {
+    var by = _playerInvSortBy;
+    var dir = _playerInvSortDir === 'asc' ? 1 : -1;
+    var rarityOrder = { común: 0, inusual: 1, infrecuente: 2, rara: 3, legendaria: 4 };
+    return groups.slice().sort(function (a, b) {
+        var itA = a.item;
+        var itB = b.item;
+        var cmp = 0;
+        if (by === 'name') {
+            var na = (itA.name || '').toLowerCase();
+            var nb = (itB.name || '').toLowerCase();
+            cmp = na < nb ? -1 : (na > nb ? 1 : 0);
+        } else if (by === 'tipo') {
+            var ta = getTipoLabel(itA).toLowerCase();
+            var tb = getTipoLabel(itB).toLowerCase();
+            cmp = ta < tb ? -1 : (ta > tb ? 1 : 0);
+        } else if (by === 'effect') {
+            var ea = (itA.effect || '').toLowerCase();
+            var eb = (itB.effect || '').toLowerCase();
+            cmp = ea < eb ? -1 : (ea > eb ? 1 : 0);
+        } else if (by === 'price') {
+            var pa = Number(itA.price) || 0;
+            var pb = Number(itB.price) || 0;
+            cmp = pa - pb;
+        } else if (by === 'rarity') {
+            var ra = rarityOrder[(itA.rarity || 'común').toLowerCase()] ?? 0;
+            var rb = rarityOrder[(itB.rarity || 'común').toLowerCase()] ?? 0;
+            cmp = ra - rb;
+        } else if (by === 'count') {
+            cmp = a.count - b.count;
+        }
+        return cmp * dir;
+    });
 }
 
 function renderPlayerView(data) {
@@ -627,7 +755,7 @@ function renderPlayerView(data) {
     const oro = (data.oro != null ? data.oro : 0).toLocaleString() + ' GP';
     const banco = (data.bancoBalance != null ? data.bancoBalance : 0).toLocaleString() + ' GP';
     const items = data.inventario || [];
-    const totalInventarioValue = items.reduce((sum, it) => sum + (Number(it.price) || 0), 0);
+    const totalInventarioValue = items.reduce((sum, it) => sum + (Number(it.price) || 0) * getItemQuantity(it), 0);
     document.getElementById('player-header-name').textContent = nombre;
     document.getElementById('player-header-class-level').textContent = classLevel;
     document.getElementById('player-header-oro').textContent = '💰 ' + oro;
@@ -642,6 +770,7 @@ function renderPlayerView(data) {
         return;
     }
     if (toolbar) toolbar.style.display = 'flex';
+    syncPlayerInventorySortSelect();
     const searchEl = document.getElementById('player-inventory-search');
     const filterEl = document.getElementById('player-inventory-filter-shop');
     const searchTerm = (searchEl && searchEl.value || '').trim().toLowerCase();
@@ -657,33 +786,40 @@ function renderPlayerView(data) {
             (filterShop === 'dm' ? !st : st === filterShop);
         return matchText && matchShop;
     });
+    const sorted = sortPlayerInventoryGroups(filtered);
     const esc = s => String(s || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    var th = function (col, label) {
+        var active = _playerInvSortBy === col;
+        var arrow = active ? (_playerInvSortDir === 'asc' ? ' ↑' : ' ↓') : '';
+        return '<th class="inv-sortable-th' + (active ? ' inv-sort-active' : '') + '" data-sort="' + col + '" role="button" tabindex="0" title="Ordenar por ' + label + '" onclick="setPlayerInventorySort(\'' + col + '\')">' + label + arrow + '</th>';
+    };
+    var theadRow = '<tr>' + th('name', 'Item') + th('tipo', 'Tipo') + th('effect', 'Efecto') + th('price', 'Precio') + th('rarity', 'Rareza') + th('count', 'Cantidad') + '<th class="inv-th-actions">Acciones</th></tr>';
     let tableHtml = '';
     let cardsHtml = '';
     const totalValueHtml = '<p class="player-inventory-total-value" style="margin-bottom:12px; color:#a89878; font-size:1em;">Valor total pertenencias: <strong style="color:#f1c40f;">' + totalInventarioValue.toLocaleString() + ' GP</strong></p>';
-    if (filtered.length === 0) {
+    if (sorted.length === 0) {
         const msg = searchTerm || filterShop
             ? 'No hay items que coincidan con los filtros.'
             : 'Sin items';
-        tableHtml = `<div class="inventory-desktop inventory-table-wrap"><table class="inventory-table"><thead><tr><th>Item</th><th>Tipo</th><th>Efecto</th><th>Precio</th><th>Rareza</th><th>Cantidad</th><th>Acciones</th></tr></thead><tbody><tr><td colspan="7" style="color:#8b7355;text-align:center;padding:20px;">${esc(msg)}</td></tr></tbody></table></div>`;
-        cardsHtml = `<div class="inventory-cards-wrap"><div class="inventory-card" style="text-align:center;color:#8b7355;padding:24px;">${esc(msg)}</div></div>`;
+        tableHtml = '<div class="inventory-desktop inventory-table-wrap"><table class="inventory-table"><thead>' + theadRow + '</thead><tbody><tr><td colspan="7" style="color:#8b7355;text-align:center;padding:20px;">' + esc(msg) + '</td></tr></tbody></table></div>';
+        cardsHtml = '<div class="inventory-cards-wrap"><div class="inventory-card" style="text-align:center;color:#8b7355;padding:24px;">' + esc(msg) + '</div></div>';
     } else {
-        const rows = filtered.map(g => {
+        const rows = sorted.map(g => {
             const it = g.item;
             const idxUse = g.indices[0];
             const idxStr = g.indices.join(',');
             const r = rarityColors[it.rarity] || '#555';
             const tipoLabel = getTipoLabel(it);
-            const isMultiple = g.count > 1;
-            const qtyControl = isMultiple
-                ? `<input type="number" min="1" max="${g.count}" value="1" class="inv-sell-qty" data-indices="${idxStr}" data-max="${g.count}" aria-label="Cantidad" title="Cantidad (usar o vender)">`
-                : '';
-            const sellBtn = isMultiple
-                ? `<button type="button" class="btn btn-secondary btn-small" onclick="openSellConfirmStack('${idxStr}', this)" title="Vender las unidades indicadas (75% c/u)">Vender</button>`
-                : `<button type="button" class="btn btn-secondary btn-small" onclick="openSellConfirm(${idxUse})" title="Vender (75% del valor)">Vender</button>`;
-            const useBtn = isMultiple
-                ? `<button type="button" class="btn btn-small" onclick="openUseItemConfirmStack('${idxStr}', this)" title="Usar las unidades indicadas">Utilizar</button>`
-                : `<button type="button" class="btn btn-small" onclick="openUseItemConfirm(${idxUse})" title="Usar 1">Utilizar</button>`;
+            const idxStrEsc = (idxStr || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            const actionsCell = `
+                <div class="inv-actions-wrap">
+                    <button type="button" class="btn btn-small btn-secondary inv-actions-menu-btn" onclick="toggleInvActionsMenu(event, this)" data-first-index="${idxUse}" data-count="${g.count}" data-indices-str="${idxStrEsc}" title="Acciones">⋮</button>
+                    <div class="inv-actions-dropdown">
+                        <button type="button" onclick="invActionUse(this)">✨ Utilizar</button>
+                        <button type="button" onclick="invActionSell(this)">💰 Vender</button>
+                        <button type="button" onclick="invActionTransfer(this)">📤 Transferir</button>
+                    </div>
+                </div>`;
             return `<tr class="player-inventory-row">
                 <td><span class="player-inventory-item-name" style="color:#d4c4a8; font-weight:600; cursor:pointer; text-decoration:underline; text-underline-offset:3px;" onclick="openPlayerInventoryItemDetail(${idxUse}, ${g.count})" role="button" tabindex="0" title="Ver detalle del ítem">${esc(it.name || 'Item')}</span></td>
                 <td><span class="inv-tipo">${esc(tipoLabel)}</span></td>
@@ -691,30 +827,26 @@ function renderPlayerView(data) {
                 <td><span style="color:#f1c40f;">${it.price != null ? esc(it.price + ' GP') : '—'}</span></td>
                 <td><span class="rarity-badge" style="background:${r}; color:#fff;">${esc(it.rarity || 'común')}</span></td>
                 <td class="inv-qty">${g.count}</td>
-                <td class="inv-actions">
-                    ${useBtn}
-                    ${qtyControl}
-                    ${sellBtn}
-                </td>
+                <td class="inv-actions">${actionsCell}</td>
             </tr>`;
         }).join('');
-        tableHtml = `<div class="inventory-desktop inventory-table-wrap"><table class="inventory-table"><thead><tr><th>Item</th><th>Tipo</th><th>Efecto</th><th>Precio</th><th>Rareza</th><th>Cantidad</th><th>Acciones</th></tr></thead><tbody>${rows}</tbody></table></div>`;
-        cardsHtml = filtered.map(g => {
+        tableHtml = '<div class="inventory-desktop inventory-table-wrap"><table class="inventory-table"><thead>' + theadRow + '</thead><tbody>' + rows + '</tbody></table></div>';
+        cardsHtml = sorted.map(g => {
             const it = g.item;
             const idxUse = g.indices[0];
             const idxStr = g.indices.join(',');
             const r = rarityColors[it.rarity] || '#555';
             const tipoLabel = getTipoLabel(it);
-            const isMultiple = g.count > 1;
-            const qtyControl = isMultiple
-                ? `<input type="number" min="1" max="${g.count}" value="1" class="inv-sell-qty" data-indices="${idxStr}" data-max="${g.count}" aria-label="Cantidad" title="Cantidad (usar o vender)">`
-                : '';
-            const sellBtn = isMultiple
-                ? `<button type="button" class="btn btn-secondary btn-small" onclick="openSellConfirmStack('${idxStr}', this)" title="Vender las unidades indicadas (75% c/u)">Vender</button>`
-                : `<button type="button" class="btn btn-secondary btn-small" onclick="openSellConfirm(${idxUse})" title="Vender (75% del valor)">Vender</button>`;
-            const useBtn = isMultiple
-                ? `<button type="button" class="btn btn-small" onclick="openUseItemConfirmStack('${idxStr}', this)" title="Usar las unidades indicadas">Utilizar</button>`
-                : `<button type="button" class="btn btn-small" onclick="openUseItemConfirm(${idxUse})" title="Usar 1">Utilizar</button>`;
+            const idxStrEscCard = (idxStr || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            const actionsCard = `
+                <div class="inv-actions-wrap">
+                    <button type="button" class="btn btn-small btn-secondary inv-actions-menu-btn" onclick="toggleInvActionsMenu(event, this)" data-first-index="${idxUse}" data-count="${g.count}" data-indices-str="${idxStrEscCard}" title="Acciones">⋮</button>
+                    <div class="inv-actions-dropdown">
+                        <button type="button" onclick="invActionUse(this)">✨ Utilizar</button>
+                        <button type="button" onclick="invActionSell(this)">💰 Vender</button>
+                        <button type="button" onclick="invActionTransfer(this)">📤 Transferir</button>
+                    </div>
+                </div>`;
             return `<div class="inventory-card">
                 <div class="inventory-card-header">
                     <span class="inventory-card-name player-inventory-item-name" style="cursor:pointer; text-decoration:underline; text-underline-offset:3px;" onclick="openPlayerInventoryItemDetail(${idxUse}, ${g.count})" role="button" tabindex="0" title="Ver detalle del ítem">${esc(it.name || 'Item')}</span>
@@ -726,11 +858,7 @@ function renderPlayerView(data) {
                     <span>× ${g.count}</span>
                 </div>
                 <div class="inventory-card-effect">${esc(it.effect || '—')}</div>
-                <div class="inventory-card-actions">
-                    ${useBtn}
-                    ${qtyControl}
-                    ${sellBtn}
-                </div>
+                <div class="inventory-card-actions">${actionsCard}</div>
             </div>`;
         }).join('');
         cardsHtml = `<div class="inventory-cards-wrap">${cardsHtml}</div>`;
@@ -740,6 +868,62 @@ function renderPlayerView(data) {
 }
 
 var _pendingUseAction = null;
+
+function closeAllInvActionsMenus() {
+    document.querySelectorAll('.inv-actions-dropdown.is-open').forEach(function (el) { el.classList.remove('is-open'); });
+}
+
+function toggleInvActionsMenu(event, btn) {
+    if (event) event.stopPropagation();
+    var dropdown = btn.nextElementSibling;
+    if (!dropdown || !dropdown.classList.contains('inv-actions-dropdown')) return;
+    var isOpen = dropdown.classList.contains('is-open');
+    closeAllInvActionsMenus();
+    if (!isOpen) dropdown.classList.add('is-open');
+}
+
+function invActionGetMenuBtn(actionBtn) {
+    var wrap = actionBtn.closest('.inv-actions-wrap');
+    return wrap ? wrap.querySelector('.inv-actions-menu-btn') : null;
+}
+
+function invActionUse(actionBtn) {
+    var menuBtn = invActionGetMenuBtn(actionBtn);
+    if (!menuBtn) return;
+    closeAllInvActionsMenus();
+    var firstIndex = parseInt(menuBtn.getAttribute('data-first-index'), 10);
+    var count = parseInt(menuBtn.getAttribute('data-count'), 10) || 1;
+    var indicesStr = (menuBtn.getAttribute('data-indices-str') || '').replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+    if (count > 1 && indicesStr) {
+        openUseItemConfirmStack(indicesStr);
+    } else {
+        openUseItemConfirm(firstIndex);
+    }
+}
+
+function invActionSell(actionBtn) {
+    var menuBtn = invActionGetMenuBtn(actionBtn);
+    if (!menuBtn) return;
+    closeAllInvActionsMenus();
+    var firstIndex = parseInt(menuBtn.getAttribute('data-first-index'), 10);
+    var count = parseInt(menuBtn.getAttribute('data-count'), 10) || 1;
+    var indicesStr = (menuBtn.getAttribute('data-indices-str') || '').replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+    if (count > 1 && indicesStr) {
+        openSellConfirmStack(indicesStr);
+    } else {
+        openSellConfirm(firstIndex);
+    }
+}
+
+function invActionTransfer(actionBtn) {
+    var menuBtn = invActionGetMenuBtn(actionBtn);
+    if (!menuBtn) return;
+    closeAllInvActionsMenus();
+    var firstIndex = parseInt(menuBtn.getAttribute('data-first-index'), 10);
+    var count = parseInt(menuBtn.getAttribute('data-count'), 10) || 1;
+    var indicesStr = (menuBtn.getAttribute('data-indices-str') || '').replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+    openTransferItemModal(firstIndex, count, indicesStr);
+}
 
 function openPlayerInventoryItemDetail(inventoryIndex, count) {
     if (!lastPlayerViewData || !lastPlayerViewData.inventario) return;
@@ -779,7 +963,8 @@ function openPlayerInventoryItemDetail(inventoryIndex, count) {
     var shopEl = document.getElementById('player-inventory-detail-shop');
     if (shopTipo) {
         shopEl.style.display = 'block';
-        shopEl.textContent = 'Procedencia: ' + shopTipo;
+        var shopLabel = shopTipo === 'encontrado banco' ? 'Encontrado / Banco' : shopTipo;
+        shopEl.textContent = 'Procedencia: ' + shopLabel;
     } else {
         shopEl.style.display = 'none';
     }
@@ -790,41 +975,60 @@ function openUseItemConfirm(index) {
     if (!lastPlayerViewData || !lastPlayerViewData.inventario) return;
     var item = lastPlayerViewData.inventario[index];
     if (!item) return;
+    var maxQty = getItemQuantity(item);
     var name = (item.name || 'Item').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     var msgEl = document.getElementById('player-use-confirm-message');
-    if (msgEl) msgEl.innerHTML = '¿Usar <strong>1 × ' + name + '</strong>?';
+    if (msgEl) msgEl.innerHTML = '¿Usar <strong>' + name + '</strong>?';
+    var qtyInput = document.getElementById('player-use-qty');
+    if (qtyInput) {
+        qtyInput.min = 1;
+        qtyInput.max = maxQty;
+        qtyInput.value = Math.min(1, maxQty);
+        qtyInput.style.display = maxQty <= 1 ? 'none' : '';
+    }
+    var qtyRow = document.getElementById('player-use-qty-row');
+    if (qtyRow) qtyRow.style.display = maxQty <= 1 ? 'none' : 'block';
     _pendingUseAction = { type: 'single', index: index };
     openModal('player-use-item-confirm-modal');
 }
 
-function openUseItemConfirmStack(indicesStr, buttonEl) {
+function openUseItemConfirmStack(indicesStr) {
     if (!lastPlayerViewData || !lastPlayerViewData.inventario) return;
     var indices = indicesStr.split(',').map(function(s) { return parseInt(s, 10); }).filter(function(n) { return !isNaN(n); });
     if (indices.length === 0) return;
-    var qty = indices.length;
-    if (buttonEl && buttonEl.nodeType === 1) {
-        var container = buttonEl.closest('td') || buttonEl.closest('.inventory-card-actions');
-        var input = container ? container.querySelector('.inv-sell-qty') : null;
-        if (input) {
-            var max = parseInt(input.getAttribute('data-max'), 10) || indices.length;
-            qty = Math.min(Math.max(1, parseInt(input.value, 10) || 1), max);
-        }
-    }
+    var inv = lastPlayerViewData.inventario;
+    var totalAvailable = indices.reduce(function(s, i) { return s + (i >= 0 && i < inv.length ? getItemQuantity(inv[i]) : 0); }, 0);
     var item = lastPlayerViewData.inventario[indices[0]];
     var name = (item && item.name ? item.name : 'Item').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     var msgEl = document.getElementById('player-use-confirm-message');
-    if (msgEl) msgEl.innerHTML = qty === 1 ? '¿Usar <strong>1 × ' + name + '</strong>?' : '¿Usar <strong>' + qty + ' × ' + name + '</strong>?';
-    _pendingUseAction = { type: 'stack', indicesStr: indicesStr, qtyOrButton: buttonEl };
+    if (msgEl) msgEl.innerHTML = '¿Usar <strong>' + name + '</strong>?';
+    var qtyInput = document.getElementById('player-use-qty');
+    if (qtyInput) {
+        qtyInput.min = 1;
+        qtyInput.max = totalAvailable;
+        qtyInput.value = 1;
+        qtyInput.style.display = 'block';
+    }
+    var qtyRow = document.getElementById('player-use-qty-row');
+    if (qtyRow) qtyRow.style.display = 'block';
+    _pendingUseAction = { type: 'stack', indicesStr: indicesStr };
     openModal('player-use-item-confirm-modal');
 }
 
 function doConfirmedUseItem() {
     if (!_pendingUseAction) { closeModal('player-use-item-confirm-modal'); return; }
     var a = _pendingUseAction;
+    var qtyInput = document.getElementById('player-use-qty');
+    var qty = (qtyInput && qtyInput.value !== '') ? Math.max(1, parseInt(qtyInput.value, 10) || 1) : 1;
+    var maxVal = qtyInput ? (parseInt(qtyInput.getAttribute('max'), 10) || qty) : qty;
+    qty = Math.min(qty, maxVal);
     _pendingUseAction = null;
     closeModal('player-use-item-confirm-modal');
-    if (a.type === 'single') playerUseItem(a.index);
-    else playerUseItemStack(a.indicesStr, a.qtyOrButton);
+    if (a.type === 'single') {
+        playerUseItemStack(String(a.index), qty);
+    } else {
+        playerUseItemStack(a.indicesStr, qty);
+    }
 }
 
 var _pendingSellAction = null;
@@ -833,55 +1037,65 @@ function openSellConfirm(index) {
     if (!lastPlayerViewData || !lastPlayerViewData.inventario) return;
     var item = lastPlayerViewData.inventario[index];
     if (!item) return;
-    var name = (item.name || 'Item').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    var maxQty = getItemQuantity(item);
     var valorVenta = Math.floor((item.price || 0) * 0.75);
+    var name = (item.name || 'Item').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     var msgEl = document.getElementById('player-sell-confirm-message');
     var hintEl = document.getElementById('player-sell-confirm-hint');
-    if (msgEl) msgEl.innerHTML = '¿Vender <strong>1 × ' + name + '</strong> por <strong>' + valorVenta.toLocaleString() + ' GP</strong>?';
-    if (hintEl) hintEl.textContent = '75% del valor de compra.';
+    if (msgEl) msgEl.innerHTML = '¿Vender <strong>' + name + '</strong> por <strong>' + valorVenta.toLocaleString() + ' GP</strong> (por unidad)?';
+    if (hintEl) hintEl.textContent = '75% del valor de compra por unidad.';
+    var qtyInput = document.getElementById('player-sell-qty');
+    if (qtyInput) {
+        qtyInput.min = 1;
+        qtyInput.max = maxQty;
+        qtyInput.value = Math.min(1, maxQty);
+        qtyInput.style.display = maxQty <= 1 ? 'none' : '';
+    }
+    var qtyRow = document.getElementById('player-sell-qty-row');
+    if (qtyRow) qtyRow.style.display = maxQty <= 1 ? 'none' : 'block';
     _pendingSellAction = { type: 'single', index: index };
     openModal('player-sell-item-confirm-modal');
 }
 
-function openSellConfirmStack(indicesStr, buttonEl) {
+function openSellConfirmStack(indicesStr) {
     if (!lastPlayerViewData || !lastPlayerViewData.inventario) return;
     var indices = indicesStr.split(',').map(function(s) { return parseInt(s, 10); }).filter(function(n) { return !isNaN(n); });
     if (indices.length === 0) return;
-    var qty = indices.length;
-    if (buttonEl && buttonEl.nodeType === 1) {
-        var container = buttonEl.closest('td') || buttonEl.closest('.inventory-card-actions');
-        var input = container ? container.querySelector('.inv-sell-qty') : null;
-        if (input) {
-            var max = parseInt(input.getAttribute('data-max'), 10) || indices.length;
-            qty = Math.min(Math.max(1, parseInt(input.value, 10) || 1), max);
-        }
-        indices = indices.slice(0, qty);
-    }
-    if (indices.length === 0) return;
     var inv = lastPlayerViewData.inventario;
-    var totalVenta = 0;
-    indices.forEach(function(i) {
-        if (i >= 0 && i < inv.length) totalVenta += Math.floor((inv[i].price || 0) * 0.75);
-    });
+    var totalAvailable = indices.reduce(function(s, i) { return s + (i >= 0 && i < inv.length ? getItemQuantity(inv[i]) : 0); }, 0);
     var itemName = (inv[indices[0]] || {}).name || 'Item';
     var name = itemName.replace(/</g, '&lt;').replace(/>/g, '&gt;');
     var msgEl = document.getElementById('player-sell-confirm-message');
     var hintEl = document.getElementById('player-sell-confirm-hint');
-    if (msgEl) msgEl.innerHTML = qty === 1
-        ? '¿Vender <strong>1 × ' + name + '</strong> por <strong>' + totalVenta.toLocaleString() + ' GP</strong>?'
-        : '¿Vender <strong>' + qty + ' × ' + name + '</strong> por <strong>' + totalVenta.toLocaleString() + ' GP</strong> en total?';
-    if (hintEl) hintEl.textContent = '75% del valor de compra por unidad.';
-    _pendingSellAction = { type: 'stack', indicesStr: indicesStr, qtyOrButton: buttonEl };
+    if (msgEl) msgEl.innerHTML = '¿Vender <strong>' + name + '</strong>?';
+    if (hintEl) hintEl.textContent = '75% del valor de compra por unidad. Total según cantidad.';
+    var qtyInput = document.getElementById('player-sell-qty');
+    if (qtyInput) {
+        qtyInput.min = 1;
+        qtyInput.max = totalAvailable;
+        qtyInput.value = 1;
+        qtyInput.style.display = 'block';
+    }
+    var qtyRow = document.getElementById('player-sell-qty-row');
+    if (qtyRow) qtyRow.style.display = 'block';
+    _pendingSellAction = { type: 'stack', indicesStr: indicesStr };
     openModal('player-sell-item-confirm-modal');
 }
 
 function doConfirmedSellItem() {
     if (!_pendingSellAction) { closeModal('player-sell-item-confirm-modal'); return; }
     var a = _pendingSellAction;
+    var qtyInput = document.getElementById('player-sell-qty');
+    var qty = (qtyInput && qtyInput.value !== '') ? Math.max(1, parseInt(qtyInput.value, 10) || 1) : 1;
+    var maxVal = qtyInput ? (parseInt(qtyInput.getAttribute('max'), 10) || qty) : qty;
+    qty = Math.min(qty, maxVal);
     _pendingSellAction = null;
     closeModal('player-sell-item-confirm-modal');
-    if (a.type === 'single') playerSellItem(a.index);
-    else playerSellItemStack(a.indicesStr, a.qtyOrButton);
+    if (a.type === 'single') {
+        playerSellItemStack(String(a.index), qty);
+    } else {
+        playerSellItemStack(a.indicesStr, qty);
+    }
 }
 
 async function playerUseItem(index) {
@@ -895,7 +1109,12 @@ async function playerUseItem(index) {
         const inventario = (data.inventario || []).slice();
         if (index < 0 || index >= inventario.length) { showToast('Ítem no válido', true); return; }
         const item = inventario[index];
-        inventario.splice(index, 1);
+        const qty = getItemQuantity(item);
+        if (qty > 1 && item.quantity != null && item.quantity >= 1) {
+            inventario[index] = { ...item, quantity: item.quantity - 1 };
+        } else {
+            inventario.splice(index, 1);
+        }
         await ref.update({ inventario });
         await db.collection('transactions').add({
             tipo: 'uso',
@@ -943,14 +1162,25 @@ async function playerUseItemStack(indicesStr, qtyOrButton) {
         if (!snap.exists) { showToast('Personaje no encontrado', true); return; }
         const data = snap.data();
         const inventario = (data.inventario || []).slice();
-        const set = new Set(indices);
-        const toRemove = indices.slice().sort((a, b) => b - a);
-        toRemove.forEach(i => {
-            if (i >= 0 && i < inventario.length) inventario.splice(i, 1);
-        });
-        await ref.update({ inventario });
+        let removed = 0;
+        const qtyToUse = Math.min(qty, indices.reduce((s, i) => s + (i >= 0 && i < inventario.length ? getItemQuantity(inventario[i]) : 0), 0));
+        let remaining = qtyToUse;
+        for (const i of indices) {
+            if (remaining <= 0 || i < 0 || i >= inventario.length) continue;
+            const it = inventario[i];
+            const itemQty = getItemQuantity(it);
+            const take = Math.min(remaining, itemQty);
+            remaining -= take;
+            if (take >= itemQty) {
+                inventario[i] = null;
+            } else {
+                inventario[i] = { ...it, quantity: (it.quantity != null ? it.quantity : 1) - take };
+            }
+        }
+        const nuevoInv = inventario.filter(it => it != null);
+        await ref.update({ inventario: nuevoInv });
         const itemName = (data.inventario[indices[0]] || {}).name || 'Item';
-        for (let i = 0; i < indices.length; i++) {
+        for (let i = 0; i < qtyToUse; i++) {
             await db.collection('transactions').add({
                 tipo: 'uso',
                 itemName: itemName,
@@ -961,9 +1191,9 @@ async function playerUseItemStack(indicesStr, qtyOrButton) {
                 fecha: firebase.firestore.FieldValue.serverTimestamp()
             });
         }
-        showToast(indices.length === 1 ? 'Item usado' : indices.length + ' items usados');
+        showToast(qtyToUse === 1 ? 'Item usado' : qtyToUse + ' items usados');
         if (lastPlayerViewData) {
-            lastPlayerViewData.inventario = inventario;
+            lastPlayerViewData.inventario = nuevoInv;
             renderPlayerView(lastPlayerViewData);
         } else {
             getCurrentPlayerDoc().then(doc => { if (doc.exists) renderPlayerView(doc.data()); });
@@ -984,14 +1214,18 @@ async function playerSellItem(index) {
         const inventario = (data.inventario || []).slice();
         if (index < 0 || index >= inventario.length) { showToast('Ítem no válido', true); return; }
         const item = inventario[index];
-        const precioCompra = item.price || 0;
-        const valorVenta = Math.floor(precioCompra * 0.75);
+        const qty = getItemQuantity(item);
+        const valorVenta = Math.floor((item.price || 0) * 0.75);
         const nuevoOro = (data.oro != null ? data.oro : 0) + valorVenta;
-        inventario.splice(index, 1);
+        if (qty > 1 && item.quantity != null && item.quantity >= 1) {
+            inventario[index] = { ...item, quantity: item.quantity - 1 };
+        } else {
+            inventario.splice(index, 1);
+        }
         await ref.update({ oro: nuevoOro, inventario });
         await db.collection('transactions').add({
             tipo: 'venta',
-            itemName: item.name || 'Item',
+            itemName: (item.name || 'Item'),
             playerName: data.nombre || 'Desconocido',
             playerId: user.id,
             shopName: 'Venta',
@@ -1036,18 +1270,30 @@ async function playerSellItemStack(indicesStr, qtyOrButton) {
         if (!snap.exists) { showToast('Personaje no encontrado', true); return; }
         const data = snap.data();
         const inventario = (data.inventario || []).slice();
-        const set = new Set(indices);
+        const totalAvailable = indices.reduce((s, i) => s + (i >= 0 && i < inventario.length ? getItemQuantity(inventario[i]) : 0), 0);
+        const qtyToSell = Math.min(qty, totalAvailable);
+        let remaining = qtyToSell;
         let totalVenta = 0;
         const firstName = (inventario[indices[0]] || {}).name || 'Item';
-        indices.forEach(i => {
-            if (i >= 0 && i < inventario.length) totalVenta += Math.floor((inventario[i].price || 0) * 0.75);
-        });
-        const nuevoInv = inventario.filter((_, i) => !set.has(i));
+        for (const i of indices) {
+            if (remaining <= 0 || i < 0 || i >= inventario.length) continue;
+            const it = inventario[i];
+            const itemQty = getItemQuantity(it);
+            const take = Math.min(remaining, itemQty);
+            remaining -= take;
+            totalVenta += Math.floor((it.price || 0) * 0.75 * take);
+            if (take >= itemQty) {
+                inventario[i] = null;
+            } else {
+                inventario[i] = { ...it, quantity: (it.quantity != null ? it.quantity : 1) - take };
+            }
+        }
+        const nuevoInv = inventario.filter(it => it != null);
         const nuevoOro = (data.oro != null ? data.oro : 0) + totalVenta;
         await ref.update({ oro: nuevoOro, inventario: nuevoInv });
         await db.collection('transactions').add({
             tipo: 'venta',
-            itemName: indices.length > 1 ? indices.length + '× ' + firstName : firstName,
+            itemName: qtyToSell > 1 ? qtyToSell + '× ' + firstName : firstName,
             playerName: data.nombre || 'Desconocido',
             playerId: user.id,
             shopName: 'Venta',
@@ -1064,6 +1310,209 @@ async function playerSellItemStack(indicesStr, qtyOrButton) {
         }
     } catch (e) {
         showToast('Error: ' + e.message, true);
+    }
+}
+
+var _pendingTransfer = null;
+
+function openTransferItemModal(firstIndex, count, indicesStr) {
+    const user = getCurrentUser();
+    if (!user || !isPlayer()) return;
+    if (!lastPlayerViewData || !lastPlayerViewData.inventario) return;
+    const item = lastPlayerViewData.inventario[firstIndex];
+    if (!item) return;
+    _pendingTransfer = { firstIndex, count, indicesStr };
+    const nameEl = document.getElementById('player-transfer-item-name');
+    const qtyEl = document.getElementById('player-transfer-qty');
+    const selectEl = document.getElementById('player-transfer-to-select');
+    if (nameEl) nameEl.textContent = 'Transferir: ' + (item.name || 'Item') + (count > 1 ? ' (máx. ' + count + ')' : '');
+    if (qtyEl) {
+        qtyEl.min = 1;
+        qtyEl.max = count;
+        qtyEl.value = count > 1 ? 1 : 1;
+    }
+    if (selectEl) {
+        selectEl.innerHTML = '<option value="">— Cargando —</option>';
+        db.collection('players').limit(200).get().then(snap => {
+            const others = (snap.docs || [])
+                .map(d => ({ id: d.id, nombre: (d.data().nombre || '').trim() || 'Sin nombre', visible: d.data().visible }))
+                .filter(p => p.id !== user.id && p.visible !== false)
+                .sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es'));
+            selectEl.innerHTML = '<option value="">— Elige jugador —</option>' +
+                others.map(p => '<option value="' + p.id + '">' + (p.nombre || p.id).replace(/</g, '&lt;') + '</option>').join('');
+        }).catch(() => {
+            selectEl.innerHTML = '<option value="">— Error al cargar —</option>';
+        });
+    }
+    if (typeof openModal === 'function') openModal('player-transfer-item-modal');
+}
+
+async function confirmTransferItem() {
+    const user = getCurrentUser();
+    if (!user || !isPlayer() || !_pendingTransfer) return;
+    const toId = document.getElementById('player-transfer-to-select') && document.getElementById('player-transfer-to-select').value;
+    if (!toId) {
+        showToast('Elige un jugador para enviar el ítem', true);
+        return;
+    }
+    if (toId === user.id) {
+        showToast('No puedes enviarte a ti mismo', true);
+        return;
+    }
+    const qtyEl = document.getElementById('player-transfer-qty');
+    const qty = Math.min(Math.max(1, parseInt(qtyEl && qtyEl.value, 10) || 1), _pendingTransfer.count);
+    const indicesStr = _pendingTransfer.indicesStr;
+    const indices = indicesStr.split(',').map(s => parseInt(s, 10)).filter(n => !isNaN(n));
+    if (indices.length === 0) return;
+    const btn = document.getElementById('player-transfer-do-btn');
+    if (btn) btn.disabled = true;
+    try {
+        const senderRef = db.collection('players').doc(user.id);
+        const senderSnap = await getCurrentPlayerDoc();
+        if (!senderSnap.exists) { showToast('Error al leer tu inventario', true); return; }
+        const senderData = senderSnap.data();
+        const inventario = (senderData.inventario || []).slice();
+        const totalAvailable = indices.reduce((s, i) => s + (i >= 0 && i < inventario.length ? getItemQuantity(inventario[i]) : 0), 0);
+        const qtyToTransfer = Math.min(qty, totalAvailable);
+        if (qtyToTransfer <= 0) { showToast('No hay unidades para transferir', true); return; }
+        let remaining = qtyToTransfer;
+        let entryToAdd = null;
+        for (const i of indices) {
+            if (remaining <= 0 || i < 0 || i >= inventario.length) continue;
+            const it = inventario[i];
+            const itemQty = getItemQuantity(it);
+            const take = Math.min(remaining, itemQty);
+            remaining -= take;
+            if (!entryToAdd) {
+                entryToAdd = Object.assign({}, it);
+                if (take > 1) entryToAdd.quantity = take;
+                else if (entryToAdd.quantity != null) delete entryToAdd.quantity;
+            } else if (entryToAdd.quantity != null) {
+                entryToAdd.quantity += take;
+            } else {
+                entryToAdd.quantity = take;
+            }
+            if (take >= itemQty) {
+                inventario[i] = null;
+            } else {
+                inventario[i] = { ...it, quantity: (it.quantity != null ? it.quantity : 1) - take };
+            }
+        }
+        const nuevoInvSender = inventario.filter(it => it != null);
+        const receiverSnap = await db.collection('players').doc(toId).get();
+        if (!receiverSnap.exists) {
+            showToast('Jugador destino no encontrado', true);
+            return;
+        }
+        const receiverData = receiverSnap.data();
+        const receiverInv = (receiverData.inventario || []).slice();
+        receiverInv.push(entryToAdd);
+        await senderRef.update({ inventario: nuevoInvSender });
+        await db.collection('players').doc(toId).update({ inventario: receiverInv });
+
+        if (typeof closeModal === 'function') closeModal('player-transfer-item-modal');
+        showToast('Transferido: ' + qtyToTransfer + '× ' + (entryToAdd.name || 'Item') + ' a ' + (receiverData.nombre || 'jugador'));
+        _pendingTransfer = null;
+        if (lastPlayerViewData) {
+            lastPlayerViewData.inventario = nuevoInvSender;
+            renderPlayerView(lastPlayerViewData);
+        } else {
+            getCurrentPlayerDoc().then(doc => { if (doc.exists) renderPlayerView(doc.data()); });
+        }
+    } catch (e) {
+        console.error(e);
+        showToast('Error al transferir: ' + (e.message || e), true);
+    }
+    if (btn) btn.disabled = false;
+}
+
+function openRegistrarEncontradoModal() {
+    const user = getCurrentUser();
+    if (!user || !isPlayer()) {
+        showToast('Solo el jugador puede registrar objetos encontrados', true);
+        return;
+    }
+    document.getElementById('registrar-encontrado-name').value = '';
+    document.getElementById('registrar-encontrado-price').value = 0;
+    document.getElementById('registrar-encontrado-quantity').value = 1;
+    document.getElementById('registrar-encontrado-rarity').value = 'común';
+    document.getElementById('registrar-encontrado-effect').value = '';
+    openModal('registrar-encontrado-modal');
+}
+
+async function confirmRegistrarEncontrado() {
+    const user = getCurrentUser();
+    if (!user || !isPlayer()) return;
+    const name = (document.getElementById('registrar-encontrado-name').value || '').trim();
+    if (!name) {
+        showToast('Escribe el nombre del objeto', true);
+        return;
+    }
+    const price = parseInt(document.getElementById('registrar-encontrado-price').value, 10) || 0;
+    const quantity = Math.max(1, parseInt(document.getElementById('registrar-encontrado-quantity').value, 10) || 1);
+    const rarity = (document.getElementById('registrar-encontrado-rarity').value || 'común').trim();
+    const effect = (document.getElementById('registrar-encontrado-effect').value || '').trim();
+    var totalValor = price * quantity;
+    var fee = Math.max(0, Math.floor(totalValor * 0.02));
+    const item = {
+        name: name,
+        price: price,
+        effect: effect,
+        rarity: rarity,
+        shopTipo: 'encontrado banco'
+    };
+    if (quantity > 1) item.quantity = quantity;
+    try {
+        const ref = db.collection('players').doc(user.id);
+        const snap = await getCurrentPlayerDoc();
+        if (!snap.exists) { showToast('Error al cargar tu personaje', true); return; }
+        const data = snap.data();
+        const oroActual = data.oro != null ? data.oro : 0;
+        if (oroActual < fee) {
+            showToast('No tienes suficiente oro. La comisión de notaría es ' + fee + ' GP (2% del valor declarado).', true);
+            return;
+        }
+        const inventario = (data.inventario || []).slice();
+        inventario.push(item);
+        const nuevoOro = oroActual - fee;
+        await ref.update({ inventario: inventario, oro: nuevoOro });
+        await db.collection('transactions').add({
+            tipo: 'registro',
+            itemName: name,
+            playerName: data.nombre || 'Jugador',
+            playerId: user.id,
+            shopName: 'Encontrado / Banco',
+            precio: fee,
+            fecha: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        closeModal('registrar-encontrado-modal');
+        if (lastPlayerViewData) {
+            lastPlayerViewData.inventario = inventario;
+            lastPlayerViewData.oro = nuevoOro;
+            renderPlayerView(lastPlayerViewData);
+        } else {
+            getCurrentPlayerDoc().then(doc => { if (doc.exists) renderPlayerView(doc.data()); });
+        }
+        var reciboBody = document.getElementById('registrar-encontrado-recibo-body');
+        if (reciboBody) {
+            reciboBody.innerHTML = buildShopReceiptHTML({
+                shopName: 'Notaría del Banco',
+                logo: '📋',
+                subtitle: 'Registro de objeto encontrado',
+                items: [{ name: name + (quantity > 1 ? ' × ' + quantity : ''), line: 'Registrado' }],
+                extraLines: [
+                    { label: 'Valor declarado (total)', value: totalValor.toLocaleString() + ' GP' },
+                    { label: 'Comisión notaría (2%)', value: fee.toLocaleString() + ' GP' }
+                ],
+                totalLabel: 'Oro descontado:',
+                totalValue: fee.toLocaleString() + ' GP',
+                footerThanks: 'Objeto registrado en tu inventario. Procedencia: Encontrado / Banco.',
+                modalId: 'registrar-encontrado-recibo-modal'
+            });
+        }
+        openModal('registrar-encontrado-recibo-modal');
+    } catch (e) {
+        showToast('Error al registrar: ' + (e.message || e), true);
     }
 }
 
@@ -1232,6 +1681,22 @@ function loadRutasConocidas() {
     window._rutasUnsubscribe = function () { unsub(); window._rutasSubscribed = false; window._rutasUnsubscribe = null; };
     // FIRESTORE LISTENER FIX
     if (typeof registerUnsub === 'function') registerUnsub('dm', 'rutas', function () { unsub(); window._rutasSubscribed = false; window._rutasUnsubscribe = null; });
+}
+
+function toggleDMRutasSection() {
+    const content = document.getElementById('dm-rutas-content');
+    const btn = document.getElementById('dm-rutas-toggle-btn');
+    if (!content || !btn) return;
+    const isVisible = content.style.display !== 'none';
+    if (isVisible) {
+        content.style.display = 'none';
+        btn.textContent = '▶ Mostrar rutas';
+        btn.title = 'Mostrar la sección Rutas conocidas';
+    } else {
+        content.style.display = 'block';
+        btn.textContent = '▼ Ocultar rutas';
+        btn.title = 'Ocultar la sección Rutas conocidas';
+    }
 }
 
 function renderDMRutas() {
@@ -1720,8 +2185,8 @@ function openPlayerCityShops(cityId, cityNombre) {
             .catch(() => {});
     }
 
-    const tipoEmoji = { herreria: '⚔️', pociones: '🧪', taberna: '🍺', biblioteca: '📚', arqueria: '🏹', emporio: '🛒', batalla: '🥊', arena: '🥊', santuario: '🪞', banco: '🏦', posada: '🏨', prision: '🔒', prisión: '🔒' };
-    const tipoClass = { herreria: 'herreria', pociones: 'pociones', taberna: 'taberna', biblioteca: 'biblioteca', arqueria: 'arqueria', emporio: 'emporio', batalla: 'batalla', arena: 'batalla', santuario: 'santuario', banco: 'banco', posada: 'posada', prision: 'prision', prisión: 'prision' };
+    const tipoEmoji = { herreria: '⚔️', pociones: '🧪', taberna: '🍺', biblioteca: '📚', arqueria: '🏹', emporio: '🛒', batalla: '🥊', arena: '🥊', santuario: '🪞', banco: '🏦', posada: '🏨', prision: '🔒', prisión: '🔒', 'encontrado banco': '📋' };
+    const tipoClass = { herreria: 'herreria', pociones: 'pociones', taberna: 'taberna', biblioteca: 'biblioteca', arqueria: 'arqueria', emporio: 'emporio', batalla: 'batalla', arena: 'batalla', santuario: 'santuario', banco: 'banco', posada: 'posada', prision: 'prision', prisión: 'prision', 'encontrado banco': 'encontrado' };
 
     const orderedShops = recomendadoId && shops.some(s => s.id === recomendadoId)
         ? [shops.find(s => s.id === recomendadoId), ...shops.filter(s => s.id !== recomendadoId)].filter(Boolean)
@@ -1734,9 +2199,9 @@ function openPlayerCityShops(cityId, cityNombre) {
         <div class="player-mistfall-shop-card player-mistfall-shop-habitantes" style="border:2px solid rgba(139,90,43,0.6);" onclick="openMiCasaModal()" role="button" tabindex="0">
             <span class="player-mistfall-shop-icon">🏠</span>
             <div class="player-mistfall-shop-info">
-                <h3 class="player-mistfall-shop-name">Home</h3>
+                <h3 class="player-mistfall-shop-name">Hogar</h3>
                 <p class="player-mistfall-shop-desc">Tu fortaleza personal</p>
-                <p class="player-mistfall-shop-enter">— Entrar a Home →</p>
+                <p class="player-mistfall-shop-enter">— Entrar a Hogar →</p>
             </div>
         </div>` : '';
     
@@ -2222,7 +2687,7 @@ function openPlayerPosadaModal(shopId) {
     const user = getCurrentUser();
     const renderOro = (oro) => {
         const el = document.getElementById('player-posada-oro');
-        if (el) el.innerHTML = 'Tu oro: <strong>' + (oro != null ? oro : 0).toLocaleString() + '</strong> GP';
+        if (el) el.innerHTML = '<strong>' + (oro != null ? oro : 0).toLocaleString() + '</strong> GP';
     };
     if (posadaSearchEl && !window._playerPosadaSearchListener) {
         window._playerPosadaSearchListener = true;
@@ -2394,7 +2859,7 @@ function openPlayerBatallaModal(shopId) {
     const user = getCurrentUser();
     const renderOro = (oro) => {
         const el = document.getElementById('player-batalla-oro');
-        if (el) el.innerHTML = 'Tu oro: <strong>' + (oro != null ? oro : 0).toLocaleString() + '</strong> GP';
+        if (el) el.innerHTML = '<strong>' + (oro != null ? oro : 0).toLocaleString() + '</strong> GP';
     };
     
     // Solo usar oponentes configurados por el DM
@@ -2651,7 +3116,7 @@ async function processBatallaPayment() {
     // Actualizar oro mostrado
     const renderOro = (oro) => {
         const el = document.getElementById('player-batalla-oro');
-        if (el) el.innerHTML = 'Tu oro: <strong>' + (oro != null ? oro : 0).toLocaleString() + '</strong> GP';
+        if (el) el.innerHTML = '<strong>' + (oro != null ? oro : 0).toLocaleString() + '</strong> GP';
     };
     renderOro(newOro);
     
@@ -2781,7 +3246,7 @@ window.checkoutPosada = async function() {
     // Actualizar oro mostrado
     const renderOro = (oro) => {
         const el = document.getElementById('player-posada-oro');
-        if (el) el.innerHTML = 'Tu oro: <strong>' + (oro != null ? oro : 0).toLocaleString() + '</strong> GP';
+        if (el) el.innerHTML = '<strong>' + (oro != null ? oro : 0).toLocaleString() + '</strong> GP';
     };
     renderOro(newOro);
     
@@ -2965,11 +3430,13 @@ async function playerArtesaniasCheckout() {
     playerArtesaniasCart.forEach(e => {
         const it = inventario[e.inventarioIndex];
         if (!it) return;
+        const qty = e.qty || 1;
         const entry = { name: it.name, price: it.price, effect: it.effect || it.desc || '', rarity: 'común' };
         if (it.type) entry.type = it.type;
         if (it.tab) entry.tab = it.tab;
         entry.shopTipo = (shop.tipo || 'arqueria').toString().toLowerCase();
-        for (let q = 0; q < e.qty; q++) playerInv.push(entry);
+        if (qty > 1) entry.quantity = qty;
+        playerInv.push(entry);
     });
     await db.collection('players').doc(user.id).update({ oro: newOro, inventario: playerInv });
     
@@ -3175,10 +3642,12 @@ async function playerEmporioCheckout() {
     playerEmporioCart.forEach(e => {
         const it = inventario[e.inventarioIndex];
         if (!it) return;
+        const qty = e.qty || 1;
         const entry = { name: it.name, price: it.price, effect: it.effect || it.desc || '', rarity: (it.rarity || 'común') };
         if (it.section) entry.section = it.section;
         entry.shopTipo = (shop.tipo || 'emporio').toString().toLowerCase();
-        for (let q = 0; q < e.qty; q++) playerInv.push(entry);
+        if (qty > 1) entry.quantity = qty;
+        playerInv.push(entry);
     });
     await db.collection('players').doc(user.id).update({ oro: newOro, inventario: playerInv });
     
@@ -3623,6 +4092,7 @@ async function playerForgeCheckout() {
     playerForgeCart.forEach(e => {
         const it = inventario[e.inventarioIndex];
         if (!it) return;
+        const qty = e.qty || 1;
         const entry = { name: it.name, price: it.price, effect: it.effect || it.desc || '', rarity: 'común' };
         if (it.tier) entry.tier = it.tier;
         if (it.damage) entry.damage = it.damage;
@@ -3630,7 +4100,8 @@ async function playerForgeCheckout() {
         if (it.ac) entry.ac = it.ac;
         if (it.tipo) entry.tipo = it.tipo;
         entry.shopTipo = (shop.tipo || 'herreria').toString().toLowerCase();
-        for (let q = 0; q < e.qty; q++) playerInv.push(entry);
+        if (qty > 1) entry.quantity = qty;
+        playerInv.push(entry);
     });
     await db.collection('players').doc(user.id).update({ oro: newOro, inventario: playerInv });
     
@@ -3901,12 +4372,14 @@ async function playerPotionCheckout() {
     for (const item of playerPotionCart) {
         const p = products[item.index];
         if (!p) continue;
+        const qty = item.qty || 1;
         const entry = { name: p.name || 'Item', price: p.price, effect: p.effect || '', rarity: (p.rarity || 'común') };
         entry.shopTipo = (shop && shop.tipo ? shop.tipo : 'pociones').toString().toLowerCase();
         if (p.avg) entry.avg = p.avg;
         if (p.damage) entry.damage = p.damage;
         if (p.damageType) entry.damageType = p.damageType;
-        for (let q = 0; q < item.qty; q++) inventario.push(entry);
+        if (qty > 1) entry.quantity = qty;
+        inventario.push(entry);
     }
     await db.collection('players').doc(user.id).update({ oro: newOro, inventario });
     
@@ -4207,7 +4680,10 @@ async function playerTavernCheckout() {
         // Solo "Para Llevar" va al inventario; "Para Servir" se consume en la taberna
         const paraLlevar = (it.categoria || 'servir').toLowerCase() === 'llevar';
         if (!paraLlevar) continue;
-        for (let q = 0; q < row.qty; q++) inventario.push({ name: it.name, price: it.price, effect: it.effect || '', rarity: 'común', shopTipo });
+        const qty = row.qty || 1;
+        const entry = { name: it.name, price: it.price, effect: it.effect || '', rarity: 'común', shopTipo };
+        if (qty > 1) entry.quantity = qty;
+        inventario.push(entry);
     }
     const newOro = oro - total;
     await db.collection('players').doc(user.id).update({ oro: newOro, inventario });
@@ -4288,7 +4764,6 @@ async function showDashboard() {
         if (typeof loadDMMissions === 'function') loadDMMissions();
         loadMapImage();
         if (typeof loadRutasConocidas === 'function') loadRutasConocidas();
-        loadAppBackgroundTheme();
     } else {
         showLoginModal();
     }
@@ -4310,7 +4785,17 @@ function refreshDMData() {
 // ==================== INITIALIZE ====================
 document.addEventListener('DOMContentLoaded', function() {
     updateFooterTagline();
-    loadAppBackgroundTheme();
+    document.addEventListener('click', function() {
+        if (typeof closeAllInvActionsMenus === 'function') closeAllInvActionsMenus();
+    });
+    document.addEventListener('keydown', function (e) {
+        var th = e.target && e.target.closest && e.target.closest('.inv-sortable-th');
+        if (th && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault();
+            var col = th.getAttribute('data-sort');
+            if (col && typeof setPlayerInventorySort === 'function') setPlayerInventorySort(col);
+        }
+    });
     if (checkAuth()) {
         if (isDM()) showDashboard();
         else if (isPlayer()) showPlayerView();
@@ -4635,12 +5120,12 @@ function loadMiCasaContent() {
         const imagenContainer = document.getElementById('mi-casa-imagen-container');
         if (!imagenContainer) return;
         if (casaInfo.imagenUrl) {
-            imagenContainer.innerHTML = `<img src="${casaInfo.imagenUrl.replace(/"/g, '&quot;')}" alt="${(casaInfo.nombre || 'Home').replace(/"/g, '&quot;')}" style="width:100%; height:auto; max-height:600px; object-fit:cover; display:block;" onerror="this.style.display='none'; this.parentElement.innerHTML='<div id=\\'mi-casa-imagen-placeholder\\' style=\\'padding:80px; color:#8b7355; font-size:4em; text-align:center;\\'><div style=\\'font-size:0.3em; margin-top:20px; color:#6b5d4a;\\'>Error al cargar la imagen</div></div>';"><div id="mi-casa-imagen-placeholder" style="display:none;"></div>`;
+            imagenContainer.innerHTML = `<img src="${casaInfo.imagenUrl.replace(/"/g, '&quot;')}" alt="${(casaInfo.nombre || 'Hogar').replace(/"/g, '&quot;')}" style="width:100%; height:auto; max-height:600px; object-fit:cover; display:block;" onerror="this.style.display='none'; this.parentElement.innerHTML='<div id=\\'mi-casa-imagen-placeholder\\' style=\\'padding:80px; color:#8b7355; font-size:4em; text-align:center;\\'><div style=\\'font-size:0.3em; margin-top:20px; color:#6b5d4a;\\'>Error al cargar la imagen</div></div>';"><div id="mi-casa-imagen-placeholder" style="display:none;"></div>`;
         } else {
             imagenContainer.innerHTML = '<div id="mi-casa-imagen-placeholder" style="padding:80px; color:#8b7355; font-size:4em; text-align:center;"><div style="font-size:0.3em; margin-top:20px; color:#6b5d4a;">El DM aún no ha agregado una imagen</div></div>';
         }
         const nombreEl = document.getElementById('mi-casa-nombre-display');
-        if (nombreEl) nombreEl.textContent = casaInfo.nombre || 'Home';
+        if (nombreEl) nombreEl.textContent = casaInfo.nombre || 'Hogar';
         const descEl = document.getElementById('mi-casa-descripcion-display');
         if (descEl) descEl.textContent = casaInfo.descripcion || 'El DM aún no ha agregado una descripción para tu casa.';
         const ubicacionEl = document.getElementById('mi-casa-ubicacion-display');

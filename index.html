@@ -28,14 +28,18 @@
         <div class="nav-overlay" id="dm-nav-overlay" onclick="closeMobileNav('dm')" aria-hidden="true"></div>
         <div class="nav-wrapper" id="dm-nav-wrapper">
         <nav class="nav-tabs">
-            <button class="nav-tab nav-tab-type-map active" data-tab="map">🗺️ Mapa</button>
-            <button class="nav-tab nav-tab-type-players" data-tab="players">👥 Jugadores</button>
-            <button class="nav-tab nav-tab-type-cities" data-tab="cities">🏘️ Ciudades/Pueblos</button>
-            <button class="nav-tab nav-tab-type-notifications" data-tab="notifications">📮 Notificaciones</button>
-            <button class="nav-tab nav-tab-type-missions" data-tab="missions">📋 Misiones</button>
-            <button class="nav-tab nav-tab-type-transactions" data-tab="transactions">📜 Historial</button>
-            <button class="nav-tab nav-tab-type-battle" type="button" onclick="window.open('battle-tracker.html', '_blank')" title="Abrir en nueva pestaña">⚔️ Battle Tracker</button>
-            <button class="nav-tab nav-tab-logout" type="button" onclick="closeMobileNav('dm'); logout();">🚪 Salir</button>
+            <div class="nav-tabs-row1">
+                <button class="nav-tab nav-tab-type-map active" data-tab="map">🗺️ Mapa</button>
+                <button class="nav-tab nav-tab-type-players" data-tab="players">👥 Jugadores</button>
+                <button class="nav-tab nav-tab-type-cities" data-tab="cities">🏘️ Ciudades/Pueblos</button>
+                <button class="nav-tab nav-tab-type-notifications" data-tab="notifications">📮 Notificaciones</button>
+                <button class="nav-tab nav-tab-type-missions" data-tab="missions">📋 Misiones</button>
+            </div>
+            <div class="nav-tabs-row2">
+                <button class="nav-tab nav-tab-type-transactions" data-tab="transactions">📜 Historial</button>
+                <button class="nav-tab nav-tab-type-battle" type="button" onclick="window.open('battle-tracker.html', '_blank')" title="Abrir en nueva pestaña">⚔️ Battle Tracker</button>
+                <button class="nav-tab nav-tab-logout" type="button" onclick="closeMobileNav('dm'); logout();">🚪 Salir</button>
+            </div>
         </nav>
         </div>
 
@@ -45,24 +49,13 @@
                 <h2 id="map-title-dm">🗺️ Mapa</h2>
                 <button type="button" class="btn btn-small" id="map-edit-toggle-btn" onclick="toggleMapEditMode()" title="Mostrar u ocultar configuración del mapa">✏️ Editar mapa</button>
             </div>
-            <div class="map-default-level-row map-default-level-row-dashboard">
-                <label for="map-default-level-select" style="color:#a89878; font-size:0.9em;">Mapa inicial para aventureros (al hacer login):</label>
-                <select id="map-default-level-select" class="map-default-level-select" onchange="setDefaultMapLevel(parseInt(this.value, 10))" aria-label="Mapa que verá el aventurero al entrar">
-                    <option value="0">—</option>
-                </select>
-            </div>
-            <div class="map-default-level-row map-default-level-row-dashboard" id="app-background-row">
-                <label for="app-background-select" style="color:#a89878; font-size:0.9em;">Fondo de la app:</label>
-                <select id="app-background-select" class="map-default-level-select" onchange="setAppBackgroundTheme(this.value)" aria-label="Tema de fondo de la aplicación">
-                    <option value="default">Predeterminado (oscuro + ruido)</option>
-                    <option value="parchment">Pergamino</option>
-                    <option value="dungeon">Mazmorra</option>
-                    <option value="tavern">Noche de taberna</option>
-                    <option value="map-grid">Cuadrícula mapa</option>
-                    <option value="minimal">Minimalista oscuro</option>
-                    <option value="warm">Cálido (velas)</option>
-                    <option value="noise-warm">Ruido + cálido</option>
-                </select>
+            <div id="map-edit-options" style="display:none;">
+                <div class="map-default-level-row map-default-level-row-dashboard">
+                    <label for="map-default-level-select" style="color:#a89878; font-size:0.9em;">Mapa inicial para aventureros (al hacer login):</label>
+                    <select id="map-default-level-select" class="map-default-level-select" onchange="setDefaultMapLevel(parseInt(this.value, 10))" aria-label="Mapa que verá el aventurero al entrar">
+                        <option value="0">—</option>
+                    </select>
+                </div>
             </div>
             <div id="map-config-row" class="map-config-row" style="display:none;">
                 <div class="map-levels-form">
@@ -93,12 +86,17 @@
                 <img id="map-img" src="https://i.imgur.com/ppAIykX.png" alt="Mapa" style="max-width:100%; border-radius:10px;">
             </div>
             <div class="dm-map-rutas-section">
-                <div class="section-header" style="margin-top:24px;">
+                <div class="section-header" style="margin-top:24px; display:flex; flex-wrap:wrap; align-items:center; gap:10px; justify-content:space-between;">
                     <h2 style="margin:0;">🛤️ Rutas conocidas</h2>
-                    <button type="button" class="btn btn-small" id="ruta-add-btn" onclick="openRutaModal()">➕ Añadir ruta</button>
+                    <button type="button" class="btn btn-small btn-secondary" id="dm-rutas-toggle-btn" onclick="toggleDMRutasSection()" title="Mostrar u ocultar la sección Rutas conocidas">▶ Mostrar rutas</button>
                 </div>
-                <p style="color:#8b7355; margin-bottom:16px;">Rutas entre ciudades: salida, llegada, medio de transporte y duración. Los aventureros las consultan en el mapa.</p>
-                <div id="dm-rutas-list" class="dm-rutas-list"></div>
+                <div id="dm-rutas-content" style="display:none;">
+                    <p style="color:#8b7355; margin-bottom:16px;">Rutas entre ciudades: salida, llegada, medio de transporte y duración. Los aventureros las consultan en el mapa.</p>
+                    <div style="margin-bottom:12px;">
+                        <button type="button" class="btn btn-small" id="ruta-add-btn" onclick="openRutaModal()">➕ Añadir ruta</button>
+                    </div>
+                    <div id="dm-rutas-list" class="dm-rutas-list"></div>
+                </div>
             </div>
         </section>
 
@@ -151,8 +149,8 @@
             </div>
             <div class="dm-notifications-subtabs">
                 <button type="button" class="dm-notifications-subtab active" data-dm-subtab="enviar" onclick="switchDMNotificationsSubtab('enviar')">📬 Enviar Notificación</button>
-                <button type="button" class="dm-notifications-subtab" data-dm-subtab="historial" onclick="switchDMNotificationsSubtab('historial')">📜 Historial de Notificaciones</button>
                 <button type="button" class="dm-notifications-subtab" data-dm-subtab="automation" onclick="switchDMNotificationsSubtab('automation')">🤖 Mensajes automáticos</button>
+                <button type="button" class="dm-notifications-subtab" data-dm-subtab="historial" onclick="switchDMNotificationsSubtab('historial')">📜 Historial de Notificaciones</button>
             </div>
             <div id="dm-notifications-container">
                 <div id="dm-notifications-enviar-panel" class="dm-notifications-subtab-content" style="display: block;">
@@ -257,6 +255,7 @@
         <section id="transactions" class="tab-content">
             <div class="section-header">
                 <h2>📜 Historial de Transacciones</h2>
+                <p style="color:#8b7355; font-size:0.9em; margin:4px 0 0 0;">Últimas 10 transacciones de los últimos 30 días. Las más antiguas se eliminan automáticamente.</p>
             </div>
             <div class="transactions-toolbar" style="margin-bottom: 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px;">
                 <input type="search" id="transactions-search" class="searchbar" placeholder="Buscar por ítem..." style="max-width: 240px;">
@@ -300,14 +299,18 @@
         <div class="nav-overlay" id="player-nav-overlay" onclick="closeMobileNav('player')" aria-hidden="true"></div>
         <div class="nav-wrapper" id="player-nav-wrapper">
         <nav class="nav-tabs" id="player-nav-tabs">
-            <button class="nav-tab nav-tab-type-map active" data-tab="player-map">🗺️ Mapa</button>
-            <button class="nav-tab nav-tab-type-cities" data-tab="player-ciudades">🏛️ Ciudades</button>
-            <button class="nav-tab nav-tab-type-inventario" data-tab="player-inventario">🎒 Inventario</button>
-            <button class="nav-tab nav-tab-type-cdd" data-tab="player-notifications">🃏 CDD & Correo<span class="nav-badge nav-badge-mail nav-badge--hidden" id="mail-unread-badge" aria-label="Correos sin leer"></span></button>
-            <button class="nav-tab nav-tab-type-home" data-tab="player-home" title="Ver mi home">🏠 Home</button>
-            <button class="nav-tab nav-tab-type-missions" data-tab="player-missions">📋 Misiones<span class="nav-badge nav-badge-missions nav-badge--hidden" id="missions-pending-badge" aria-label="Misiones por aceptar"></span></button>
-            <button class="nav-tab nav-tab-type-battle" type="button" onclick="window.open('battle-tracker.html', '_blank')" title="Abrir en nueva pestaña">⚔️ Battle Tracker</button>
-            <button class="nav-tab nav-tab-logout" type="button" onclick="closeMobileNav('player'); logout();">🚪 Salir</button>
+            <div class="nav-tabs-row1">
+                <button class="nav-tab nav-tab-type-map active" data-tab="player-map">🗺️ Mapa</button>
+                <button class="nav-tab nav-tab-type-cities" data-tab="player-ciudades">🏛️ Ciudades</button>
+                <button class="nav-tab nav-tab-type-inventario" data-tab="player-inventario">🎒 Inventario</button>
+                <button class="nav-tab nav-tab-type-cdd" data-tab="player-notifications">🃏 CDD & Correo<span class="nav-badge nav-badge-mail nav-badge--hidden" id="mail-unread-badge" aria-label="Correos sin leer"></span></button>
+                <button class="nav-tab nav-tab-type-home" data-tab="player-home" title="Ver mi hogar">🏠 Hogar</button>
+            </div>
+            <div class="nav-tabs-row2">
+                <button class="nav-tab nav-tab-type-missions" data-tab="player-missions">📋 Misiones<span class="nav-badge nav-badge-missions nav-badge--hidden" id="missions-pending-badge" aria-label="Misiones por aceptar"></span></button>
+                <button class="nav-tab nav-tab-type-battle" type="button" onclick="window.open('battle-tracker.html', '_blank')" title="Abrir en nueva pestaña">⚔️ Battle Tracker</button>
+                <button class="nav-tab nav-tab-logout" type="button" onclick="closeMobileNav('player'); logout();">🚪 Salir</button>
+            </div>
         </nav>
         </div>
         <section id="player-map" class="tab-content active">
@@ -373,6 +376,11 @@
                     <h1 class="player-mistfall-h1" id="player-directorio-city-name">—</h1>
                     <p class="player-mistfall-subtitle">Directorio de la Ciudad</p>
                 </header>
+                <div class="player-mistfall-divider">
+                    <div class="player-mistfall-divider-line"></div>
+                    <span class="player-mistfall-divider-icon">⚜️</span>
+                    <div class="player-mistfall-divider-line"></div>
+                </div>
                 <div class="player-directorio-top-bar directorio-tabs-collapsed" id="player-directorio-top-bar">
                     <button type="button" class="player-directorio-tabs-toggle" id="player-directorio-tabs-toggle" onclick="toggleDirectorioTabsMobile()" aria-expanded="false" aria-label="Mostrar u ocultar menú (Comercios, Historia, etc.)">Menú <span class="player-directorio-tabs-toggle-icon" aria-hidden="true">▼</span></button>
                     <div class="player-directorio-tabs" id="player-directorio-tabs">
@@ -381,11 +389,6 @@
                         <button type="button" class="btn btn-small btn-secondary player-directorio-tab" data-tab="notas" onclick="switchDirectorioTab('notas')">📝 Mis notas</button>
                         <button type="button" class="btn btn-small btn-secondary player-directorio-tab" data-tab="habitantes" onclick="switchDirectorioTab('habitantes')">🎭 Habitantes</button>
                     </div>
-                </div>
-                <div class="player-mistfall-divider">
-                    <div class="player-mistfall-divider-line"></div>
-                    <span class="player-mistfall-divider-icon">⚜️</span>
-                    <div class="player-mistfall-divider-line"></div>
                 </div>
                 <div id="player-directorio-panel-comercios" class="player-directorio-panel">
                     <div id="player-directorio-shops-grid" class="player-mistfall-shops-grid"></div>
@@ -423,7 +426,25 @@
                             <option value="emporio">Emporio</option>
                             <option value="biblioteca">Biblioteca</option>
                             <option value="santuario">Santuario</option>
+                            <option value="encontrado banco">Encontrado / Banco</option>
                             <option value="dm">DM / Otros</option>
+                        </select>
+                    </div>
+                    <div class="player-inventory-sort-row">
+                        <label for="player-inventory-sort" class="player-inventory-sort-label">Ordenar por:</label>
+                        <select id="player-inventory-sort" class="player-inventory-sort-select" aria-label="Ordenar inventario" onchange="setPlayerInventorySortFromSelect(this.value)">
+                            <option value="name_asc">Nombre (A→Z)</option>
+                            <option value="name_desc">Nombre (Z→A)</option>
+                            <option value="tipo_asc">Tipo (A→Z)</option>
+                            <option value="tipo_desc">Tipo (Z→A)</option>
+                            <option value="effect_asc">Efecto (A→Z)</option>
+                            <option value="effect_desc">Efecto (Z→A)</option>
+                            <option value="price_asc">Precio (menor primero)</option>
+                            <option value="price_desc">Precio (mayor primero)</option>
+                            <option value="rarity_asc">Rareza (baja → alta)</option>
+                            <option value="rarity_desc">Rareza (alta → baja)</option>
+                            <option value="count_asc">Cantidad (menor primero)</option>
+                            <option value="count_desc">Cantidad (mayor primero)</option>
                         </select>
                     </div>
                 </div>
@@ -463,16 +484,16 @@
             </div>
         </section>
 
-        <!-- Home (Mi Casa) - misma pestaña que el resto -->
+        <!-- Hogar (Mi Casa) - misma pestaña que el resto -->
         <section id="player-home" class="tab-content">
             <div class="section-header">
-                <h2>🏠 Home</h2>
+                <h2>🏠 Hogar</h2>
             </div>
             <div class="mi-casa-main-block" style="background: linear-gradient(180deg, rgba(26, 26, 26, 0.98) 0%, rgba(20, 20, 20, 0.98) 100%); border: 2px solid #8b5a2b; margin: 0 0 24px 0; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.6);">
                 <div style="padding: 20px 24px; border-bottom: 2px solid #8b5a2b; background: linear-gradient(135deg, rgba(139, 90, 43, 0.15) 0%, rgba(107, 74, 27, 0.1) 100%);">
                     <h2 style="font-family:'Cinzel', serif; color:#d4af37; font-size: 1.6em; margin: 0; text-transform: uppercase; letter-spacing: 3px; display: flex; align-items: center; gap: 12px; text-shadow: 2px 2px 4px rgba(0,0,0,0.8);">
                         <span style="font-size: 1.2em;">🏠</span>
-                        <span id="mi-casa-nombre-display">Home</span>
+                        <span id="mi-casa-nombre-display">Hogar</span>
                     </h2>
                 </div>
                 <div id="mi-casa-imagen-container" style="width:100%; min-height:450px; max-height:650px; overflow:hidden; background:linear-gradient(135deg, #1a1a1a 0%, #2a231c 100%); display:flex; align-items:center; justify-content:center; position:relative; border-bottom: 2px solid #4a3c31;">
@@ -578,6 +599,10 @@
             </div>
             <div class="modal-body player-use-confirm-body">
                 <p class="player-use-confirm-message" id="player-use-confirm-message">¿Usar este ítem?</p>
+                <div class="form-group player-use-qty-row" id="player-use-qty-row" style="margin-top:12px;">
+                    <label for="player-use-qty" style="color:#a89878; font-size:0.9em;">Cantidad</label>
+                    <input type="number" id="player-use-qty" min="1" value="1" aria-label="Cantidad a utilizar" style="width:100%; max-width:120px; padding:8px 12px; background:rgba(0,0,0,0.4); border:1px solid #4a3c31; border-radius:6px; color:#d4c4a8;">
+                </div>
                 <p class="player-use-confirm-hint">Se retirará del inventario.</p>
             </div>
             <div class="modal-footer player-use-confirm-footer">
@@ -596,11 +621,42 @@
             </div>
             <div class="modal-body player-use-confirm-body">
                 <p class="player-use-confirm-message" id="player-sell-confirm-message">¿Vender este ítem?</p>
+                <div class="form-group player-sell-qty-row" id="player-sell-qty-row" style="margin-top:12px;">
+                    <label for="player-sell-qty" style="color:#a89878; font-size:0.9em;">Cantidad</label>
+                    <input type="number" id="player-sell-qty" min="1" value="1" aria-label="Cantidad a vender" style="width:100%; max-width:120px; padding:8px 12px; background:rgba(0,0,0,0.4); border:1px solid #4a3c31; border-radius:6px; color:#d4c4a8;">
+                </div>
                 <p class="player-use-confirm-hint" id="player-sell-confirm-hint">75% del valor de compra.</p>
             </div>
             <div class="modal-footer player-use-confirm-footer">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('player-sell-item-confirm-modal')">Cancelar</button>
                 <button type="button" class="btn player-use-confirm-btn" onclick="doConfirmedSellItem()">Vender</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Transferir ítem a otro jugador -->
+    <div class="modal-overlay" id="player-transfer-item-modal">
+        <div class="modal player-use-confirm-modal" style="max-width: 440px;">
+            <div class="modal-header player-use-confirm-header">
+                <h3 class="player-use-confirm-title">📤 Transferir ítem</h3>
+                <button class="modal-close" onclick="closeModal('player-transfer-item-modal')" aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="modal-body player-use-confirm-body">
+                <p class="player-use-confirm-message" id="player-transfer-item-name">—</p>
+                <div class="form-group" style="margin-top:12px;">
+                    <label for="player-transfer-qty" style="color:#a89878; font-size:0.9em;">Cantidad</label>
+                    <input type="number" id="player-transfer-qty" min="1" value="1" style="width:100%; padding:8px 12px; background:rgba(0,0,0,0.4); border:1px solid #4a3c31; border-radius:6px; color:#d4c4a8;">
+                </div>
+                <div class="form-group" style="margin-top:12px;">
+                    <label for="player-transfer-to-select" style="color:#a89878; font-size:0.9em;">Enviar a</label>
+                    <select id="player-transfer-to-select" style="width:100%; padding:8px 12px; background:rgba(0,0,0,0.4); border:1px solid #4a3c31; border-radius:6px; color:#d4c4a8;">
+                        <option value="">— Cargando jugadores —</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer player-use-confirm-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('player-transfer-item-modal')">Cancelar</button>
+                <button type="button" class="btn player-use-confirm-btn" id="player-transfer-do-btn" onclick="confirmTransferItem()">Transferir</button>
             </div>
         </div>
     </div>
@@ -760,7 +816,7 @@
                     <div id="player-santuario-outcome" style="text-align:center; padding:12px; border-radius:8px; font-weight:600;">—</div>
                     <div id="player-santuario-effect" style="background:rgba(212,168,75,0.1); border-left:3px solid #d4af37; padding:12px; border-radius:0 8px 8px 0; font-size:0.9em;"></div>
                 </div>
-                <p style="color:#8b7355; font-size:0.85em; text-align:center;">Tu oro: <strong id="player-santuario-oro-display" style="color:#d4af37;">0</strong> GP</p>
+                <p style="color:#8b7355; font-size:0.85em; text-align:center;"><strong id="player-santuario-oro-display" style="color:#d4af37;">0</strong> GP</p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary btn-small" id="player-santuario-reset-btn">Reset sesión</button>
@@ -771,33 +827,37 @@
 
     <!-- Modal Banco (depósitos y retiros; 2% de comisión en retiros) -->
     <div class="modal-overlay" id="player-banco-modal">
-        <div class="modal" style="max-width: 480px;">
-            <div class="modal-header">
-                <h3 id="player-banco-title">🏦 Banco</h3>
-                <p style="color: #7a6a5a; font-size: 0.85em; margin-top: 5px; font-style: italic;">Cuenta compartida entre todas las ciudades</p>
-                <button class="modal-close" onclick="closeModal('player-banco-modal')">&times;</button>
+        <div class="modal player-banco-modal" style="max-width: 520px;">
+            <div class="modal-header player-banco-modal-header">
+                <div>
+                    <h3 id="player-banco-title" class="player-banco-modal-title">🏦 Banco</h3>
+                    <p class="player-banco-modal-subtitle">Cuenta compartida entre todas las ciudades</p>
+                </div>
+                <button class="modal-close" onclick="closeModal('player-banco-modal')" aria-label="Cerrar">&times;</button>
             </div>
-            <div class="modal-body" style="display:flex; flex-direction:column; gap:16px;">
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                    <div class="player-banco-box" style="background:rgba(0,0,0,0.3); border:1px solid #4a3c31; border-radius:8px; padding:16px; text-align:center;">
-                        <div style="font-size:0.8em; color:#8b7355; text-transform:uppercase; margin-bottom:4px;">En tu bolsa</div>
-                        <div id="player-banco-oro" class="gold-value" style="font-size:1.4em;">0 GP</div>
+            <div class="modal-body player-banco-modal-body">
+                <div class="player-banco-balances">
+                    <div class="player-banco-balance-box">
+                        <span class="player-banco-balance-label">En tu bolsa</span>
+                        <span id="player-banco-oro" class="player-banco-balance-value">0 GP</span>
                     </div>
-                    <div class="player-banco-box" style="background:rgba(0,0,0,0.3); border:1px solid #4a3c31; border-radius:8px; padding:16px; text-align:center;">
-                        <div style="font-size:0.8em; color:#8b7355; text-transform:uppercase; margin-bottom:4px;">En el banco</div>
-                        <div id="player-banco-balance" class="gold-value" style="font-size:1.4em; color:#5a8a5a;">0 GP</div>
+                    <div class="player-banco-balance-box player-banco-balance-box-bank">
+                        <span class="player-banco-balance-label">En el banco</span>
+                        <span id="player-banco-balance" class="player-banco-balance-value">0 GP</span>
                     </div>
                 </div>
-                <p style="color:#8b7355; font-size:0.85em; text-align:center;">Los retiros tienen una comisión del 2% del valor retirado.</p>
-                <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
-                    <div class="form-group" style="flex:1; min-width:120px;">
-                        <label style="font-size:0.75rem; color:#8b7355;">Cantidad (GP)</label>
-                        <input type="number" id="player-banco-amount" min="1" step="1" placeholder="0" style="width:100%; padding:10px 12px; background:#1a1a1a; border:1px solid #4a3c31; border-radius:6px; color:#d4c4a8;">
+                <p class="player-banco-fee-hint">Los retiros tienen una comisión del 2% del valor retirado.</p>
+                <div class="player-banco-actions-row">
+                    <label for="player-banco-amount" class="player-banco-amount-label">Cantidad (GP)</label>
+                    <input type="number" id="player-banco-amount" class="player-banco-amount-input" min="1" step="1" placeholder="0" aria-label="Cantidad en GP">
+                    <div class="player-banco-buttons">
+                        <button type="button" class="btn player-banco-btn-deposit" id="player-banco-deposit-btn" onclick="doPlayerBancoDeposit()">Depositar</button>
+                        <button type="button" class="btn btn-secondary player-banco-btn-withdraw" id="player-banco-withdraw-btn" onclick="doPlayerBancoWithdraw()">Retirar</button>
                     </div>
-                    <div style="display:flex; gap:8px;">
-                        <button type="button" class="btn" id="player-banco-deposit-btn" onclick="doPlayerBancoDeposit()">Depositar</button>
-                        <button type="button" class="btn btn-secondary" id="player-banco-withdraw-btn" onclick="doPlayerBancoWithdraw()">Retirar</button>
-                    </div>
+                </div>
+                <div class="player-banco-register-section">
+                    <p class="player-banco-register-hint">El objeto debe pasar por una inspección del banquero. El banco se reserva el derecho de registrarlo o no. El registro tiene un coste del 2% del valor declarado del objeto, que se descontará de tu oro.</p>
+                    <button type="button" class="btn btn-secondary player-banco-register-btn" onclick="closeModal('player-banco-modal'); openRegistrarEncontradoModal();" title="Abrir formulario de registro">📋 Registrar objeto encontrado</button>
                 </div>
             </div>
             <div class="modal-footer">
@@ -815,7 +875,7 @@
             </div>
             <div class="modal-body" style="display:flex; flex-direction:column; gap:16px;">
                 <div id="player-batalla-body">
-                    <p id="player-batalla-oro" class="gold-value" style="margin-bottom:16px; font-size:1em;">Tu oro: <strong>0</strong> GP</p>
+                    <p id="player-batalla-oro" class="gold-value" style="margin-bottom:16px; font-size:1em;"><strong>0</strong> GP</p>
                     <div class="player-shop-layout" style="display:flex; flex-direction:column; gap:16px;">
                         <div class="player-shop-cart-toggle-row">
                             <button type="button" class="btn btn-small player-shop-cart-toggle-btn" onclick="toggleShopCart(this)" aria-label="Ver carrito"><span class="player-shop-cart-toggle-label-default">🛒 Ir al carrito <span class="player-shop-cart-badge" id="player-batalla-cart-badge" data-count="0">0</span></span><span class="player-shop-cart-toggle-label-back">Seguir comprando</span></button>
@@ -860,7 +920,7 @@
             </div>
             <div class="modal-body" style="display:flex; flex-direction:column; gap:16px;">
                 <div id="player-posada-body">
-                    <p id="player-posada-oro" class="gold-value" style="margin-bottom:16px; font-size:1em;">Tu oro: <strong>0</strong> GP</p>
+                    <p id="player-posada-oro" class="gold-value" style="margin-bottom:16px; font-size:1em;"><strong>0</strong> GP</p>
                     <div class="player-shop-search-wrap">
                         <button type="button" class="player-shop-search-toggle" aria-expanded="false" onclick="var w=this.closest('.player-shop-search-wrap'); w.classList.toggle('expanded'); this.setAttribute('aria-expanded', w.classList.contains('expanded'));">🔍 Búsqueda y filtros</button>
                         <div class="player-shop-search-row">
@@ -929,7 +989,7 @@
             </div>
             <div class="modal-body">
                 <div id="player-artesanias-body">
-                <div class="player-artesanias-oro" style="margin-bottom:15px; padding:10px; background: rgba(26,42,26,0.6); border-radius:8px; color:#aed581; border:1px solid #4a7c4a;">Tu oro: <strong id="player-artesanias-oro-display">0</strong> GP</div>
+                <div class="player-artesanias-oro" style="margin-bottom:15px; padding:10px; background: rgba(26,42,26,0.6); border-radius:8px; color:#aed581; border:1px solid #4a7c4a;"><strong id="player-artesanias-oro-display">0</strong> GP</div>
                 <div class="player-shop-search-wrap">
                     <button type="button" class="player-shop-search-toggle" aria-expanded="false" onclick="var w=this.closest('.player-shop-search-wrap'); w.classList.toggle('expanded'); this.setAttribute('aria-expanded', w.classList.contains('expanded'));">🔍 Búsqueda y filtros</button>
                     <div class="player-shop-search-row">
@@ -974,7 +1034,7 @@
             </div>
             <div class="modal-body">
                 <div id="player-emporio-body">
-                <div class="player-emporio-oro" style="margin-bottom:15px; padding:10px; background: rgba(40,45,55,0.6); border-radius:8px; color:#9ca8b8; border:1px solid #6a7a8a;">Tu oro: <strong id="player-emporio-oro-display">0</strong> GP</div>
+                <div class="player-emporio-oro" style="margin-bottom:15px; padding:10px; background: rgba(40,45,55,0.6); border-radius:8px; color:#9ca8b8; border:1px solid #6a7a8a;"><strong id="player-emporio-oro-display">0</strong> GP</div>
                 <div class="player-shop-search-wrap">
                     <button type="button" class="player-shop-search-toggle" aria-expanded="false" onclick="var w=this.closest('.player-shop-search-wrap'); w.classList.toggle('expanded'); this.setAttribute('aria-expanded', w.classList.contains('expanded'));">🔍 Búsqueda y filtros</button>
                     <div class="player-shop-search-row">
@@ -1021,7 +1081,7 @@
             </div>
             <div class="modal-body">
                 <div id="player-forge-body">
-                <div class="player-forge-oro" style="margin-bottom:15px; padding:10px; background: rgba(0,0,0,0.3); border-radius:8px; color:#f4d03f;">Tu oro: <strong id="player-forge-oro-display">0</strong> GP</div>
+                <div class="player-forge-oro" style="margin-bottom:15px; padding:10px; background: rgba(0,0,0,0.3); border-radius:8px; color:#f4d03f;"><strong id="player-forge-oro-display">0</strong> GP</div>
                 <div class="player-shop-search-wrap">
                     <button type="button" class="player-shop-search-toggle" aria-expanded="false" onclick="var w=this.closest('.player-shop-search-wrap'); w.classList.toggle('expanded'); this.setAttribute('aria-expanded', w.classList.contains('expanded'));">🔍 Búsqueda y filtros</button>
                     <div class="player-shop-search-row">
@@ -1071,7 +1131,7 @@
             </div>
             <div class="modal-body">
                 <div id="player-biblioteca-body">
-                    <div class="player-biblioteca-oro" style="margin-bottom:15px; padding:10px; background: rgba(50,30,70,0.5); border-radius:8px; color:#c9a0dc; border:1px solid #6a4a8a;">Tu oro: <strong id="player-biblioteca-oro-display">0</strong> GP</div>
+                    <div class="player-biblioteca-oro" style="margin-bottom:15px; padding:10px; background: rgba(50,30,70,0.5); border-radius:8px; color:#c9a0dc; border:1px solid #6a4a8a;"><strong id="player-biblioteca-oro-display">0</strong> GP</div>
                     <div class="player-shop-search-wrap">
                         <button type="button" class="player-shop-search-toggle" aria-expanded="false" onclick="var w=this.closest('.player-shop-search-wrap'); w.classList.toggle('expanded'); this.setAttribute('aria-expanded', w.classList.contains('expanded'));">🔍 Búsqueda y filtros</button>
                         <div class="player-shop-search-row">
@@ -1125,7 +1185,7 @@
             <div class="modal-body">
                 <div id="player-tavern-body" class="tavern-showing-entrada">
                 <div class="player-tavern-oro" style="margin-bottom:15px; padding:10px; background: rgba(0,0,0,0.3); border-radius:8px; color:#f4d03f;">
-                    <strong>Tu oro:</strong> <span id="player-tavern-oro-display">0</span> GP
+                    <span id="player-tavern-oro-display">0</span> GP
                 </div>
                 <div class="player-shop-search-wrap player-tavern-search-wrap">
                     <button type="button" class="player-shop-search-toggle" aria-expanded="false" onclick="var w=this.closest('.player-shop-search-wrap'); w.classList.toggle('expanded'); this.setAttribute('aria-expanded', w.classList.contains('expanded'));">🔍 Búsqueda y filtros</button>
@@ -1217,7 +1277,7 @@
             <div class="modal-body">
                 <div id="player-potion-body">
                 <div class="player-potion-shop-oro" style="margin-bottom:15px; padding:10px; background: rgba(0,0,0,0.3); border-radius:8px; color:#f1c40f;">
-                    <strong>Tu oro:</strong> <span id="player-potion-shop-oro-display">0</span> GP
+                    <span id="player-potion-shop-oro-display">0</span> GP
                 </div>
                 <div class="player-shop-search-wrap">
                     <button type="button" class="player-shop-search-toggle" aria-expanded="false" onclick="var w=this.closest('.player-shop-search-wrap'); w.classList.toggle('expanded'); this.setAttribute('aria-expanded', w.classList.contains('expanded'));">🔍 Búsqueda y filtros</button>
@@ -1789,6 +1849,10 @@
                         <input type="number" id="give-item-price" min="0" value="0" style="width: 100%;">
                     </div>
                     <div class="form-group">
+                        <label style="color: #d4af37; font-weight: 600; margin-bottom: 6px; display: block;">Cantidad</label>
+                        <input type="number" id="give-item-quantity" min="1" value="1" style="width: 100%;">
+                    </div>
+                    <div class="form-group">
                         <label style="color: #d4af37; font-weight: 600; margin-bottom: 6px; display: block;">Rareza</label>
                         <select id="give-item-rarity" style="width: 100%;">
                             <option value="común">🟢 Común</option>
@@ -1806,6 +1870,63 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeModal('give-item-modal')">Cancelar</button>
                 <button class="btn" onclick="giveItemToPlayer()">✅ Entregar Item</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Registrar objeto encontrado (jugador: notarizar hallazgos de misiones) -->
+    <div class="modal-overlay" id="registrar-encontrado-modal">
+        <div class="modal" style="max-width: 520px;">
+            <div class="modal-header">
+                <h3>📋 Registrar objeto encontrado</h3>
+                <button class="modal-close" onclick="closeModal('registrar-encontrado-modal')" aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="player-use-confirm-hint" style="margin-bottom:16px;">El objeto debe pasar por una inspección del banquero. El banco se reserva el derecho de registrarlo o no. El registro tiene un coste del <strong>2% del valor declarado</strong> del objeto, que se descontará de tu oro.</p>
+                <div class="form-group">
+                    <label for="registrar-encontrado-name">Nombre del objeto</label>
+                    <input type="text" id="registrar-encontrado-name" placeholder="Ej: Gema de visión nocturna" style="width:100%; padding:10px 12px; background:rgba(0,0,0,0.4); border:1px solid #4a3c31; border-radius:6px; color:#d4c4a8;">
+                </div>
+                <div style="display:flex; flex-wrap: wrap; gap: 12px;">
+                    <div class="form-group" style="flex:1; min-width: 100px;">
+                        <label for="registrar-encontrado-price">Valor (GP)</label>
+                        <input type="number" id="registrar-encontrado-price" min="0" value="0" style="width:100%; padding:10px 12px; background:rgba(0,0,0,0.4); border:1px solid #4a3c31; border-radius:6px; color:#d4c4a8;">
+                    </div>
+                    <div class="form-group" style="flex:1; min-width: 100px;">
+                        <label for="registrar-encontrado-quantity">Cantidad</label>
+                        <input type="number" id="registrar-encontrado-quantity" min="1" value="1" style="width:100%; padding:10px 12px; background:rgba(0,0,0,0.4); border:1px solid #4a3c31; border-radius:6px; color:#d4c4a8;">
+                    </div>
+                    <div class="form-group" style="flex:1; min-width: 120px;">
+                        <label for="registrar-encontrado-rarity">Rareza</label>
+                        <select id="registrar-encontrado-rarity" style="width:100%; padding:10px 12px; background:rgba(0,0,0,0.4); border:1px solid #4a3c31; border-radius:6px; color:#d4c4a8;">
+                            <option value="común">Común</option>
+                            <option value="inusual">Inusual</option>
+                            <option value="rara">Rara</option>
+                            <option value="legendaria">Legendaria</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="registrar-encontrado-effect">Efecto / descripción</label>
+                    <textarea id="registrar-encontrado-effect" placeholder="Ej: Permite ver en la oscuridad 60 pies" rows="3" style="width:100%; padding:10px 12px; background:rgba(0,0,0,0.4); border:1px solid #4a3c31; border-radius:6px; color:#d4c4a8; resize:vertical;"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('registrar-encontrado-modal')">Cancelar</button>
+                <button type="button" class="btn" onclick="confirmRegistrarEncontrado()">📋 Registrar en inventario</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recibo de registro (objeto encontrado) - mismo estilo que recibos de tiendas -->
+    <div class="modal-overlay" id="registrar-encontrado-recibo-modal">
+        <div class="modal" style="max-width: 520px;">
+            <div class="modal-header">
+                <h3>📋 Recibo de notaría</h3>
+                <button class="modal-close" onclick="closeModal('registrar-encontrado-recibo-modal')" aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="modal-body" id="registrar-encontrado-recibo-body">
+                <!-- Se rellena con buildShopReceiptHTML (estilo player-shop-receipt) -->
             </div>
         </div>
     </div>
@@ -1837,6 +1958,13 @@
                 <div class="form-group" id="automation-rule-remove-wrap" style="display: flex; align-items: center; gap: 10px;">
                     <input type="checkbox" id="automation-rule-remove" checked>
                     <label for="automation-rule-remove" style="margin: 0; color: #a89878;">Quitar este ítem de la tienda cuando se compre (queda en manos del personaje)</label>
+                </div>
+                <div class="form-group">
+                    <label>Hacer visible esta misión al jugador (opcional)</label>
+                    <select id="automation-rule-mission">
+                        <option value="">— Ninguna —</option>
+                    </select>
+                    <p style="margin: 6px 0 0; font-size: 0.85em; color: #8b7355;">Si eliges una misión, cuando el jugador compre este ítem y reciba el mensaje, también se le hará visible la misión.</p>
                 </div>
             </div>
             <div class="modal-footer">
@@ -2476,6 +2604,14 @@
                     <button type="button" class="btn btn-secondary" style="width: 100%; margin-top: 10px;" onclick="document.getElementById('csv-import-section').style.display = 'none';">Cancelar</button>
                 </div>
                 
+                <div class="player-shop-search-wrap" style="margin-bottom: 12px;">
+                    <button type="button" class="player-shop-search-toggle" aria-expanded="false" onclick="var w=this.closest('.player-shop-search-wrap'); w.classList.toggle('expanded'); this.setAttribute('aria-expanded', w.classList.contains('expanded'));">🔍 Búsqueda y filtros</button>
+                    <div class="player-shop-search-row">
+                        <input type="text" id="inventory-search" class="player-shop-search-input" placeholder="Buscar por nombre, efecto o precio..." oninput="applyInventoryFilters()">
+                    </div>
+                    <div id="inventory-filter-buttons" class="player-shop-filters" style="flex-wrap: wrap; gap: 8px;"></div>
+                </div>
+                
                 <div id="inventory-list" style="max-height: 400px; overflow-y: auto;"></div>
             </div>
             <div class="modal-footer">
@@ -2500,6 +2636,10 @@
                 <div class="form-group">
                     <label>Precio (GP)</label>
                     <input type="number" id="item-price" min="0" value="50">
+                </div>
+                <div class="form-group">
+                    <label>Cantidad</label>
+                    <input type="number" id="item-quantity" min="1" value="1" title="Unidades en stock (1 = una sola entrada)">
                 </div>
                 <div class="form-group">
                     <label>Efecto / Descripción</label>

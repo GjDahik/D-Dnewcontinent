@@ -64,6 +64,29 @@ async function runAutomationRules(shopId, itemsBought, playerId, playerName) {
             console.error('Automation: error enviando notificación', e);
         }
 
+        if (rule.missionId) {
+            try {
+                const missionRef = db.collection('missions').doc(rule.missionId);
+                const missionSnap = await missionRef.get();
+                if (missionSnap.exists) {
+                    const d = missionSnap.data();
+                    const status = (d.status || '').toString().toLowerCase();
+                    const assigned = Array.isArray(d.assignedPlayerIds) ? [...d.assignedPlayerIds] : [];
+                    const pid = String(playerId);
+                    if (assigned.indexOf(pid) === -1) assigned.push(pid);
+                    const updates = {
+                        assignedPlayerIds: assigned,
+                        visibleTo: 'player',
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    };
+                    if (status === 'draft') updates.status = 'visible';
+                    await missionRef.update(updates);
+                }
+            } catch (e) {
+                console.error('Automation: error haciendo visible la misión', e);
+            }
+        }
+
         if (rule.removeFromShop) {
             if (shopInv === null) {
                 const shopSnap = await db.collection('shops').doc(shopId).get();
@@ -71,7 +94,13 @@ async function runAutomationRules(shopId, itemsBought, playerId, playerName) {
             }
             const idx = shopInv.findIndex(x => automationItemSignature(x) === sig);
             if (idx >= 0) {
-                shopInv.splice(idx, 1);
+                const it = shopInv[idx];
+                const qty = (it.quantity != null && it.quantity >= 1) ? it.quantity : 1;
+                if (qty > 1) {
+                    shopInv[idx] = { ...it, quantity: it.quantity - 1 };
+                } else {
+                    shopInv.splice(idx, 1);
+                }
                 shopInvDirty = true;
             }
         }
@@ -86,9 +115,9 @@ async function runAutomationRules(shopId, itemsBought, playerId, playerName) {
     }
 }
 
-/** Crea una regla. item: { name, effect, price }. */
-async function createAutomationRule(shopId, item, message, removeFromShop) {
-    await db.collection('automation_rules').add({
+/** Crea una regla. item: { name, effect, price }. missionId opcional: al activarse la regla, se hace visible esa misión al jugador. */
+async function createAutomationRule(shopId, item, message, removeFromShop, missionId) {
+    const payload = {
         shopId,
         itemName: (item.name || item.title || '').trim(),
         itemEffect: (item.effect || item.desc || '').trim(),
@@ -96,12 +125,14 @@ async function createAutomationRule(shopId, item, message, removeFromShop) {
         message: (message || '').trim(),
         removeFromShop: !!removeFromShop,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    };
+    if (missionId && (missionId = String(missionId).trim())) payload.missionId = missionId;
+    await db.collection('automation_rules').add(payload);
 }
 
 /** Actualiza una regla existente. */
-async function updateAutomationRule(ruleId, shopId, item, message, removeFromShop) {
-    await db.collection('automation_rules').doc(ruleId).update({
+async function updateAutomationRule(ruleId, shopId, item, message, removeFromShop, missionId) {
+    const payload = {
         shopId,
         itemName: (item.name || item.title || '').trim(),
         itemEffect: (item.effect || item.desc || '').trim(),
@@ -109,7 +140,9 @@ async function updateAutomationRule(ruleId, shopId, item, message, removeFromSho
         message: (message || '').trim(),
         removeFromShop: !!removeFromShop,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    };
+    payload.missionId = (missionId && String(missionId).trim()) || null;
+    await db.collection('automation_rules').doc(ruleId).update(payload);
 }
 
 /** Elimina una regla. */
@@ -161,7 +194,7 @@ function loadAutomationRulesList() {
     const el = document.getElementById('automation-rules-list');
     if (!el) return;
     el.innerHTML = '<p style="color:#8b7355; text-align:center; padding:20px;">Cargando reglas...</p>';
-    loadAllAutomationRules().then(rules => {
+    loadAllAutomationRules().then(async rules => {
         const sh = (typeof shopsData !== 'undefined' ? shopsData : []) || [];
         const shopName = id => (sh.find(s => s.id === id) || {}).nombre || '?';
         const shopTipo = id => (sh.find(s => s.id === id) || {}).tipo || '';
@@ -169,17 +202,26 @@ function loadAutomationRulesList() {
             el.innerHTML = '<p style="color:#8b7355; text-align:center; padding:24px;">No hay reglas. Crea una con "Nueva regla".</p>';
             return;
         }
+        const missionIds = [...new Set(rules.filter(r => r.missionId).map(r => r.missionId))];
+        const missionTitles = {};
+        if (missionIds.length) {
+            await Promise.all(missionIds.map(async mid => {
+                const snap = await db.collection('missions').doc(mid).get();
+                if (snap.exists) missionTitles[mid] = (snap.data().title || 'Sin título').trim();
+            }));
+        }
+        const esc = s => String(s || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         el.innerHTML = rules.map(r => {
             const msg = (r.message || '').trim();
             const preview = msg.length > 80 ? msg.slice(0, 80) + '…' : msg;
-            const esc = s => String(s || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
             const isPosada = (shopTipo(r.shopId) || '').toLowerCase() === 'posada';
             const priceLabel = isPosada ? (r.itemPrice != null ? ' — ' + r.itemPrice + ' GP/noche' : '') : (r.itemPrice != null ? ' — ' + r.itemPrice + ' GP' : '');
             const remove = !isPosada && r.removeFromShop ? ' <span style="color:#8b7355; font-size:0.85em;">· Quitar de tienda</span>' : '';
+            const missionLabel = r.missionId ? ` <span style="color:#8fbc8f; font-size:0.85em;">→ Desbloquea misión: ${esc(missionTitles[r.missionId] || '?')}</span>` : '';
             return `<div class="mini-card" style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
                 <div style="flex:1; min-width:0;">
                     <div class="mini-card-title" style="margin-bottom:4px;">${esc(r.itemName || '?')}${priceLabel}</div>
-                    <div style="color:#8b7355; font-size:0.9em; margin-bottom:6px;">${esc(shopName(r.shopId))}${isPosada ? ' <span style="color:#6b5d4a;">· Posada</span>' : ''}${remove}</div>
+                    <div style="color:#8b7355; font-size:0.9em; margin-bottom:6px;">${esc(shopName(r.shopId))}${isPosada ? ' <span style="color:#6b5d4a;">· Posada</span>' : ''}${remove}${missionLabel}</div>
                     <div style="color:#a89878; font-size:0.9em; white-space:pre-wrap; line-height:1.4;">${esc(preview)}</div>
                 </div>
                 <div style="display:flex; gap:8px; flex-shrink:0;">
@@ -226,6 +268,7 @@ function openAutomationRuleModal(ruleForEdit) {
     const msgEl = document.getElementById('automation-rule-message');
     const removeEl = document.getElementById('automation-rule-remove');
     const removeWrap = document.getElementById('automation-rule-remove-wrap');
+    const missionSel = document.getElementById('automation-rule-mission');
     const titleEl = document.getElementById('automation-rule-modal-title');
     if (!shopSel || !itemSel || !msgEl || !removeEl) return;
 
@@ -243,6 +286,20 @@ function openAutomationRuleModal(ruleForEdit) {
     }).join('');
 
     shopSel.onchange = () => _populateAutomationItemsForShop(shopSel, itemSel, removeWrap, shops);
+
+    if (missionSel) {
+        missionSel.innerHTML = '<option value="">— Ninguna —</option>';
+        db.collection('missions').where('status', '==', 'draft').limit(200).get().then(snap => {
+            snap.docs.forEach(d => {
+                const data = d.data();
+                const title = (data.title || 'Sin título').replace(/"/g, '&quot;');
+                const status = (data.status || '').toString().toLowerCase();
+                const label = status === 'draft' ? title + ' (borrador)' : title;
+                missionSel.appendChild(new Option(label, d.id));
+            });
+            if (isEdit && ruleForEdit.missionId) missionSel.value = ruleForEdit.missionId;
+        }).catch(() => {});
+    }
 
     if (isEdit) {
         shopSel.value = ruleForEdit.shopId || '';
@@ -264,6 +321,7 @@ function openAutomationRuleModal(ruleForEdit) {
         }
         msgEl.value = (ruleForEdit.message || '').trim();
         removeEl.checked = !!ruleForEdit.removeFromShop;
+        if (missionSel && ruleForEdit.missionId) missionSel.value = ruleForEdit.missionId;
     } else {
         itemSel.innerHTML = '<option value="">— Elige un ítem o cuarto —</option>';
         if (removeWrap) removeWrap.style.display = 'flex';
@@ -288,9 +346,11 @@ function saveAutomationRule() {
     const itemSel = document.getElementById('automation-rule-item');
     const msgEl = document.getElementById('automation-rule-message');
     const removeEl = document.getElementById('automation-rule-remove');
+    const missionSel = document.getElementById('automation-rule-mission');
     if (!shopSel || !itemSel || !msgEl) return;
     const shopId = (shopSel.value || '').trim();
     const message = (msgEl.value || '').trim();
+    const missionId = (missionSel && missionSel.value) ? missionSel.value.trim() : '';
     if (!shopId) { showToast('Elige una tienda', true); return; }
     const rawVal = itemSel.value;
     if (rawVal === '' || rawVal === null) { showToast('Elige un ítem o cuarto', true); return; }
@@ -322,8 +382,8 @@ function saveAutomationRule() {
     const removeFromShop = isPosada ? false : !!removeEl.checked;
     const updating = !!_editingRuleId;
     const promise = updating
-        ? updateAutomationRule(_editingRuleId, shopId, item, message, removeFromShop)
-        : createAutomationRule(shopId, item, message, removeFromShop);
+        ? updateAutomationRule(_editingRuleId, shopId, item, message, removeFromShop, missionId || null)
+        : createAutomationRule(shopId, item, message, removeFromShop, missionId || null);
     promise.then(() => {
         showToast(updating ? 'Regla actualizada' : 'Regla guardada');
         _editingRuleId = null;

@@ -183,7 +183,7 @@ function openMissionModal(missionId) {
         if (visibleToSelect) visibleToSelect.value = m.visibleTo || 'all';
         if (assignedPlayersWrap) {
             assignedPlayersWrap.innerHTML = '';
-            const players = window.playersData || [];
+            const players = (window.getVisiblePlayers && window.getVisiblePlayers()) || (window.playersData || []).filter(p => p.visible !== false);
             const assigned = Array.isArray(m.assignedPlayerIds) ? m.assignedPlayerIds : [];
             players.forEach(p => {
                 const label = document.createElement('label');
@@ -209,7 +209,8 @@ function openMissionModal(missionId) {
         if (visibleToSelect) visibleToSelect.value = 'all';
         if (assignedPlayersWrap) {
             assignedPlayersWrap.innerHTML = '';
-            (window.playersData || []).forEach(p => {
+            const playersNew = (window.getVisiblePlayers && window.getVisiblePlayers()) || (window.playersData || []).filter(p => p.visible !== false);
+            playersNew.forEach(p => {
                 const label = document.createElement('label');
                 label.style.display = 'block';
                 label.style.marginBottom = '6px';

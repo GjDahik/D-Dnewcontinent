@@ -42,6 +42,10 @@ function isOldMistfallCity(cityOrNombre) {
     return ('' + n).trim().toLowerCase() === OLD_MISTFALL_CITY_NAME.toLowerCase();
 }
 
+/** Cache por ciudad: solo se cargan NPCs y tiendas al expandir. { cityId: { npcs: [], shops: [], loaded: true } } */
+var _cityDataCache = {};
+if (typeof window !== 'undefined') window._cityDataCache = _cityDataCache;
+
 // FIRESTORE REALTIME REMOVED: replaced with manual refresh (getDocs)
 function fetchCitiesDM() {
     if (!db) return Promise.resolve();
@@ -62,47 +66,45 @@ function fetchCitiesDM() {
         });
 }
 
-// FIRESTORE REALTIME REMOVED: replaced with manual refresh (getDocs)
-function fetchNpcsDM() {
-    if (!db) return Promise.resolve();
-    return db.collection('npcs').limit(300).get()
-        .then(snap => {
-            npcsData = snap && snap.docs ? snap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
-            window.npcsData = npcsData;
-            if (typeof renderCities === 'function') renderCities();
-        })
-        .catch(err => {
-            console.error('Error en snapshot de npcs:', err);
-        });
+/** Carga NPCs y tiendas de una ciudad (bajo demanda). Actualiza _cityDataCache y npcsData/shopsData para esa ciudad. */
+function ensureCityDataLoaded(cityId) {
+    if (!db || !cityId) return Promise.resolve();
+    if (_cityDataCache[cityId] && _cityDataCache[cityId].loaded) return Promise.resolve();
+
+    return Promise.all([
+        db.collection('npcs').where('ciudadId', '==', cityId).limit(300).get(),
+        db.collection('shops').where('ciudadId', '==', cityId).limit(300).get()
+    ]).then(([npcsSnap, shopsSnap]) => {
+        const npcs = npcsSnap && npcsSnap.docs ? npcsSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+        const shops = shopsSnap && shopsSnap.docs ? shopsSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+        _cityDataCache[cityId] = { npcs, shops, loaded: true };
+        // Mantener npcsData/shopsData como unión de ciudades ya cargadas (para editNpc, editShop, etc.)
+        npcsData = (npcsData || []).filter(n => n.ciudadId !== cityId).concat(npcs);
+        shopsData = (shopsData || []).filter(s => s.ciudadId !== cityId).concat(shops);
+        window.npcsData = npcsData;
+        window.shopsData = shopsData;
+        if (typeof renderCities === 'function') renderCities();
+    }).catch(err => {
+        console.error('Error al cargar datos de ciudad:', err);
+        if (typeof showToast === 'function') showToast('Error al cargar ciudad: ' + (err.message || err), true);
+    });
 }
 
-// FIRESTORE REALTIME REMOVED: replaced with manual refresh (getDocs)
-function fetchShopsDM() {
-    if (!db) return Promise.resolve();
-    return db.collection('shops').limit(300).get()
-        .then(snap => {
-            shopsData = snap && snap.docs ? snap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
-            window.shopsData = shopsData;
-            if (typeof renderCities === 'function') renderCities();
-        })
-        .catch(err => {
-            console.error('Error en snapshot de shops:', err);
-        });
+/** Vuelve a cargar solo los datos de una ciudad (tras guardar/eliminar NPC o tienda). */
+function refreshCityData(cityId) {
+    if (!cityId) return Promise.resolve();
+    if (_cityDataCache[cityId]) _cityDataCache[cityId].loaded = false;
+    return ensureCityDataLoaded(cityId);
 }
 
+// FIRESTORE REALTIME REMOVED: solo se cargan ciudades al entrar; NPCs/tiendas al expandir
 function loadWorld() {
     if (!db) {
         console.error('Error: db no está definido');
         return;
     }
-    // FIRESTORE REALTIME REMOVED: replaced with manual refresh (getDocs)
-    Promise.all([
-        fetchCitiesDM(),
-        fetchNpcsDM(),
-        fetchShopsDM()
-    ]).then(() => {
-        if (typeof renderCities === 'function') renderCities();
-    });
+    // No cargar todos los NPCs ni tiendas: solo ciudades. Los datos por ciudad se cargan en ensureCityDataLoaded()
+    fetchCitiesDM();
 }
 
 function renderCities() {
@@ -164,8 +166,12 @@ function renderCities() {
         let htmlContent = '';
         cities.forEach((city, index) => {
             console.log(`Procesando ciudad ${index + 1}:`, city.nombre);
-            const cityNpcs = npcs.filter(n => n.ciudadId === city.id).slice().sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es'));
-            const cityShops = shops.filter(s => s.ciudadId === city.id).slice().sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es'));
+            const cached = _cityDataCache[city.id];
+            const cityNpcs = cached ? (cached.npcs || []).slice().sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es')) : [];
+            const cityShops = cached ? (cached.shops || []).slice().sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es')) : [];
+            const countsLoaded = !!cached;
+            const npcCountLabel = countsLoaded ? cityNpcs.length : '?';
+            const shopCountLabel = countsLoaded ? cityShops.length : '?';
         const nivelColor = city.nivel <= 2 ? '🟢' : city.nivel <= 4 ? '🟡' : city.nivel <= 5 ? '🟠' : '🔴';
         const tipoEmoji = { herreria: '⚔️', pociones: '🧪', taberna: '🍺', biblioteca: '📚', arqueria: '🏹', emporio: '🛒', batalla: '🥊', santuario: '🪞', banco: '🏦', posada: '🏨' };
         const actitudEmoji = { amigable: '😊', neutral: '😐', hostil: '😠' };
@@ -180,17 +186,12 @@ function renderCities() {
                     </div>
                     <div class="city-meta">
                         <span>${nivelColor} Nivel ${city.nivel}</span>
-                        <span>🎭 ${cityNpcs.length}</span>
-                        <span>🛒 ${cityShops.length}</span>
+                        <span>🎭 ${npcCountLabel}</span>
+                        <span>🛒 ${shopCountLabel}</span>
                         <span class="city-toggle">▼</span>
                     </div>
                 </div>
                 <div class="city-actions" style="flex-wrap:wrap; align-items:center;">
-                    <button class="btn btn-small" onclick="event.stopPropagation(); openNpcModal('${city.id}')">+ NPC</button>
-                    <button class="btn btn-small" onclick="event.stopPropagation(); openShopModal('${city.id}')">+ Tienda</button>
-                    <button class="btn btn-small btn-secondary" onclick="event.stopPropagation(); openImportShopsModal('${city.id}')">📤 Importar Tiendas</button>
-                    <button class="btn btn-small btn-secondary" onclick="event.stopPropagation(); openImportNpcsModal('${city.id}')">📤 Importar NPCs</button>
-                    <button class="btn btn-small btn-danger" onclick="event.stopPropagation(); deleteAllShopsFromCity('${city.id}', '${(city.nombre || '').replace(/'/g, "\\'")}')" title="Eliminar todas las tiendas de esta ciudad">🗑️ Eliminar Tiendas</button>
                     <button class="btn btn-small btn-secondary" onclick="event.stopPropagation(); editCity('${city.id}')">✏️</button>
                     ${!isOldMistfallCity(city) ? `<button class="btn btn-small btn-danger" onclick="event.stopPropagation(); deleteCity('${city.id}', '${(city.nombre || '').replace(/'/g, "\\'")}')">🗑️</button>` : '<span class="btn btn-small btn-secondary" style="opacity:0.7; cursor:not-allowed;" title="Old Mistfall solo puede eliminarse desde la base de datos">🗑️</span>'}
                     <button class="btn btn-small ${(city.visibleToPlayers !== false) ? 'btn-success' : 'btn-secondary'}" onclick="event.stopPropagation(); toggleCityVisibility('${city.id}')" title="${(city.visibleToPlayers !== false) ? 'Visible para jugadores. Clic para ocultar.' : 'Oculta para jugadores. Clic para mostrar.'}">${(city.visibleToPlayers !== false) ? '👁️ Visible' : '👁️‍🗨️ Oculta'}</button>
@@ -203,28 +204,48 @@ function renderCities() {
                     </div>
                 </div>
                 <div class="city-content">
-                    <div class="subsection">
+                    <div class="subsection subsection-npcs" id="city-${city.id}-npcs-subsection">
                         <div class="subsection-header">
-                            <h4>🎭 NPCs (${cityNpcs.length})</h4>
+                            <div class="subsection-header-title subsection-header-toggle" role="button" tabindex="0" data-city-id="${city.id}" data-section="npcs" onclick="event.stopPropagation(); toggleCitySubsection(this.closest('.subsection').querySelector('.subsection-body'))" onkeydown="if(event.key==='Enter'||event.key===' ') { event.preventDefault(); var b=this.closest('.subsection').querySelector('.subsection-body'); toggleCitySubsection(b); }" title="Clic para mostrar u ocultar">
+                                <h4>🎭 NPCs (${countsLoaded ? cityNpcs.length : '?'}) <span class="subsection-toggle-icon">▶</span></h4>
+                            </div>
+                            <div class="subsection-header-toolbar" onclick="event.stopPropagation();">
+                                <button type="button" class="btn btn-small" onclick="event.stopPropagation(); openNpcModal('${city.id}')">+ NPC</button>
+                                <button type="button" class="btn btn-small btn-secondary" onclick="event.stopPropagation(); openImportNpcsModal('${city.id}')">📤 Importar NPCs</button>
+                                <button type="button" class="btn btn-small btn-danger" onclick="event.stopPropagation(); deleteAllNpcsFromCity('${city.id}', '${(city.nombre || '').replace(/'/g, "\\'")}')" title="Eliminar todos los NPCs de esta ciudad">🗑️ Eliminar NPCs</button>
+                            </div>
                         </div>
+                        <div class="subsection-body" id="city-${city.id}-npcs-body" style="display:none;">
                         <input type="search" class="searchbar city-section-search" placeholder="Buscar NPCs..." data-city-id="${city.id}" data-section="npcs" oninput="filterCitySection(this)" style="margin-bottom:10px;">
                         <div id="city-${city.id}-npcs-cards" class="mini-cards">
-                            ${cityNpcs.length ? cityNpcs.map(n => `
-                                <div class="mini-card">
+                            ${cityNpcs.length ? cityNpcs.map(n => {
+                                const actitud = (n.actitud || 'neutral').toLowerCase();
+                                const actitudClass = ['amigable','neutral','hostil'].includes(actitud) ? actitud : 'neutral';
+                                return `
+                                <div class="mini-card mini-card-npc">
                                     <div class="mini-card-title">${n.nombre}</div>
-                                    <div class="mini-card-info">${n.rol} • ${actitudEmoji[n.actitud] || ''} ${n.actitud}</div>
+                                    <div class="mini-card-info">${n.rol} <span class="badge-actitud badge-actitud-${actitudClass}" title="Actitud">${actitudEmoji[n.actitud] || ''} ${n.actitud}</span></div>
                                     <div class="mini-card-actions">
                                         <button class="btn btn-small btn-secondary" onclick="editNpc('${n.id}')">✏️</button>
                                         <button class="btn btn-small btn-danger" onclick="deleteNpc('${n.id}', '${(n.nombre || '').replace(/'/g, "\\'")}')">🗑️</button>
                                     </div>
                                 </div>
-                            `).join('') : '<p style="color:#a89a8c;padding:10px;">Sin NPCs</p>'}
+                            `}).join('') : '<p style="color:#a89a8c;padding:10px;">Sin NPCs</p>'}
+                        </div>
                         </div>
                     </div>
-                    <div class="subsection">
+                    <div class="subsection subsection-shops" id="city-${city.id}-shops-subsection">
                         <div class="subsection-header">
-                            <h4>🛒 Tiendas (${cityShops.length})</h4>
+                            <div class="subsection-header-title subsection-header-toggle" role="button" tabindex="0" data-city-id="${city.id}" data-section="shops" onclick="event.stopPropagation(); toggleCitySubsection(this.closest('.subsection').querySelector('.subsection-body'))" onkeydown="if(event.key==='Enter'||event.key===' ') { event.preventDefault(); var b=this.closest('.subsection').querySelector('.subsection-body'); toggleCitySubsection(b); }" title="Clic para mostrar u ocultar">
+                                <h4>🛒 Tiendas (${countsLoaded ? cityShops.length : '?'}) <span class="subsection-toggle-icon">▶</span></h4>
+                            </div>
+                            <div class="subsection-header-toolbar" onclick="event.stopPropagation();">
+                                <button type="button" class="btn btn-small" onclick="event.stopPropagation(); openShopModal('${city.id}')">+ Tienda</button>
+                                <button type="button" class="btn btn-small btn-secondary" onclick="event.stopPropagation(); openImportShopsModal('${city.id}')">📤 Importar Tiendas</button>
+                                <button type="button" class="btn btn-small btn-danger" onclick="event.stopPropagation(); deleteAllShopsFromCity('${city.id}', '${(city.nombre || '').replace(/'/g, "\\'")}')" title="Eliminar todas las tiendas de esta ciudad">🗑️ Eliminar Tiendas</button>
+                            </div>
                         </div>
+                        <div class="subsection-body" id="city-${city.id}-shops-body" style="display:none;">
                         <input type="search" class="searchbar city-section-search" placeholder="Buscar tiendas..." data-city-id="${city.id}" data-section="shops" oninput="filterCitySection(this)" style="margin-bottom:10px;">
                         <div id="city-${city.id}-shops-cards" class="mini-cards">
                             ${cityShops.length ? cityShops.map(s => {
@@ -237,9 +258,9 @@ function renderCities() {
                                 const sinInventario = isSantuario || isBanco || isPosada || isBatalla;
                                 const nombreEsc = (s.nombre || '').replace(/'/g, "\\'");
                                 return `
-                                <div class="mini-card">
+                                <div class="mini-card mini-card-shop">
                                     <div class="mini-card-title">${tipoEmoji[s.tipo] || '🏪'} ${s.nombre}</div>
-                                    <div class="mini-card-info">${s.tipo} ${owner ? '• ' + owner.nombre : ''}${sinInventario ? ' <span style="color:#8b7355; font-size:0.85em;">(sin inventario)</span>' : ''}</div>
+                                    <div class="mini-card-info">${s.tipo} ${owner ? '• ' + owner.nombre : ''}${sinInventario ? ' <span class="badge-sin-inventario">sin inventario</span>' : ''}</div>
                                     <div class="mini-card-actions">
                                     ${s.tipo === 'batalla' ? `<button class="btn btn-small" onclick="openBatallaConfigModal('${s.id}')" title="Configurar enemigos de esta tienda">🥊</button>` : ''}
                                     ${!sinInventario ? `<button class="btn btn-small" onclick="manageInventory('${s.id}')">📦</button>` : ''}
@@ -248,6 +269,7 @@ function renderCities() {
                                     </div>
                                 </div>`;
                             }).join('') : '<p style="color:#a89a8c;padding:10px;">Sin tiendas</p>'}
+                        </div>
                         </div>
                     </div>
                 </div>
@@ -270,6 +292,8 @@ function renderCities() {
 // Hacer funciones globalmente accesibles
 window.renderCities = renderCities;
 window.loadWorld = loadWorld;
+window.ensureCityDataLoaded = ensureCityDataLoaded;
+window.refreshCityData = refreshCityData;
 
 // Filtro por búsqueda dentro de cada ciudad (NPCs o Tiendas)
 function filterCitySection(inputEl) {
@@ -288,15 +312,19 @@ function filterCitySection(inputEl) {
     if (section === 'npcs') {
         let list = cityNpcs.slice().sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es'));
         if (q) list = list.filter(n => (n.nombre || '').toLowerCase().includes(q));
-        container.innerHTML = list.length ? list.map(n => `
-            <div class="mini-card">
+        container.innerHTML = list.length ? list.map(n => {
+            const actitud = (n.actitud || 'neutral').toLowerCase();
+            const actitudClass = ['amigable','neutral','hostil'].includes(actitud) ? actitud : 'neutral';
+            return `
+            <div class="mini-card mini-card-npc">
                 <div class="mini-card-title">${n.nombre}</div>
-                <div class="mini-card-info">${n.rol} • ${actitudEmoji[n.actitud] || ''} ${n.actitud}</div>
+                <div class="mini-card-info">${n.rol} <span class="badge-actitud badge-actitud-${actitudClass}" title="Actitud">${actitudEmoji[n.actitud] || ''} ${n.actitud}</span></div>
                 <div class="mini-card-actions">
                     <button class="btn btn-small btn-secondary" onclick="editNpc('${n.id}')">✏️</button>
                     <button class="btn btn-small btn-danger" onclick="deleteNpc('${n.id}', '${(n.nombre || '').replace(/'/g, "\\'")}')">🗑️</button>
                 </div>
-            </div>`).join('') : '<p style="color:#a89a8c;padding:10px;">Sin NPCs' + (q ? ' que coincidan' : '') + '</p>';
+            </div>`;
+        }).join('') : '<p style="color:#a89a8c;padding:10px;">Sin NPCs' + (q ? ' que coincidan' : '') + '</p>';
     } else {
         let list = cityShops.slice().sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es'));
         if (q) list = list.filter(s => (s.nombre || '').toLowerCase().includes(q));
@@ -306,9 +334,9 @@ function filterCitySection(inputEl) {
             const sinInventario = ['santuario', 'banco', 'posada', 'batalla'].includes(shopTipo);
             const nombreEsc = (s.nombre || '').replace(/'/g, "\\'");
             return `
-            <div class="mini-card">
+            <div class="mini-card mini-card-shop">
                 <div class="mini-card-title">${tipoEmoji[s.tipo] || '🏪'} ${s.nombre}</div>
-                <div class="mini-card-info">${s.tipo} ${owner ? '• ' + owner.nombre : ''}${sinInventario ? ' <span style="color:#8b7355; font-size:0.85em;">(sin inventario)</span>' : ''}</div>
+                <div class="mini-card-info">${s.tipo} ${owner ? '• ' + owner.nombre : ''}${sinInventario ? ' <span class="badge-sin-inventario">sin inventario</span>' : ''}</div>
                 <div class="mini-card-actions">
                 ${s.tipo === 'batalla' ? `<button class="btn btn-small" onclick="openBatallaConfigModal('${s.id}')" title="Configurar enemigos de esta tienda">🥊</button>` : ''}
                 ${!sinInventario ? `<button class="btn btn-small" onclick="manageInventory('${s.id}')">📦</button>` : ''}
@@ -320,6 +348,16 @@ function filterCitySection(inputEl) {
     }
 }
 window.filterCitySection = filterCitySection;
+
+function toggleCitySubsection(bodyEl) {
+    if (!bodyEl) return;
+    const header = bodyEl.previousElementSibling;
+    const icon = header ? header.querySelector('.subsection-toggle-icon') : null;
+    const isHidden = bodyEl.style.display === 'none';
+    bodyEl.style.display = isHidden ? 'block' : 'none';
+    if (icon) icon.textContent = isHidden ? '▼' : '▶';
+}
+window.toggleCitySubsection = toggleCitySubsection;
 
 // Función de diagnóstico que se puede llamar desde la consola
 window.debugCities = function() {
@@ -356,7 +394,16 @@ window.debugCities = function() {
 };
 
 function toggleCity(id) {
-    document.getElementById('city-' + id).classList.toggle('expanded');
+    const el = document.getElementById('city-' + id);
+    if (!el) return;
+    const isExpanding = !el.classList.contains('expanded');
+    if (isExpanding) {
+        ensureCityDataLoaded(id).then(() => {
+            el.classList.add('expanded');
+        });
+    } else {
+        el.classList.remove('expanded');
+    }
 }
 
 function setEstablecimientoRecomendado(cityId, shopId) {
@@ -524,7 +571,7 @@ function importShopsCSV(event) {
         batch.commit().then(function() {
             showToast(count + ' tiendas importadas para la ciudad seleccionada');
             closeModal('import-shops-modal');
-            // Limpiar el campo para evitar reutilización
+            if (typeof refreshCityData === 'function' && cityId) refreshCityData(cityId);
             if (cityIdEl) cityIdEl.value = '';
         }).catch(function(e) {
             console.error('Error al importar tiendas:', e);
@@ -609,6 +656,7 @@ function importNpcsCSV(event) {
         batch.commit().then(function() {
             showToast(count + ' NPCs importados');
             closeModal('import-npcs-modal');
+            if (typeof refreshCityData === 'function' && cityId) refreshCityData(cityId);
         }).catch(function(err) { showToast('Error: ' + err.message, true); });
     });
     event.target.value = '';
@@ -841,13 +889,16 @@ function saveNpc() {
         precioBatalla: precioBatalla > 0 ? precioBatalla : null
     };
     if (!data.nombre) { showToast('Nombre requerido', true); return; }
+    const cityId = data.ciudadId;
     (id ? db.collection('npcs').doc(id).update(data) : db.collection('npcs').add(data))
-        .then(() => { showToast(id ? 'NPC actualizado' : 'NPC creado'); closeModal('npc-modal'); if (typeof loadWorld === 'function') loadWorld(); });
+        .then(() => { showToast(id ? 'NPC actualizado' : 'NPC creado'); closeModal('npc-modal'); if (typeof refreshCityData === 'function' && cityId) refreshCityData(cityId); });
 }
 
 function deleteNpc(id, nombre) {
-    if (confirm(`¿Eliminar a ${nombre}?`))
-        db.collection('npcs').doc(id).delete().then(() => { showToast('NPC eliminado'); if (typeof loadWorld === 'function') loadWorld(); });
+    if (confirm(`¿Eliminar a ${nombre}?`)) {
+        const cityId = (npcsData || []).find(n => n.id === id)?.ciudadId;
+        db.collection('npcs').doc(id).delete().then(() => { showToast('NPC eliminado'); if (typeof refreshCityData === 'function' && cityId) refreshCityData(cityId); });
+    }
 }
 
 // Shop CRUD
@@ -933,13 +984,16 @@ function saveShop() {
     
     if (!id) data.inventario = [];
     if (!data.nombre) { showToast('Nombre requerido', true); return; }
+    const cityId = data.ciudadId;
     (id ? db.collection('shops').doc(id).update(data) : db.collection('shops').add(data))
-        .then(() => { showToast(id ? 'Tienda actualizada' : 'Tienda creada'); closeModal('shop-modal'); if (typeof loadWorld === 'function') loadWorld(); });
+        .then(() => { showToast(id ? 'Tienda actualizada' : 'Tienda creada'); closeModal('shop-modal'); if (typeof refreshCityData === 'function' && cityId) refreshCityData(cityId); });
 }
 
 function deleteShop(id, nombre) {
-    if (confirm(`¿Eliminar ${nombre}?`))
-        db.collection('shops').doc(id).delete().then(() => { showToast('Tienda eliminada'); if (typeof loadWorld === 'function') loadWorld(); });
+    if (confirm(`¿Eliminar ${nombre}?`)) {
+        const cityId = (shopsData || []).find(s => s.id === id)?.ciudadId;
+        db.collection('shops').doc(id).delete().then(() => { showToast('Tienda eliminada'); if (typeof refreshCityData === 'function' && cityId) refreshCityData(cityId); });
+    }
 }
 
 function deleteAllShopsFromCity(cityId, cityNombre) {
@@ -970,16 +1024,50 @@ function deleteAllShopsFromCity(cityId, cityNombre) {
         
         return batch.commit().then(() => {
             showToast(`Se eliminaron ${count} tienda${count !== 1 ? 's' : ''} de ${cityNombre}`);
-            // Recargar las ciudades para actualizar la vista
-            if (typeof renderCities === 'function') {
-                setTimeout(() => renderCities(), 500);
-            }
+            if (typeof refreshCityData === 'function') refreshCityData(cityId);
         });
     }).catch(error => {
         console.error('Error al eliminar tiendas:', error);
         showToast('Error al eliminar tiendas: ' + error.message, true);
     });
 }
+
+function deleteAllNpcsFromCity(cityId, cityNombre) {
+    if (!cityId) {
+        showToast('Error: ID de ciudad no válido', true);
+        return;
+    }
+    
+    if (!confirm(`⚠️ ADVERTENCIA: Esto eliminará TODOS los NPCs de la ciudad "${cityNombre}".\n\nEsta acción NO se puede deshacer.\n\n¿Estás seguro de que deseas continuar?`)) {
+        return;
+    }
+    
+    showToast('Eliminando NPCs de ' + cityNombre + '...', false);
+    
+    db.collection('npcs').where('ciudadId', '==', cityId).limit(300).get().then(snapshot => {
+        if (snapshot.empty) {
+            showToast('No hay NPCs en esta ciudad para eliminar');
+            return;
+        }
+        
+        const batch = db.batch();
+        let count = 0;
+        
+        snapshot.forEach(doc => {
+            batch.delete(doc.ref);
+            count++;
+        });
+        
+        return batch.commit().then(() => {
+            showToast(`Se eliminaron ${count} NPC${count !== 1 ? 's' : ''} de ${cityNombre}`);
+            if (typeof refreshCityData === 'function') refreshCityData(cityId);
+        });
+    }).catch(error => {
+        console.error('Error al eliminar NPCs:', error);
+        showToast('Error al eliminar NPCs: ' + error.message, true);
+    });
+}
+window.deleteAllNpcsFromCity = deleteAllNpcsFromCity;
 
 function openBatallaConfigModal(shopId) {
     const shops = window.shopsData || shopsData || [];
@@ -1105,14 +1193,14 @@ function saveBatallaConfig() {
     const precioFijo = precioFijoEl ? (parseInt(precioFijoEl.value) || 0) : 0;
 
     const ref = db.collection('shops').doc(shopId);
+    const cityId = (shopsData || []).find(s => s.id === shopId)?.ciudadId;
     ref.update({
         batallaOponentes: batallaConfigOponentes,
         batallaPrecioFijo: precioFijo
     }).then(() => {
         showToast('Configuración guardada para esta tienda de batalla');
         closeModal('batalla-config-modal');
-        // Recargar datos
-        if (typeof loadWorld === 'function') loadWorld();
+        if (typeof refreshCityData === 'function' && cityId) refreshCityData(cityId);
     }).catch(error => {
         console.error('Error guardando configuración:', error);
         showToast('Error al guardar: ' + error.message, true);

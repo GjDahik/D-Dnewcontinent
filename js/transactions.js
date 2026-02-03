@@ -1,5 +1,6 @@
 // ==================== TRANSACTIONS ====================
-const TRANSACTIONS_PAGE_SIZE = 20;
+const TRANSACTIONS_PAGE_SIZE = 10;
+const TRANSACTIONS_MAX_AGE_DAYS = 30;
 let transactionsData = [];
 let currentTransactionsPage = 1;
 
@@ -126,18 +127,41 @@ function populateTransactionsFilters() {
 
 var _transactionsUnsubscribe = null;
 
-// OPTIMIZACIÓN READS: get() al abrir pestaña Historial, sin listener permanente
+/** Fecha límite: solo transacciones de los últimos N días. */
+function getTransactionsCutoffTimestamp() {
+    const d = new Date();
+    d.setDate(d.getDate() - TRANSACTIONS_MAX_AGE_DAYS);
+    d.setHours(0, 0, 0, 0);
+    return firebase.firestore.Timestamp.fromDate(d);
+}
+
+/** Elimina transacciones con más de 30 días (en segundo plano). */
+function cleanupOldTransactions() {
+    const cutoff = getTransactionsCutoffTimestamp();
+    db.collection('transactions').where('fecha', '<', cutoff).limit(500).get()
+        .then(snap => {
+            if (snap.empty) return;
+            const batch = db.batch();
+            snap.forEach(doc => batch.delete(doc.ref));
+            return batch.commit();
+        })
+        .catch(err => console.error('Cleanup transacciones antiguas:', err));
+}
+
+// OPTIMIZACIÓN READS: get() al abrir pestaña Historial; solo últimas 10 y últimos 30 días
 function loadTransactions() {
     const list = document.getElementById('transactions-list');
     if (!list) return;
     list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📜</div><p>Cargando transacciones...</p></div>';
-    db.collection('transactions').orderBy('fecha', 'desc').limit(200).get()
+    const cutoff = getTransactionsCutoffTimestamp();
+    db.collection('transactions').where('fecha', '>=', cutoff).orderBy('fecha', 'desc').limit(10).get()
         .then(snap => {
             if (snap.empty) {
                 transactionsData = [];
-                list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📜</div><p>No hay transacciones</p></div>';
+                list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📜</div><p>No hay transacciones (solo se muestran las últimas 10 de los últimos 30 días)</p></div>';
                 const paginationEl = document.getElementById('transactions-pagination');
                 if (paginationEl) paginationEl.style.display = 'none';
+                cleanupOldTransactions();
                 return;
             }
             transactionsData = [];
@@ -153,6 +177,7 @@ function loadTransactions() {
             if (filterShopEl && !filterShopEl._bound) { filterShopEl._bound = true; filterShopEl.onchange = applyFilters; }
             currentTransactionsPage = 1;
             renderTransactionsPage();
+            cleanupOldTransactions();
         })
         .catch(err => {
             console.error('Error cargando transacciones:', err);

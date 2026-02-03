@@ -13,6 +13,12 @@ function manageInventory(shopId) {
     document.getElementById('inventory-shop-id').value = shopId;
     document.getElementById('inventory-shop-name').textContent = shop.nombre;
     document.getElementById('inventory-modal-title').textContent = '📦 Inventario - ' + shop.nombre;
+
+    const searchEl = document.getElementById('inventory-search');
+    if (searchEl) searchEl.value = '';
+    const wrap = document.querySelector('#inventory-modal .player-shop-search-wrap');
+    if (wrap) wrap.classList.remove('expanded');
+    _populateInventoryFilterButtons(shop);
     
     // Reset CSV import section
     document.getElementById('csv-import-section').style.display = 'none';
@@ -85,8 +91,121 @@ function downloadShopInventoryExcel() {
     if (typeof showToast === 'function') showToast('Descargado: ' + filename);
 }
 
+function _inventoryItemMatchesSearch(item, searchText) {
+    if (!searchText) return true;
+    const name = (item.name || '').toLowerCase();
+    const effect = (item.effect || item.desc || '').toLowerCase();
+    const priceStr = String(item.price != null ? item.price : '');
+    return name.includes(searchText) || effect.includes(searchText) || priceStr.includes(searchText);
+}
+
+function _inventoryItemMatchesFilter(item, filterValue, shop) {
+    if (!filterValue) return true;
+    const tipo = (shop.tipo || '').toLowerCase();
+    const isTaberna = tipo === 'taberna';
+    const isHerreria = tipo === 'herreria';
+    const isArqueria = tipo === 'arqueria';
+    const [key, val] = filterValue.indexOf(':') >= 0 ? filterValue.split(':') : ['', ''];
+    if (key === 'rarity') return (item.rarity || 'común').toLowerCase() === val;
+    if (key === 'type' && isTaberna) return (item.type || 'drink').toLowerCase() === val;
+    if (key === 'categoria') return (item.categoria || 'servir').toLowerCase() === val;
+    if (key === 'tier') return Number(item.tier) === Number(val) || (item.tier == null && Number(val) === 1);
+    if (key === 'tipo' && isHerreria) return (item.tipo || 'arma').toLowerCase() === val;
+    if (key === 'tab') return (item.tab || 'flechas').toLowerCase() === val;
+    if (key === 'type' && isArqueria) return (item.type || 'common').toLowerCase() === val;
+    if (key === 'section') return (item.section || '').toLowerCase() === val;
+    return true;
+}
+
+function _populateInventoryFilterButtons(shop) {
+    const container = document.getElementById('inventory-filter-buttons');
+    if (!container) return;
+    container.innerHTML = '';
+    const items = shop.inventario || [];
+    const tipo = (shop.tipo || '').toLowerCase();
+    const isTaberna = tipo === 'taberna';
+    const isHerreria = tipo === 'herreria';
+    const isArqueria = tipo === 'arqueria';
+    const isBiblioteca = tipo === 'biblioteca';
+    const isEmporio = tipo === 'emporio';
+    const tierNames = { 1: 'Nv. 1-5', 6: 'Nv. 6-10', 11: 'Nv. 11-15', 16: 'Nv. 16-20' };
+    const artesaniasTabLabels = { flechas: 'Flechas', ropa: 'Ropa', servicios: 'Servicios' };
+    const bibliotecaSectionLabels = { magia: 'Magia', fabricacion: 'Fabricación', cocina: 'Cocina', trampas: 'Trampas', alquimia: 'Alquimia', mapas: 'Mapas', restringida: 'Restringida' };
+    const emporioSectionLabels = { materiales: 'Materiales', raros: 'Raros', mapas: 'Mapas', otros: 'Otros' };
+
+    const addBtn = (label, value) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-small' + (value ? ' btn-secondary' : '');
+        btn.dataset.filter = value || '';
+        btn.textContent = label;
+        btn.addEventListener('click', function () {
+            container.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            applyInventoryFilters();
+        });
+        if (!value) btn.classList.add('active');
+        container.appendChild(btn);
+    };
+
+    addBtn('Todos', '');
+    const seen = {};
+    if (isTaberna) {
+        items.forEach(it => {
+            const t = (it.type || 'drink').toLowerCase();
+            const c = (it.categoria || 'servir').toLowerCase();
+            if (!seen['type:' + t]) { seen['type:' + t] = true; addBtn(t === 'food' ? 'Comida' : 'Bebida', 'type:' + t); }
+            if (!seen['categoria:' + c]) { seen['categoria:' + c] = true; addBtn(c === 'llevar' ? 'Para llevar' : 'Para servir', 'categoria:' + c); }
+        });
+    } else if (isHerreria) {
+        items.forEach(it => {
+            const tier = it.tier != null ? it.tier : 1;
+            const tip = (it.tipo || 'arma').toLowerCase();
+            if (!seen['tier:' + tier]) { seen['tier:' + tier] = true; addBtn(tierNames[tier] || 'Nv. ' + tier, 'tier:' + tier); }
+            if (!seen['tipo:' + tip]) { seen['tipo:' + tip] = true; addBtn(tip === 'armadura' ? 'Armadura' : (tip === 'servicio' ? 'Servicio' : 'Arma'), 'tipo:' + tip); }
+        });
+    } else if (isArqueria) {
+        items.forEach(it => {
+            const tab = (it.tab || 'flechas').toLowerCase();
+            const ty = (it.type || 'common').toLowerCase();
+            if (!seen['tab:' + tab]) { seen['tab:' + tab] = true; addBtn(artesaniasTabLabels[tab] || tab, 'tab:' + tab); }
+            if (!seen['type:' + ty]) { seen['type:' + ty] = true; addBtn(ty === 'magic' ? 'Mágico' : (ty === 'elemental' ? 'Elemental' : (ty === 'gear' ? 'Equipo' : (ty === 'service' ? 'Servicio' : 'Común'))), 'type:' + ty); }
+        });
+    } else if (isBiblioteca) {
+        items.forEach(it => {
+            const sec = (it.section || 'magia').toLowerCase();
+            if (!seen['section:' + sec]) { seen['section:' + sec] = true; addBtn(bibliotecaSectionLabels[sec] || sec, 'section:' + sec); }
+        });
+    } else if (isEmporio) {
+        items.forEach(it => {
+            const sec = (it.section || 'otros').toLowerCase();
+            const r = (it.rarity || 'común').toLowerCase();
+            if (!seen['section:' + sec]) { seen['section:' + sec] = true; addBtn(emporioSectionLabels[sec] || sec, 'section:' + sec); }
+            if (!seen['rarity:' + r]) { seen['rarity:' + r] = true; addBtn(r === 'inusual' ? 'Inusual' : (r === 'rara' ? 'Rara' : (r === 'legendaria' ? 'Legendaria' : 'Común')), 'rarity:' + r); }
+        });
+    } else {
+        items.forEach(it => {
+            const r = (it.rarity || 'común').toLowerCase();
+            if (!seen['rarity:' + r]) { seen['rarity:' + r] = true; addBtn(r === 'inusual' ? 'Inusual' : (r === 'rara' ? 'Rara' : (r === 'legendaria' ? 'Legendaria' : 'Común')), 'rarity:' + r); }
+        });
+    }
+}
+
+function applyInventoryFilters() {
+    const shopId = document.getElementById('inventory-shop-id').value;
+    if (!shopId) return;
+    const shop = shopsData.find(s => s.id === shopId);
+    if (shop) renderInventoryList(shop);
+}
+window.applyInventoryFilters = applyInventoryFilters;
+
 function renderInventoryList(shop) {
     const list = document.getElementById('inventory-list');
+    const searchEl = document.getElementById('inventory-search');
+    const filterBtns = document.getElementById('inventory-filter-buttons');
+    const activeBtn = filterBtns ? filterBtns.querySelector('button.active') : null;
+    const filterValue = (activeBtn && activeBtn.dataset.filter) ? activeBtn.dataset.filter : '';
+    const searchText = (searchEl && searchEl.value || '').trim().toLowerCase();
     const items = shop.inventario || [];
     const tipo = (shop.tipo || '').toLowerCase();
     const isTaberna = tipo === 'taberna';
@@ -95,8 +214,14 @@ function renderInventoryList(shop) {
     const isBiblioteca = tipo === 'biblioteca';
     const isEmporio = tipo === 'emporio';
 
+    const filtered = items.map((item, realIndex) => ({ item, realIndex })).filter(({ item }) => _inventoryItemMatchesSearch(item, searchText) && _inventoryItemMatchesFilter(item, filterValue, shop));
+
     if (items.length === 0) {
         list.innerHTML = '<p style="color:#8b7355; text-align:center; padding:30px;">No hay items en el inventario</p>';
+        return;
+    }
+    if (filtered.length === 0) {
+        list.innerHTML = '<p style="color:#8b7355; text-align:center; padding:30px;">Ningún item coincide con la búsqueda.</p>';
         return;
     }
 
@@ -146,7 +271,7 @@ function renderInventoryList(shop) {
         return `<span style="color:#8b7355; font-size:0.8em;">${emporioSectionLabels[sec] || sec}</span>`;
     };
 
-    list.innerHTML = items.map((item, index) => `
+    list.innerHTML = filtered.map(({ item, realIndex }) => `
         <div class="mini-card" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
             <div style="flex:1;">
                 <div class="mini-card-title" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
@@ -164,11 +289,14 @@ function renderInventoryList(shop) {
                 ${isBiblioteca ? `<div style="margin-bottom:4px;">${bibliotecaBadge(item)}</div>` : ''}
                 ${isEmporio ? `<div style="margin-bottom:4px;">${emporioBadge(item)}</div>` : ''}
                 <div class="mini-card-info">${item.effect || item.desc || ''}</div>
-                <div style="color:#f1c40f; font-weight:bold;">${item.price} GP</div>
+                <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                    <span style="color:#f1c40f; font-weight:bold;">${item.price} GP</span>
+                    ${(item.quantity != null && item.quantity >= 2) ? '<span style="color:#8b7355; font-size:0.9em;">Cant: ' + item.quantity + '</span>' : ''}
+                </div>
             </div>
             <div class="mini-card-actions">
-                <button class="btn btn-small btn-secondary" onclick="editItem(${index})">✏️</button>
-                <button class="btn btn-small btn-danger" onclick="deleteItem(${index})">🗑️</button>
+                <button class="btn btn-small btn-secondary" onclick="editItem(${realIndex})">✏️</button>
+                <button class="btn btn-small btn-danger" onclick="deleteItem(${realIndex})">🗑️</button>
             </div>
         </div>
     `).join('');
@@ -188,6 +316,8 @@ function openItemModal(index = null) {
     document.getElementById('item-index').value = index !== null ? index : -1;
     document.getElementById('item-name').value = '';
     document.getElementById('item-price').value = 50;
+    var qtyEl = document.getElementById('item-quantity');
+    if (qtyEl) qtyEl.value = 1;
     document.getElementById('item-effect').value = '';
     document.getElementById('item-avg').value = '';
     document.getElementById('item-rarity').value = 'común';
@@ -238,6 +368,8 @@ function openItemModal(index = null) {
         var item = shop.inventario[index];
         document.getElementById('item-name').value = item.name || '';
         document.getElementById('item-price').value = item.price != null ? item.price : 50;
+        var qtyEl = document.getElementById('item-quantity');
+        if (qtyEl) qtyEl.value = (item.quantity != null && item.quantity >= 1) ? item.quantity : 1;
         document.getElementById('item-effect').value = item.effect || item.desc || '';
         document.getElementById('item-modal-title').textContent = '✏️ Editar Item';
         if (isGeneric) {
@@ -297,6 +429,8 @@ function saveItem() {
     const name = (document.getElementById('item-name').value || '').trim();
     const price = parseInt(document.getElementById('item-price').value, 10);
     const effect = (document.getElementById('item-effect').value || '').trim();
+    const qtyEl = document.getElementById('item-quantity');
+    const quantity = (qtyEl && parseInt(qtyEl.value, 10) >= 1) ? parseInt(qtyEl.value, 10) : 1;
 
     if (!shop) {
         showToast('Tienda no encontrada', true);
@@ -312,6 +446,7 @@ function saveItem() {
     }
 
     var item = { name: name, price: price, effect: effect };
+    if (quantity > 1) item.quantity = quantity;
     if (isGeneric) {
         item.avg = (document.getElementById('item-avg').value || '').trim();
         item.rarity = (document.getElementById('item-rarity').value || 'común').toLowerCase();
@@ -369,7 +504,7 @@ function saveItem() {
             closeModal('item-modal');
             shop.inventario = inventario;
             renderInventoryList(shop);
-            if (typeof loadWorld === 'function') loadWorld();
+            if (typeof refreshCityData === 'function' && shop.ciudadId) refreshCityData(shop.ciudadId);
         })
         .catch(function(e) { showToast('Error: ' + e.message, true); });
 }
@@ -388,7 +523,7 @@ function deleteItem(index) {
             showToast('Item eliminado');
             shop.inventario = inventario;
             renderInventoryList(shop);
-            if (typeof loadWorld === 'function') loadWorld();
+            if (typeof refreshCityData === 'function' && shop.ciudadId) refreshCityData(shop.ciudadId);
         })
         .catch(e => showToast('Error: ' + e.message, true));
 }
@@ -414,7 +549,7 @@ function deleteAllItems() {
             showToast('Se borraron todos los items (' + count + ')');
             shop.inventario = inventario;
             renderInventoryList(shop);
-            if (typeof loadWorld === 'function') loadWorld();
+            if (typeof refreshCityData === 'function' && shop.ciudadId) refreshCityData(shop.ciudadId);
         })
         .catch(e => showToast('Error: ' + e.message, true));
 }
@@ -762,6 +897,8 @@ function processCSVUpload() {
             var tiempoIdx = header.indexOf('tiempo');
             var nivelIdx = header.indexOf('nivel');
             var efLabelIdx = header.indexOf('eflabel');
+            var cantidadIdx = header.indexOf('cantidad');
+            if (cantidadIdx === -1) cantidadIdx = header.indexOf('quantity');
 
             if (nameIdx === -1 || priceIdx === -1) {
                 showToast('El CSV debe tener al menos las columnas "name" y "price"', true);
@@ -824,6 +961,11 @@ function processCSVUpload() {
                     errors.push('Línea ' + (i + 1) + ': precio inválido');
                     continue;
                 }
+                var quantity = 1;
+                if (cantidadIdx >= 0 && values[cantidadIdx] !== undefined && values[cantidadIdx] !== '') {
+                    var qNum = parseInt(values[cantidadIdx], 10);
+                    if (!isNaN(qNum) && qNum >= 1) quantity = Math.min(qNum, 99999);
+                }
 
                 var item;
                 if (isTaberna) {
@@ -846,6 +988,7 @@ function processCSVUpload() {
                     }
                     
                     item = { name: name, price: price, effect: effect, type: type, categoria: categoria };
+                    if (quantity > 1) item.quantity = quantity;
                 } else if (isHerreria) {
                     var tierNum = tierIdx >= 0 ? parseInt(values[tierIdx], 10) : 1;
                     if (isNaN(tierNum) || validTiers.indexOf(tierNum) === -1) tierNum = 1;
@@ -860,6 +1003,7 @@ function processCSVUpload() {
                         if (acIdx >= 0 && values[acIdx]) item.ac = values[acIdx];
                         item.isArmor = true;
                     }
+                    if (quantity > 1) item.quantity = quantity;
                 } else if (isArqueria) {
                     var typeArq = (typeArqIdx >= 0 ? (values[typeArqIdx] || 'common') : 'common').toLowerCase().trim();
                     if (validTypesArq.indexOf(typeArq) === -1) typeArq = 'common';
@@ -868,6 +1012,7 @@ function processCSVUpload() {
                     var effectArq = effectIdx >= 0 ? (values[effectIdx] || '') : '';
                     var descArq = descIdx >= 0 ? (values[descIdx] || '') : '';
                     item = { name: name, price: price, type: typeArq, tab: tabVal, effect: effectArq || descArq, desc: descArq || effectArq };
+                    if (quantity > 1) item.quantity = quantity;
                 } else if (isBiblioteca) {
                     var validSections = ['magia', 'fabricacion', 'cocina', 'trampas', 'alquimia', 'mapas', 'restringida'];
                     var sectionVal = (sectionIdx >= 0 ? (values[sectionIdx] || 'magia') : 'magia').toLowerCase().trim();
@@ -877,6 +1022,7 @@ function processCSVUpload() {
                     if (tiempoIdx >= 0 && values[tiempoIdx]) item.tiempo = values[tiempoIdx];
                     if (nivelIdx >= 0 && values[nivelIdx]) { var n = parseInt(values[nivelIdx]); if (!isNaN(n)) item.nivel = n; }
                     if (efLabelIdx >= 0 && values[efLabelIdx]) item.efLabel = values[efLabelIdx];
+                    if (quantity > 1) item.quantity = quantity;
                 } else if (isEmporio) {
                     var validSectionsEmp = ['materiales', 'raros', 'mapas', 'otros'];
                     var sectionEmp = (sectionIdx >= 0 ? (values[sectionIdx] || 'otros') : 'otros').toLowerCase().trim();
@@ -885,12 +1031,14 @@ function processCSVUpload() {
                     if (rarityEmp === 'infrecuente') rarityEmp = 'inusual';
                     if (validRarities.indexOf(rarityEmp) === -1) rarityEmp = 'común';
                     item = { name: name, price: price, section: sectionEmp, effect: effect, rarity: rarityEmp };
+                    if (quantity > 1) item.quantity = quantity;
                 } else {
                     var avg = (avgIdx !== -1 ? (values[avgIdx] || '').trim() : '') || (danoIdx !== -1 ? (values[danoIdx] || '').trim() : '') || (damageIdx >= 0 ? (values[damageIdx] || '').trim() : '');
                     var rarity = (rarityIdx !== -1 ? (values[rarityIdx] || 'común') : 'común').toLowerCase().trim();
                     if (rarity === 'infrecuente') rarity = 'inusual';
                     if (validRarities.indexOf(rarity) === -1) rarity = 'común';
                     item = { name: name, price: price, effect: effect, avg: avg, rarity: rarity };
+                    if (quantity > 1) item.quantity = quantity;
                 }
                 inventario.push(item);
                 count++;
@@ -910,7 +1058,7 @@ function processCSVUpload() {
                     showToast(count + ' items importados exitosamente' + (errors.length > 0 ? ' (con ' + errors.length + ' errores)' : ''));
                     shop.inventario = inventario;
                     renderInventoryList(shop);
-                    if (typeof loadWorld === 'function') loadWorld();
+                    if (typeof refreshCityData === 'function' && shop.ciudadId) refreshCityData(shop.ciudadId);
                     // Resetear el formulario
                     document.getElementById('csv-file-input').value = '';
                     document.getElementById('csv-file-preview').style.display = 'none';

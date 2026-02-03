@@ -50,22 +50,23 @@ function loadNotificationRecipients() {
     // Limpiar opciones excepto "Todos"
     select.innerHTML = '<option value="all">📢 Todos los Jugadores</option>';
     
-    // Cargar jugadores desde playersData si está disponible, sino desde Firestore
-    if (window.playersData && window.playersData.length > 0) {
-        window.playersData.forEach(player => {
-            const option = document.createElement('option');
-            option.value = player.id;
-            option.textContent = `⚔️ ${player.nombre || 'Sin nombre'}`;
-            select.appendChild(option);
-        });
+    // Cargar solo jugadores visibles (desde playersData o Firestore)
+    const addVisiblePlayer = (id, nombre) => {
+        const option = document.createElement('option');
+        option.value = id;
+        option.textContent = `⚔️ ${nombre || 'Sin nombre'}`;
+        select.appendChild(option);
+    };
+    if (window.getVisiblePlayers && window.getVisiblePlayers().length > 0) {
+        window.getVisiblePlayers().forEach(player => addVisiblePlayer(player.id, player.nombre));
+    } else if (window.playersData && window.playersData.length > 0) {
+        window.playersData.filter(p => p.visible !== false).forEach(player => addVisiblePlayer(player.id, player.nombre));
     } else {
         db.collection('players').limit(200).get().then(snap => {
             snap.forEach(doc => {
                 const player = doc.data();
-                const option = document.createElement('option');
-                option.value = doc.id;
-                option.textContent = `⚔️ ${player.nombre || 'Sin nombre'}`;
-                select.appendChild(option);
+                if (player.visible === false) return;
+                addVisiblePlayer(doc.id, player.nombre);
             });
         });
     }
@@ -204,21 +205,34 @@ async function sendNotification() {
         };
         
         if (recipientId === 'all') {
-            // Enviar a todos los jugadores (limit para no traer miles)
-            const playersSnap = await db.collection('players').limit(200).get();
+            // Enviar solo a jugadores visibles
+            const visiblePlayers = window.getVisiblePlayers ? window.getVisiblePlayers() : [];
+            let docsToUse = [];
+            if (visiblePlayers.length > 0) {
+                docsToUse = visiblePlayers.map(p => ({ id: p.id, data: () => ({ nombre: p.nombre || 'Jugador' }) }));
+            } else {
+                const playersSnap = await db.collection('players').limit(200).get();
+                playersSnap.forEach(doc => {
+                    if (doc.data().visible === false) return;
+                    const d = doc.data();
+                    docsToUse.push({ id: doc.id, data: () => d });
+                });
+            }
             const batch = db.batch();
             let count = 0;
-            
-            playersSnap.forEach(doc => {
+            docsToUse.forEach(doc => {
                 const notificationRef = db.collection('notifications').doc();
                 batch.set(notificationRef, {
                     ...notificationData,
                     playerId: doc.id,
-                    playerName: doc.data().nombre || 'Jugador'
+                    playerName: (typeof doc.data === 'function' ? doc.data() : doc.data).nombre || 'Jugador'
                 });
                 count++;
             });
-            
+            if (count === 0) {
+                showToast('No hay jugadores visibles para enviar', true);
+                return;
+            }
             await batch.commit();
             showToast(`Notificación enviada a ${count} jugador${count !== 1 ? 'es' : ''}`);
         } else {
@@ -384,23 +398,23 @@ async function openNotificationModal(notificationId) {
     const horaStr = fecha.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
     const isRead = notif.leida === true;
     
-    // Crear contenido del modal
+    // Crear contenido del modal (clases para estilos responsive en móvil)
     const modalContent = `
-        <div style="background: linear-gradient(180deg, rgba(61, 42, 30, 0.95) 0%, rgba(42, 28, 20, 0.98) 100%); border: 2px solid #8b5a2b; border-radius: 12px; padding: 30px; max-width: 600px; margin: 0 auto; box-shadow: 0 8px 32px rgba(0,0,0,0.5);">
-            <div style="text-align: center; margin-bottom: 24px;">
-                <div style="font-size: 4em; margin-bottom: 12px;">📮</div>
-                <div style="font-family: 'Cinzel', serif; color: #d4af37; font-size: 1.5em; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 2px;">Carta del Dungeon Master</div>
-                <div style="color: #8b7355; font-size: 0.9em;">${fechaStr} a las ${horaStr}</div>
+        <div class="notification-letter" style="background: linear-gradient(180deg, rgba(61, 42, 30, 0.95) 0%, rgba(42, 28, 20, 0.98) 100%); border: 2px solid #8b5a2b; border-radius: 12px; padding: 30px; max-width: 600px; margin: 0 auto; box-shadow: 0 8px 32px rgba(0,0,0,0.5);">
+            <div class="notification-letter-header" style="text-align: center; margin-bottom: 24px;">
+                <div class="notification-letter-icon" style="font-size: 4em; margin-bottom: 12px;">📮</div>
+                <div class="notification-letter-title" style="font-family: 'Cinzel', serif; color: #d4af37; font-size: 1.5em; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 2px;">Carta del Dungeon Master</div>
+                <div class="notification-letter-date" style="color: #8b7355; font-size: 0.9em;">${fechaStr} a las ${horaStr}</div>
             </div>
-            <div style="border-top: 2px solid #8b5a2b; border-bottom: 2px solid #8b5a2b; padding: 24px 0; margin: 24px 0; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 24px;">
-                <div style="color: #d4c4a8; line-height: 1.8; font-size: 1.05em; white-space: pre-wrap; text-align: left;">${(notif.mensaje || 'Sin mensaje').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</div>
+            <div class="notification-letter-body" style="border-top: 2px solid #8b5a2b; border-bottom: 2px solid #8b5a2b; padding: 24px 0; margin: 24px 0; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 24px;">
+                <div class="notification-letter-text" style="color: #d4c4a8; line-height: 1.8; font-size: 1.05em; white-space: pre-wrap; text-align: left;">${(notif.mensaje || 'Sin mensaje').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</div>
             </div>
             ${!isRead ? `
-            <div style="text-align: center;">
+            <div class="notification-letter-actions" style="text-align: center;">
                 <button class="btn" onclick="markNotificationAsRead('${notificationId}')" style="min-width: 200px; font-size: 1.05em;">✓ Marcar como Leída</button>
             </div>
             ` : `
-            <div style="text-align: center; color: #8b7355; font-style: italic;">
+            <div class="notification-letter-actions" style="text-align: center; color: #8b7355; font-style: italic;">
                 ✓ Esta carta ya fue leída
             </div>
             `}
