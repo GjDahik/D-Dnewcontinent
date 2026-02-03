@@ -71,5 +71,10 @@ service cloud.firestore {
     match /bitacora_viajes/{viajeId} {
       allow read, write: if true;
     }
+
+    // Marcadores del mapa del DM: visibles para todos los aventureros
+    match /map_markers/{markerId} {
+      allow read, write: if true;
+    }
   }
 }

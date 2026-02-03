@@ -280,6 +280,7 @@ function renderCities() {
         console.log('HTML generado, longitud:', htmlContent.length);
         container.innerHTML = htmlContent;
         console.log('Ciudades renderizadas exitosamente. Contenedor ahora tiene:', container.children.length, 'elementos hijos');
+        if (typeof renderDMMapMarkersDropdown === 'function' && typeof isDM === 'function' && isDM()) renderDMMapMarkersDropdown();
     } catch (error) {
         console.error('Error renderizando ciudades:', error);
         console.error('Stack trace:', error.stack);
