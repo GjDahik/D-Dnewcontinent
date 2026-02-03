@@ -10,6 +10,27 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
+// ==================== PWA - BASE PATH Y SERVICE WORKER ====================
+/** Base path para GitHub Pages (ej. /dm-dashboard-modular/). Usado para manifest, SW y rutas. */
+var PWA_BASE = (function () {
+  try {
+    var path = new URL(document.baseURI || window.location.href).pathname;
+    if (path.indexOf('/') === 0) path = path.slice(1);
+    var parts = path.split('/').filter(Boolean);
+    var first = parts[0];
+    if (first && first !== 'index.html') return '/' + first + '/';
+  } catch (e) {}
+  return '/';
+})();
+
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  navigator.serviceWorker.register(PWA_BASE + 'sw.js').then(function (reg) {
+    console.log('[PWA] Service Worker registrado:', reg.scope);
+  }).catch(function (err) {
+    console.warn('[PWA] Error registrando Service Worker:', err);
+  });
+}
+
 // ==================== UTILIDADES ====================
 /** Debounce: ejecuta fn tras ms ms sin nuevas llamadas. Reduce renders en buscadores. */
 function debounce(fn, ms) {

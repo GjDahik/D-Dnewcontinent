@@ -419,6 +419,8 @@ function toggleCityVisibility(cityId) {
     if (!city) return;
     var next = city.visibleToPlayers === false;
     db.collection('cities').doc(cityId).update({ visibleToPlayers: next }).then(function() {
+        city.visibleToPlayers = next;
+        if (typeof renderCities === 'function') renderCities();
         showToast(next ? 'Ciudad visible para jugadores' : 'Ciudad oculta para jugadores');
     }).catch(function(e) { showToast('Error: ' + (e.message || e), true); });
 }
