@@ -1521,11 +1521,8 @@ function initPlayerMapMarkers() {
         }
         const layer = document.getElementById('player-map-markers-layer');
         if (layer) {
-            layer.addEventListener('click', function (e) {
-                if (playerMapPlaceMode) return;
-                const marker = e.target.closest('.player-map-marker');
+            function handleMarkerTap(marker) {
                 if (!marker) return;
-                e.stopPropagation();
                 const isMobile = window.innerWidth <= 768;
                 if (marker.dataset.cityId) {
                     if (isMobile) {
@@ -1544,6 +1541,31 @@ function initPlayerMapMarkers() {
                     layer.querySelectorAll('.player-map-marker.label-visible').forEach(function (m) { m.classList.remove('label-visible'); });
                     marker.classList.toggle('label-visible');
                 }
+            }
+            var lastMarkerTapTime = 0;
+            var touchStartMarker = null;
+            layer.addEventListener('touchstart', function (e) {
+                if (playerMapPlaceMode) return;
+                touchStartMarker = e.target.closest('.player-map-marker') || null;
+            }, { passive: true });
+            layer.addEventListener('touchend', function (e) {
+                if (playerMapPlaceMode) return;
+                var marker = touchStartMarker || e.target.closest('.player-map-marker');
+                touchStartMarker = null;
+                if (!marker) return;
+                e.preventDefault();
+                if (Date.now() - lastMarkerTapTime < 350) return;
+                lastMarkerTapTime = Date.now();
+                handleMarkerTap(marker);
+            }, { passive: false });
+            layer.addEventListener('click', function (e) {
+                if (playerMapPlaceMode) return;
+                if (Date.now() - lastMarkerTapTime < 350) return;
+                const marker = e.target.closest('.player-map-marker');
+                if (!marker) return;
+                e.stopPropagation();
+                lastMarkerTapTime = Date.now();
+                handleMarkerTap(marker);
             });
             layer.addEventListener('keydown', function (e) {
                 if (playerMapPlaceMode) return;

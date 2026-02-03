@@ -1903,8 +1903,11 @@ body {
 .player-map-zoom-controls {
     display: flex;
     justify-content: center;
+    align-items: center;
     gap: 8px;
     margin: 10px 0;
+    width: 100%;
+    box-sizing: border-box;
 }
 .player-map-viewport {
     position: relative;
@@ -1916,6 +1919,9 @@ body {
     width: 100%;
 }
 @media (max-width: 768px) {
+    .player-map-zoom-controls {
+        justify-content: center !important;
+    }
     .player-map-wrap {
         padding: 12px;
     }
@@ -1982,6 +1988,7 @@ body {
     gap: 0;
     pointer-events: auto;
     cursor: pointer;
+    touch-action: manipulation;
 }
 .player-map-marker-pin {
     font-size: 1.4em;
