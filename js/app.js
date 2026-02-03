@@ -577,7 +577,11 @@ function updateMapPlayerView() {
     const lev = visibleLevels[playerMapLevelIndex];
     const url = (lev.imageUrl || DEFAULT_MAP_IMAGE_URL).trim();
     const name = (lev.name || 'Nivel ' + (playerMapLevelIndex + 1)).trim();
-    if (playerMapImg) { playerMapImg.src = url; playerMapImg.alt = 'Mapa de ' + name; }
+    if (playerMapImg) {
+        playerMapImg.src = url;
+        playerMapImg.alt = 'Mapa de ' + name;
+        playerMapImg.onload = function () { if (typeof renderPlayerMapMarkers === 'function') renderPlayerMapMarkers(); };
+    }
     if (mapTitlePlayer) mapTitlePlayer.textContent = '🗺️ Mapa de ' + name;
     if (nameEl) nameEl.textContent = name;
     if (btnUp) btnUp.disabled = playerMapLevelIndex >= visibleLevels.length - 1;
@@ -1582,6 +1586,16 @@ function initPlayerMapMarkers() {
             });
         }
         setPlayerMapMarkersPanel(false);
+        var resizeTimeout;
+        window.addEventListener('resize', function () {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(function () {
+                if (typeof renderPlayerMapMarkers === 'function') renderPlayerMapMarkers();
+            }, 100);
+        });
+        setTimeout(function () {
+            if (typeof renderPlayerMapMarkers === 'function') renderPlayerMapMarkers();
+        }, 300);
     }
     initPlayerMapViewport();
 }

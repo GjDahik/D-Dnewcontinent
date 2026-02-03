@@ -1926,7 +1926,7 @@ body {
         padding: 12px;
     }
     .player-map-viewport {
-        min-height: 0;
+        min-height: 240px;
         height: auto;
     }
     .player-map-ubicacion {
@@ -1976,7 +1976,10 @@ body {
 .player-map-markers-layer {
     position: absolute;
     inset: 0;
-    pointer-events: none;
+    pointer-events: auto;
+    z-index: 2;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
 }
 .player-map-marker {
     position: absolute;
