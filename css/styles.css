@@ -1342,7 +1342,7 @@ body {
     max-width: 380px;
     height: 40px;
 }
-@media (max-width: 768px) {
+@media (max-width: 1200px) {
     .legend-card .legend-track-body {
         flex-direction: column;
         gap: 12px;
@@ -1459,7 +1459,7 @@ body {
 .player-banco-register-btn { width: 100%; justify-content: center; }
 
 /* Modal Banco en móvil: scroll suave y contenido compacto */
-@media (max-width: 768px) {
+@media (max-width: 1200px) {
     #player-banco-modal.modal-overlay.active {
         padding: 12px;
         align-items: flex-start;
@@ -1513,7 +1513,7 @@ body {
 }
 
 /* Modal de Correo (notificación) en móvil: más espacio para texto y scroll */
-@media (max-width: 768px) {
+@media (max-width: 1200px) {
     #notification-modal.modal-overlay.active {
         padding: 12px;
         align-items: flex-start;
@@ -1850,7 +1850,7 @@ body {
 }
 .inventory-card-actions .inv-sell-qty:focus { outline: none; border-color: #8b5a2b; }
 
-@media (max-width: 768px) {
+@media (max-width: 1200px) {
     .player-inventory-toolbar {
         flex-direction: column;
         align-items: stretch;
@@ -2757,7 +2757,7 @@ body {
 }
 
 /* RESPONSIVE */
-@media (max-width: 768px) {
+@media (max-width: 1200px) {
     body { padding: 10px; }
 
     /* En móvil: header = barra fija arriba siempre; placa debajo en el contenido */
