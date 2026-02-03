@@ -1506,6 +1506,12 @@ function initPlayerMapMarkers() {
         loadPlayerMapMarkers();
         renderPlayerMapFreeMarkersDropdown();
         renderPlayerMapMarkers();
+        var markersBtn = document.getElementById('player-map-markers-toggle-btn');
+        if (markersBtn) markersBtn.addEventListener('click', function () { setPlayerMapMarkersPanel(!playerMapMarkersPanelOpen); });
+        var rutasBtn = document.getElementById('player-map-rutas-toggle-btn');
+        if (rutasBtn) rutasBtn.addEventListener('click', function () { if (typeof togglePlayerRutasPanel === 'function') togglePlayerRutasPanel(); });
+        var bitacoraBtn = document.getElementById('player-map-bitacora-toggle-btn');
+        if (bitacoraBtn) bitacoraBtn.addEventListener('click', function () { if (typeof togglePlayerBitacoraPanel === 'function') togglePlayerBitacoraPanel(); });
         const stage = document.getElementById('player-map-stage');
         if (stage) {
             stage.addEventListener('click', function (e) {
@@ -1514,7 +1520,8 @@ function initPlayerMapMarkers() {
                     return;
                 }
                 if (!playerMapPlaceMode) {
-                    if (window.innerWidth <= 768 && !e.target.closest('.player-map-marker')) {
+                    var isTouch = (typeof window.matchMedia !== 'undefined' && window.matchMedia('(pointer: coarse), (max-width: 1024px)').matches) || window.innerWidth <= 1024;
+                    if (isTouch && !e.target.closest('.player-map-marker')) {
                         var ly = document.getElementById('player-map-markers-layer');
                         if (ly) ly.querySelectorAll('.player-map-marker.label-visible').forEach(function (m) { m.classList.remove('label-visible'); });
                     }
@@ -1527,7 +1534,7 @@ function initPlayerMapMarkers() {
         if (layer) {
             function handleMarkerTap(marker) {
                 if (!marker) return;
-                const isMobile = window.innerWidth <= 768;
+                var isMobile = (typeof window.matchMedia !== 'undefined' && window.matchMedia('(pointer: coarse), (max-width: 1024px)').matches) || window.innerWidth <= 1024;
                 if (marker.dataset.cityId) {
                     if (isMobile) {
                         const labelAlreadyVisible = marker.classList.contains('label-visible');
@@ -1548,6 +1555,10 @@ function initPlayerMapMarkers() {
             }
             var lastMarkerTapTime = 0;
             var touchStartMarker = null;
+            var pointerStartMarker = null;
+            function isTouchOrSmallScreen() {
+                return (typeof window.matchMedia !== 'undefined' && window.matchMedia('(pointer: coarse), (max-width: 1024px)').matches) || window.innerWidth <= 1024;
+            }
             layer.addEventListener('touchstart', function (e) {
                 if (playerMapPlaceMode) return;
                 touchStartMarker = e.target.closest('.player-map-marker') || null;
@@ -1562,10 +1573,26 @@ function initPlayerMapMarkers() {
                 lastMarkerTapTime = Date.now();
                 handleMarkerTap(marker);
             }, { passive: false });
+            layer.addEventListener('pointerdown', function (e) {
+                if (playerMapPlaceMode) return;
+                if (e.pointerType === 'touch' || e.pointerType === 'pen') pointerStartMarker = e.target.closest('.player-map-marker') || null;
+            }, { passive: true });
+            layer.addEventListener('pointerup', function (e) {
+                if (playerMapPlaceMode) return;
+                var marker = pointerStartMarker || e.target.closest('.player-map-marker');
+                pointerStartMarker = null;
+                if (!marker) return;
+                if (e.pointerType === 'touch' || e.pointerType === 'pen') {
+                    if (Date.now() - lastMarkerTapTime < 350) return;
+                    lastMarkerTapTime = Date.now();
+                    e.preventDefault();
+                    handleMarkerTap(marker);
+                }
+            }, { passive: false });
             layer.addEventListener('click', function (e) {
                 if (playerMapPlaceMode) return;
                 if (Date.now() - lastMarkerTapTime < 350) return;
-                const marker = e.target.closest('.player-map-marker');
+                var marker = e.target.closest('.player-map-marker');
                 if (!marker) return;
                 e.stopPropagation();
                 lastMarkerTapTime = Date.now();
@@ -1577,8 +1604,8 @@ function initPlayerMapMarkers() {
                 if (!marker || !marker.dataset.cityId) return;
                 if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    const isMobile = window.innerWidth <= 768;
-                    if (isMobile && marker.classList.contains('label-visible')) {
+                    var isMob = (typeof window.matchMedia !== 'undefined' && window.matchMedia('(pointer: coarse), (max-width: 1024px)').matches) || window.innerWidth <= 1024;
+                    if (isMob && marker.classList.contains('label-visible')) {
                         marker.classList.remove('label-visible');
                     }
                     openPlayerCityFromMap(marker.dataset.cityId, marker.dataset.cityName);
@@ -1635,6 +1662,7 @@ function updatePlayerMapPlaceModeUI() {
 function togglePlayerMapMarkersPanel() {
     setPlayerMapMarkersPanel(!playerMapMarkersPanelOpen);
 }
+window.togglePlayerMapMarkersPanel = togglePlayerMapMarkersPanel;
 
 function setPlayerMapMarkersPanel(isOpen) {
     if (isOpen) closeOtherPlayerMapPanels('markers');

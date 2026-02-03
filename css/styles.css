@@ -1909,11 +1909,16 @@ body {
     width: 100%;
     box-sizing: border-box;
 }
+.player-map-zoom-controls .btn {
+    min-width: 44px;
+    min-height: 44px;
+}
 .player-map-viewport {
     position: relative;
     overflow: hidden;
     border-radius: 10px;
     touch-action: none;
+    -ms-touch-action: none;
     background: #2a2520;
     min-height: 320px;
     width: 100%;
@@ -1937,6 +1942,7 @@ body {
     .player-map-module .btn {
         width: 100%;
         min-width: 0;
+        min-height: 44px;
         box-sizing: border-box;
     }
     .player-map-viewport .player-map-marker-label {
@@ -1976,10 +1982,8 @@ body {
 .player-map-markers-layer {
     position: absolute;
     inset: 0;
-    pointer-events: auto;
+    pointer-events: none;
     z-index: 2;
-    -webkit-transform: translateZ(0);
-    transform: translateZ(0);
 }
 .player-map-marker {
     position: absolute;
@@ -1992,6 +1996,8 @@ body {
     pointer-events: auto;
     cursor: pointer;
     touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    tap-highlight-color: transparent;
 }
 .player-map-marker-pin {
     font-size: 1.4em;
