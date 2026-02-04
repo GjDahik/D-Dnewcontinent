@@ -1625,6 +1625,7 @@ function initPlayerMapMarkers() {
         }, 300);
     }
     initPlayerMapViewport();
+    if (typeof initPlayerMapTouch === 'function') initPlayerMapTouch();
 }
 
 function updatePlayerMapPlaceModeUI() {
