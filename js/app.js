@@ -610,39 +610,66 @@ function getPlayerMapLevelKey() {
 }
 
 function loadPlayerMapMarkers() {
-    try {
-        const raw = localStorage.getItem('playerMapMarkersV1');
-        const parsed = raw ? JSON.parse(raw) : [];
-        if (Array.isArray(parsed)) {
-            playerMapMarkers = parsed
-                .map(normalizePlayerMapMarker)
-                .filter(m => m && m.type === 'custom');
-        } else {
-            playerMapMarkers = [];
-        }
-    } catch (e) {
+    var user = getCurrentUser();
+    if (!db || !user || !user.id || !isPlayer()) {
         playerMapMarkers = [];
-    }
-    try {
-        const rawCustom = localStorage.getItem('playerMapCustomMarkersV1');
-        const parsedCustom = rawCustom ? JSON.parse(rawCustom) : [];
-        if (Array.isArray(parsedCustom)) {
-            playerMapCustomMarkers = parsedCustom.map(normalizePlayerCustomMarker).filter(Boolean);
-        } else {
-            playerMapCustomMarkers = [];
-        }
-    } catch (e) {
         playerMapCustomMarkers = [];
+        return Promise.resolve();
+    }
+    return db.collection('player_map_markers').doc(user.id).get().then(function (doc) {
+        var data = doc.exists ? doc.data() : {};
+        var markers = Array.isArray(data.markers) ? data.markers : [];
+        var customs = Array.isArray(data.customMarkers) ? data.customMarkers : [];
+        playerMapMarkers = markers.map(normalizePlayerMapMarker).filter(function (m) { return m && m.type === 'custom'; });
+        playerMapCustomMarkers = customs.map(normalizePlayerCustomMarker).filter(Boolean);
+        if (playerMapMarkers.length === 0 && playerMapCustomMarkers.length === 0) {
+            migrateFromLocalStorage();
+        }
+        if (typeof renderPlayerMapMarkers === 'function') renderPlayerMapMarkers();
+        if (typeof renderPlayerMapFreeMarkersDropdown === 'function') renderPlayerMapFreeMarkersDropdown();
+    }).catch(function (e) {
+        console.error('Error loading player map markers:', e);
+        migrateFromLocalStorage();
+        if (typeof renderPlayerMapMarkers === 'function') renderPlayerMapMarkers();
+        if (typeof renderPlayerMapFreeMarkersDropdown === 'function') renderPlayerMapFreeMarkersDropdown();
+    });
+}
+
+function migrateFromLocalStorage() {
+    try {
+        var raw = localStorage.getItem('playerMapMarkersV1');
+        var parsed = raw ? JSON.parse(raw) : [];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+            playerMapMarkers = parsed.map(normalizePlayerMapMarker).filter(function (m) { return m && m.type === 'custom'; });
+        }
+    } catch (e) {}
+    try {
+        var rawCustom = localStorage.getItem('playerMapCustomMarkersV1');
+        var parsedCustom = rawCustom ? JSON.parse(rawCustom) : [];
+        if (Array.isArray(parsedCustom) && parsedCustom.length > 0) {
+            playerMapCustomMarkers = parsedCustom.map(normalizePlayerCustomMarker).filter(Boolean);
+        }
+    } catch (e) {}
+    if (playerMapMarkers.length > 0 || playerMapCustomMarkers.length > 0) {
+        savePlayerMapMarkers();
+        try {
+            localStorage.removeItem('playerMapMarkersV1');
+            localStorage.removeItem('playerMapCustomMarkersV1');
+        } catch (e2) {}
     }
 }
 
 function savePlayerMapMarkers() {
-    try {
-        localStorage.setItem('playerMapMarkersV1', JSON.stringify(playerMapMarkers));
-    } catch (e) {}
-    try {
-        localStorage.setItem('playerMapCustomMarkersV1', JSON.stringify(playerMapCustomMarkers));
-    } catch (e) {}
+    var user = getCurrentUser();
+    if (!db || !user || !user.id || !isPlayer()) return Promise.resolve();
+    var payload = {
+        markers: playerMapMarkers,
+        customMarkers: playerMapCustomMarkers,
+        updatedAt: (typeof firebase !== 'undefined' && firebase.firestore && firebase.firestore.FieldValue) ? firebase.firestore.FieldValue.serverTimestamp() : new Date()
+    };
+    return db.collection('player_map_markers').doc(user.id).set(payload, { merge: true }).catch(function (e) {
+        console.error('Error saving player map markers:', e);
+    });
 }
 
 function normalizePlayerMapMarker(marker) {
@@ -1503,9 +1530,9 @@ function openDMCityFromMap(cityId) {
 function initPlayerMapMarkers() {
     if (!window._playerMapMarkersInit) {
         window._playerMapMarkersInit = true;
-        loadPlayerMapMarkers();
-        renderPlayerMapFreeMarkersDropdown();
-        renderPlayerMapMarkers();
+        loadPlayerMapMarkers().then(function () {
+            renderPlayerMapFreeMarkersDropdown();
+            renderPlayerMapMarkers();
         var markersBtn = document.getElementById('player-map-markers-toggle-btn');
         if (markersBtn) markersBtn.addEventListener('click', function () { setPlayerMapMarkersPanel(!playerMapMarkersPanelOpen); });
         var rutasBtn = document.getElementById('player-map-rutas-toggle-btn');
@@ -1623,9 +1650,10 @@ function initPlayerMapMarkers() {
         setTimeout(function () {
             if (typeof renderPlayerMapMarkers === 'function') renderPlayerMapMarkers();
         }, 300);
+        initPlayerMapViewport();
+        if (typeof initPlayerMapTouch === 'function') initPlayerMapTouch();
+        });
     }
-    initPlayerMapViewport();
-    if (typeof initPlayerMapTouch === 'function') initPlayerMapTouch();
 }
 
 function updatePlayerMapPlaceModeUI() {

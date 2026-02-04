@@ -76,5 +76,10 @@ service cloud.firestore {
     match /map_markers/{markerId} {
       allow read, write: if true;
     }
+
+    // Marcadores del mapa del jugador: por jugador, para sincronizar entre dispositivos
+    match /player_map_markers/{playerId} {
+      allow read, write: if true;
+    }
   }
 }
