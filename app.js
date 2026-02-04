@@ -609,6 +609,9 @@ function getPlayerMapLevelKey() {
     return String(lev.name || ('Nivel ' + (playerMapLevelIndex + 1))).trim();
 }
 
+// FIX: Variable global para guardar el listener de marcadores
+var _playerMapMarkersUnsubscribe = null;
+
 function loadPlayerMapMarkers() {
     var user = getCurrentUser();
     if (!db || !user || !user.id || !isPlayer()) {
@@ -616,7 +619,15 @@ function loadPlayerMapMarkers() {
         playerMapCustomMarkers = [];
         return Promise.resolve();
     }
-    return db.collection('player_map_markers').doc(user.id).get().then(function (doc) {
+    
+    // FIX: Cerrar listener anterior si existe (evita duplicados)
+    if (_playerMapMarkersUnsubscribe) {
+        _playerMapMarkersUnsubscribe();
+        _playerMapMarkersUnsubscribe = null;
+    }
+    
+    // FIX: Usar onSnapshot en vez de get() para sincronización en tiempo real
+    _playerMapMarkersUnsubscribe = db.collection('player_map_markers').doc(user.id).onSnapshot(function (doc) {
         var data = doc.exists ? doc.data() : {};
         var markers = Array.isArray(data.markers) ? data.markers : [];
         var customs = Array.isArray(data.customMarkers) ? data.customMarkers : [];
@@ -627,12 +638,19 @@ function loadPlayerMapMarkers() {
         }
         if (typeof renderPlayerMapMarkers === 'function') renderPlayerMapMarkers();
         if (typeof renderPlayerMapFreeMarkersDropdown === 'function') renderPlayerMapFreeMarkersDropdown();
-    }).catch(function (e) {
+    }, function (e) {
         console.error('Error loading player map markers:', e);
         migrateFromLocalStorage();
         if (typeof renderPlayerMapMarkers === 'function') renderPlayerMapMarkers();
         if (typeof renderPlayerMapFreeMarkersDropdown === 'function') renderPlayerMapFreeMarkersDropdown();
     });
+    
+    // FIX: Registrar el listener para que se cierre al cambiar de usuario
+    if (typeof registerUnsub === 'function') {
+        registerUnsub('player', null, _playerMapMarkersUnsubscribe);
+    }
+    
+    return Promise.resolve();
 }
 
 function migrateFromLocalStorage() {
@@ -1528,19 +1546,30 @@ function openDMCityFromMap(cityId) {
 }
 
 function initPlayerMapMarkers() {
+    // FIX: Permitir reinicialización al cambiar de usuario
+    // Los event listeners solo se agregan una vez para evitar duplicados
     if (!window._playerMapMarkersInit) {
         window._playerMapMarkersInit = true;
-        loadPlayerMapMarkers().then(function () {
-            renderPlayerMapFreeMarkersDropdown();
-            renderPlayerMapMarkers();
+        
+        // Event listeners (solo una vez)
         var markersBtn = document.getElementById('player-map-markers-toggle-btn');
-        if (markersBtn) markersBtn.addEventListener('click', function () { setPlayerMapMarkersPanel(!playerMapMarkersPanelOpen); });
+        if (markersBtn && !markersBtn._hasListener) {
+            markersBtn._hasListener = true;
+            markersBtn.addEventListener('click', function () { setPlayerMapMarkersPanel(!playerMapMarkersPanelOpen); });
+        }
         var rutasBtn = document.getElementById('player-map-rutas-toggle-btn');
-        if (rutasBtn) rutasBtn.addEventListener('click', function () { if (typeof togglePlayerRutasPanel === 'function') togglePlayerRutasPanel(); });
+        if (rutasBtn && !rutasBtn._hasListener) {
+            rutasBtn._hasListener = true;
+            rutasBtn.addEventListener('click', function () { if (typeof togglePlayerRutasPanel === 'function') togglePlayerRutasPanel(); });
+        }
         var bitacoraBtn = document.getElementById('player-map-bitacora-toggle-btn');
-        if (bitacoraBtn) bitacoraBtn.addEventListener('click', function () { if (typeof togglePlayerBitacoraPanel === 'function') togglePlayerBitacoraPanel(); });
+        if (bitacoraBtn && !bitacoraBtn._hasListener) {
+            bitacoraBtn._hasListener = true;
+            bitacoraBtn.addEventListener('click', function () { if (typeof togglePlayerBitacoraPanel === 'function') togglePlayerBitacoraPanel(); });
+        }
         const stage = document.getElementById('player-map-stage');
-        if (stage) {
+        if (stage && !stage._hasClickListener) {
+            stage._hasClickListener = true;
             stage.addEventListener('click', function (e) {
                 if (playerMapWasDragging) {
                     playerMapWasDragging = false;
@@ -1654,6 +1683,13 @@ function initPlayerMapMarkers() {
         if (typeof initPlayerMapTouch === 'function') initPlayerMapTouch();
         });
     }
+    
+    // FIX: Cargar marcadores cada vez que se llama initPlayerMapMarkers
+    // Esto asegura que se recarguen al cambiar de usuario
+    loadPlayerMapMarkers().then(function () {
+        renderPlayerMapFreeMarkersDropdown();
+        renderPlayerMapMarkers();
+    });
 }
 
 function updatePlayerMapPlaceModeUI() {
