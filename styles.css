@@ -1929,10 +1929,18 @@ body {
     }
     .player-map-wrap {
         padding: 12px;
+        max-height: 75vh;
     }
     .player-map-viewport {
-        min-height: 240px;
-        height: auto;
+        min-height: auto !important; /* FIX: elimina altura mínima forzada */
+        height: auto !important;
+        max-height: 70vh;
+    }
+    .player-map-stage {
+        height: auto !important; /* FIX: que se ajuste a la imagen */
+    }
+    .player-map-img {
+        max-height: 70vh; /* FIX: limita la altura máxima */
     }
     .player-map-ubicacion {
         flex-direction: column;
@@ -3912,35 +3920,4 @@ body {
 
 .mi-casa-notes-block {
     box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-}
-
-/* ========================================
-   AJUSTES DE MAPA PARA MÓVILES -FIX ESPACIO NEGRO
-   ======================================== */
-@media (max-width: 768px) {
-    /* Fuerza que el viewport se ajuste al contenido real */
-    .player-map-viewport {
-        height: auto !important;
-        min-height: auto !important;
-        max-height: 70vh !important;
-    }
-    
-    .player-map-wrap {
-        max-height: 75vh;
-    }
-    
-    /* El stage debe ajustarse a la imagen, no tener altura fija */
-    .player-map-stage {
-        height: auto !important;
-        min-height: auto !important;
-    }
-    
-    /* La imagen debe ocupar el ancho completo y altura automática */
-    .player-map-img {
-        width: 100% !important;
-        height: auto !important;
-        max-height: 70vh;
-        object-fit: contain;
-        display: block;
-    }
 }
