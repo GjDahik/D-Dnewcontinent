@@ -3915,22 +3915,32 @@ body {
 }
 
 /* ========================================
-   AJUSTES DE MAPA PARA MÓVILES
+   AJUSTES DE MAPA PARA MÓVILES -FIX ESPACIO NEGRO
    ======================================== */
 @media (max-width: 768px) {
-    /* Reduce el contenedor del mapa en pantallas pequeñas */
+    /* Fuerza que el viewport se ajuste al contenido real */
     .player-map-viewport {
-        height: 50vh !important;
-        max-height: 50vh;
+        height: auto !important;
+        min-height: auto !important;
+        max-height: 70vh !important;
     }
     
     .player-map-wrap {
-        max-height: 60vh;
+        max-height: 75vh;
     }
     
-    /* Asegura que el mapa sea más manejable en móviles */
+    /* El stage debe ajustarse a la imagen, no tener altura fija */
     .player-map-stage {
-        width: 100%;
-        height: 100%;
+        height: auto !important;
+        min-height: auto !important;
+    }
+    
+    /* La imagen debe ocupar el ancho completo y altura automática */
+    .player-map-img {
+        width: 100% !important;
+        height: auto !important;
+        max-height: 70vh;
+        object-fit: contain;
+        display: block;
     }
 }
