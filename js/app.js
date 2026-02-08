@@ -2770,6 +2770,7 @@ function fetchPlayerCities() {
     return db.collection('cities').limit(300).get()
         .then(snap => {
             playerCitiesData = snap && snap.docs ? snap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+            playerCitiesData.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
             if (typeof renderPlayerCities === 'function') renderPlayerCities();
         })
         .catch(err => { console.error('Error cargando ciudades (player):', err); });
@@ -2817,7 +2818,7 @@ function loadPlayerWorld() {
 function renderPlayerCities() {
     const el = document.getElementById('player-cities-container');
     if (!el) return;
-    const visibleCities = playerCitiesData.filter(c => c.visibleToPlayers !== false);
+    const visibleCities = playerCitiesData.filter(c => c.visibleToPlayers !== false).sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
     if (!visibleCities.length) {
         el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🏘️</div><p>No hay ciudades visibles. El DM puede activarlas desde el dashboard.</p></div>';
         return;
@@ -2848,7 +2849,7 @@ function renderPlayerCities() {
 function renderPlayerMapUbicacionDropdown() {
     const sel = document.getElementById('player-map-ubicacion-select');
     if (!sel) return;
-    const visibleCities = playerCitiesData.filter(c => c.visibleToPlayers !== false);
+    const visibleCities = playerCitiesData.filter(c => c.visibleToPlayers !== false).sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
     const currentValue = playerUbicacionActual || '';
     sel.innerHTML = '<option value="">— Selecciona tu ciudad —</option>' + visibleCities.map(c => {
         const n = (c.nombre || 'Sin nombre').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -3002,7 +3003,7 @@ function renderPlayerRutas() {
     const llegadaEl = document.getElementById('player-ruta-llegada');
     const medioEl = document.getElementById('player-ruta-medio');
     if (!salidaEl || !llegadaEl || !medioEl) return;
-    const visibleCities = (playerCitiesData || []).filter(c => c.visibleToPlayers !== false);
+    const visibleCities = (playerCitiesData || []).filter(c => c.visibleToPlayers !== false).sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
     const opt = (id, name) => `<option value="${(id || '').replace(/"/g, '&quot;')}">${(name || 'Sin nombre').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</option>`;
     salidaEl.innerHTML = '<option value="">— Selecciona —</option>' + visibleCities.map(c => opt(c.id, c.nombre)).join('');
     llegadaEl.innerHTML = '<option value="">— Selecciona —</option>' + visibleCities.map(c => opt(c.id, c.nombre)).join('');
@@ -3286,7 +3287,7 @@ async function saveBitacoraNoteFromModal() {
 function loadPlayerCityNotesPreviews() {
     const user = getCurrentUser();
     if (!user || !user.id || (user.type !== 'player' && user.tipo !== 'player')) return;
-    const visibleCities = playerCitiesData.filter(c => c.visibleToPlayers !== false);
+    const visibleCities = playerCitiesData.filter(c => c.visibleToPlayers !== false).sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
     if (!visibleCities.length) return;
     Promise.all(visibleCities.map(city =>
         db.collection('cities').doc(city.id).collection('playerNotes').doc(user.id).get()

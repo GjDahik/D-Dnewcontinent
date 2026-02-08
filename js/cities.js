@@ -53,6 +53,7 @@ function fetchCitiesDM() {
         .then(snap => {
             if (snap && snap.docs && snap.docs.length > 0) {
                 citiesData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                citiesData.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
             } else {
                 citiesData = [];
             }
@@ -163,8 +164,9 @@ function renderCities() {
     console.log('Primeras 3 ciudades:', cities.slice(0, 3));
     
     try {
+        const sortedCities = [...cities].sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
         let htmlContent = '';
-        cities.forEach((city, index) => {
+        sortedCities.forEach((city, index) => {
             console.log(`Procesando ciudad ${index + 1}:`, city.nombre);
             const cached = _cityDataCache[city.id];
             const cityNpcs = cached ? (cached.npcs || []).slice().sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es')) : [];
@@ -192,6 +194,10 @@ function renderCities() {
                     </div>
                 </div>
                 <div class="city-actions" style="flex-wrap:wrap; align-items:center;">
+                    <label for="city-order-${city.id}" style="color:#8b7355; font-size:0.85em; margin-right:4px;" title="Orden en que los aventureros ven las ciudades">Orden:</label>
+                    <select id="city-order-${city.id}" style="width:auto; min-width:3em; margin-right:8px; background:#1a1a1a; border:1px solid #4a3c31; color:#d4c4a8; padding:4px 8px; border-radius:4px; font-size:0.9em;" onchange="event.stopPropagation(); setCityOrderPosition('${city.id}', parseInt(this.value, 10))">
+                        ${sortedCities.map((_, i) => `<option value="${i + 1}" ${index === i ? 'selected' : ''}>${i + 1}</option>`).join('')}
+                    </select>
                     <button class="btn btn-small btn-secondary" onclick="event.stopPropagation(); editCity('${city.id}')">✏️</button>
                     ${!isOldMistfallCity(city) ? `<button class="btn btn-small btn-danger" onclick="event.stopPropagation(); deleteCity('${city.id}', '${(city.nombre || '').replace(/'/g, "\\'")}')">🗑️</button>` : '<span class="btn btn-small btn-secondary" style="opacity:0.7; cursor:not-allowed;" title="Old Mistfall solo puede eliminarse desde la base de datos">🗑️</span>'}
                     <button class="btn btn-small ${(city.visibleToPlayers !== false) ? 'btn-success' : 'btn-secondary'}" onclick="event.stopPropagation(); toggleCityVisibility('${city.id}')" title="${(city.visibleToPlayers !== false) ? 'Visible para jugadores. Clic para ocultar.' : 'Oculta para jugadores. Clic para mostrar.'}">${(city.visibleToPlayers !== false) ? '👁️ Visible' : '👁️‍🗨️ Oculta'}</button>
@@ -737,6 +743,7 @@ window.deleteCity = deleteCity;
 window.toggleCity = toggleCity;
 window.toggleCityVisibility = toggleCityVisibility;
 window.setEstablecimientoRecomendado = setEstablecimientoRecomendado;
+window.setCityOrderPosition = setCityOrderPosition;
 
 function editCity(id) {
     const cities = window.citiesData || citiesData || [];
@@ -802,6 +809,11 @@ function saveCity() {
             lore: loreEl ? loreEl.value.trim() : '',
             visibleToPlayers: visibleEl.checked
         };
+        if (!id) {
+            const cities = window.citiesData || citiesData || [];
+            const maxOrder = cities.reduce((m, c) => Math.max(m, c.order ?? 0), -1);
+            data.order = maxOrder + 1;
+        }
         
         if (!data.nombre) { 
             showToast('Nombre requerido', true); 
@@ -850,6 +862,28 @@ function deleteCity(id, nombre) {
             showToast('Error al eliminar: ' + e.message, true);
         });
     }
+}
+
+/** Coloca la ciudad en la posición elegida (1 = primera). Actualiza order en Firestore. */
+function setCityOrderPosition(cityId, newPosition1Based) {
+    if (!db || !cityId || newPosition1Based == null) return;
+    const cities = window.citiesData || citiesData || [];
+    const sorted = [...cities].sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+    const idx = sorted.findIndex(c => c.id === cityId);
+    if (idx < 0) return;
+    const newIdx = Math.max(0, Math.min(sorted.length - 1, newPosition1Based - 1));
+    if (idx === newIdx) return;
+    const city = sorted[idx];
+    const reordered = sorted.filter(c => c.id !== cityId);
+    reordered.splice(newIdx, 0, city);
+    const updates = reordered.map((c, i) => db.collection('cities').doc(c.id).update({ order: i }));
+    Promise.all(updates).then(() => {
+        if (typeof showToast === 'function') showToast('Orden actualizado');
+        if (typeof loadWorld === 'function') loadWorld();
+    }).catch(e => {
+        console.error('Error actualizando orden:', e);
+        if (typeof showToast === 'function') showToast('Error al cambiar orden: ' + (e.message || e), true);
+    });
 }
 
 // NPC CRUD
