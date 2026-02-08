@@ -733,21 +733,24 @@ function renderPlayerMapFreeMarkersDropdown() {
 function loadPlayerDMMapMarkers() {
     if (!db || !isPlayer()) return Promise.resolve();
     return db.collection('map_markers').where('source', '==', 'dm').get().then(function (snap) {
-        var byKey = {};
+        var byDocId = {};
+        var customByKey = {};
         (snap.docs || []).forEach(function (d) {
             var m = { id: d.id, ...d.data() };
             if (m.source !== 'dm') return;
+            byDocId[d.id] = m;
             if (m.type === 'custom') {
-                var key = (m.customId || m.id || '') + '::' + (m.levelKey || 'default');
-                var prev = byKey[key];
+                var rawCustomId = (m.customId != null && m.customId !== '') ? String(m.customId).trim() : '';
+                var key = (rawCustomId || d.id) + '::' + (m.levelKey || 'default');
+                var prev = customByKey[key];
                 var ts = m.updatedAt && typeof m.updatedAt.toMillis === 'function' ? m.updatedAt.toMillis() : 0;
                 var pts = prev && prev.updatedAt && typeof prev.updatedAt.toMillis === 'function' ? prev.updatedAt.toMillis() : 0;
-                if (!prev || ts >= pts) byKey[key] = m;
-            } else {
-                byKey[d.id] = m;
+                if (!prev || ts >= pts) customByKey[key] = m;
             }
         });
-        playerDMMapMarkers = Object.values(byKey);
+        var cityMarkers = Object.values(byDocId).filter(function (m) { return m.type !== 'custom'; });
+        var customMarkers = Object.values(customByKey);
+        playerDMMapMarkers = cityMarkers.concat(customMarkers);
         if (typeof renderPlayerMapMarkers === 'function') renderPlayerMapMarkers();
     }).catch(function (e) { console.error('Error loading DM map markers for player:', e); });
 }
