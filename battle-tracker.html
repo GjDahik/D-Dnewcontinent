@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>⚔️ Battle Tracker - Nueva Valdoria</title>
+<title>⚔️ Battle Tracker - DragonKeep</title>
+<link rel="icon" type="image/png" href="./icons/icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=MedievalSharp&family=Crimson+Text:wght@400;600&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -129,7 +130,7 @@ input::placeholder{color:#5a5a6e}
 </head>
 <body>
 <div class="container">
-<a href="index.html" class="back-link">← Volver al dashboard</a>
+<button type="button" class="back-link btn-medieval btn-small" onclick="if(window.opener){window.opener.focus();window.close();}else{window.location.href='index.html';}" style="margin-bottom:.75rem;border-radius:4px;">← Regresar a DragonKeep</button>
 
 <div class="header">
 <div class="header-content">
@@ -150,11 +151,21 @@ input::placeholder{color:#5a5a6e}
 </div>
 
 <div class="panel" id="addPanel">
-<h2>📜 Agregar Jugador</h2>
+<h2>📜 Agregar a la batalla</h2>
 <div class="form-row">
-<input type="text" id="newName" placeholder="Nombre del aventurero..." style="flex:1;min-width:150px">
+<div style="display:flex;flex-wrap:wrap;align-items:stretch;gap:.5rem;flex:1;min-width:0;">
+<button type="button" class="btn-medieval btn-small" id="nameSourceToggleBtn" onclick="toggleNameSource()" title="Cambiar entre lista y escribir nombre" style="align-self:stretch;padding:.4rem .6rem;">✏️</button>
+<div id="nameSourceDropdownWrap" style="display:flex;align-items:center;gap:.5rem;flex:1;min-width:120px;">
+<select id="adventurerSelect" class="input-field" style="min-width:160px;flex:1;" onchange="onAdventurerSelectChange()" title="Elegir aventurero">
+<option value="">— Aventureros —</option>
+</select>
+</div>
+<div id="nameSourceInputWrap" style="display:none;flex:1;min-width:120px;">
+<input type="text" id="newName" placeholder="Nombre (NPC, personaje, etc.)" style="width:100%;min-width:140px" title="Escribir nombre manual">
+</div>
+</div>
 <input type="number" id="newInit" placeholder="Init" class="input-field" onkeypress="return event.charCode>=48&&event.charCode<=57">
-<button class="btn-medieval" onclick="addPlayer()">Agregar Jugador</button>
+<button class="btn-medieval" onclick="addPlayer()">Agregar Aventurero</button>
 <button class="btn-medieval btn-danger" onclick="addEnemy()">+ Enemigo 💀</button>
 <button class="btn-medieval" onclick="addBBEG()" style="background:linear-gradient(180deg,#4a1a4a 0%,#2d0d2d 100%);border-color:#8b5588">+ BBEG 👹</button>
 </div>
@@ -178,6 +189,52 @@ var CONDITIONS=['Blinded','Charmed','Deafened','Frightened','Grappled','Incapaci
 var combatants=[];
 var currentTurn=0;
 var round=1;
+
+function loadAdventurerDropdown(){
+  var sel=document.getElementById('adventurerSelect');
+  if(!sel)return;
+  sel.innerHTML='<option value="">— Aventureros —</option>';
+  try{
+    var raw=localStorage.getItem('dragonkeep_tracker_players');
+    var list=raw?JSON.parse(raw):[];
+    if(Array.isArray(list)&&list.length>0){
+      list.forEach(function(p){
+        var name=(p&&p.nombre)?String(p.nombre).trim():'';
+        if(name)sel.appendChild(new Option(name,name));
+      });
+    }
+  }catch(e){}
+}
+
+var nameSourceIsInput=false;
+
+function onAdventurerSelectChange(){
+  var sel=document.getElementById('adventurerSelect');
+  var nameInput=document.getElementById('newName');
+  if(!sel||!nameInput)return;
+  var v=sel.value;
+  nameInput.value=v?v:'';
+}
+
+function toggleNameSource(){
+  nameSourceIsInput=!nameSourceIsInput;
+  var dropdownWrap=document.getElementById('nameSourceDropdownWrap');
+  var inputWrap=document.getElementById('nameSourceInputWrap');
+  var btn=document.getElementById('nameSourceToggleBtn');
+  if(dropdownWrap)dropdownWrap.style.display=nameSourceIsInput?'none':'flex';
+  if(inputWrap)inputWrap.style.display=nameSourceIsInput?'flex':'none';
+  if(btn)btn.textContent=nameSourceIsInput?'📋':'✏️';
+  if(!nameSourceIsInput){ var ni=document.getElementById('newName'); if(ni)ni.value=''; }
+}
+
+function getPlayerNameForAdd(){
+  if(nameSourceIsInput){
+    var nameInput=document.getElementById('newName');
+    return nameInput&&nameInput.value?nameInput.value.trim():'';
+  }
+  var sel=document.getElementById('adventurerSelect');
+  return sel&&sel.value&&sel.value.trim()?sel.value.trim():'';
+}
 var enemyCount=0;
 var bbegCount=0;
 var timerSeconds=0;
@@ -308,38 +365,40 @@ function sortCombatants(){
 function addPlayer(){
   var nameInput=document.getElementById('newName');
   var initInputEl=document.getElementById('newInit');
-  var name=nameInput.value.trim();
-  var initInput=initInputEl.value;
+  var adventurerSelect=document.getElementById('adventurerSelect');
+  var name=getPlayerNameForAdd();
+  var initInput=initInputEl?initInputEl.value:'';
   
-  nameInput.classList.remove('input-error');
-  initInputEl.classList.remove('input-error');
+  if(nameInput)nameInput.classList.remove('input-error');
+  if(initInputEl)initInputEl.classList.remove('input-error');
   
   if(!name&&!initInput){
-    nameInput.classList.add('input-error');
-    initInputEl.classList.add('input-error');
+    if(nameInput)nameInput.classList.add('input-error');
+    if(initInputEl)initInputEl.classList.add('input-error');
     showError('¡Ingresa el nombre y la iniciativa del aventurero!');
     return;
   }
   if(!name){
-    nameInput.classList.add('input-error');
-    showError('¡Ingresa el nombre del aventurero!');
+    if(nameInput)nameInput.classList.add('input-error');
+    showError('¡Elige un aventurero o pulsa "Escribir" y escribe un nombre!');
     return;
   }
   if(!initInput){
-    initInputEl.classList.add('input-error');
+    if(initInputEl)initInputEl.classList.add('input-error');
     showError('¡Ingresa la iniciativa del aventurero!');
     return;
   }
-  var init=parseInt(initInput);
+  var init=parseInt(initInput,10);
   if(isNaN(init)){
-    initInputEl.classList.add('input-error');
+    if(initInputEl)initInputEl.classList.add('input-error');
     showError('¡La iniciativa debe ser un número!');
     return;
   }
   combatants.push({id:Date.now(),name:name,initiative:init,isEnemy:false,isBBEG:false,conditions:[],damage:0,damageLog:[],dead:false,fallen:false});
   sortCombatants();
-  nameInput.value='';
-  initInputEl.value='';
+  if(nameInput)nameInput.value='';
+  if(initInputEl)initInputEl.value='';
+  if(adventurerSelect)adventurerSelect.value='';
   render();
 }
 
@@ -496,7 +555,7 @@ function render(){
         :'')+
         (!c.isEnemy?
         '<div class="detail-section">'+
-          '<label>⬇️ Estado del Jugador</label>'+
+          '<label>⬇️ Estado del Aventurero</label>'+
           '<button class="btn-medieval btn-fallen btn-small '+(c.fallen?'active':'')+'" onclick="toggleFallen('+c.id+')">⬇️ '+(c.fallen?'Levantar':'Caído')+'</button>'+
         '</div>'
         :'')+
@@ -511,6 +570,7 @@ function render(){
   }).join('');
 }
 
+loadAdventurerDropdown();
 render();
 </script>
 </body>

@@ -88,6 +88,17 @@ async function loginPlayer(nombre, pin) {
 // ==================== LOGOUT ====================
 function logout() {
     if (typeof closeAllSubscriptions === 'function') closeAllSubscriptions();
+    
+    // FIX: Limpiar variables de marcadores del jugador para evitar contaminación entre usuarios
+    if (typeof playerMapMarkers !== 'undefined') playerMapMarkers = [];
+    if (typeof playerMapCustomMarkers !== 'undefined') playerMapCustomMarkers = [];
+    if (typeof playerDMMapMarkers !== 'undefined') playerDMMapMarkers = [];
+    
+    // FIX: Resetear bandera de inicialización para que se recarguen los marcadores del próximo usuario
+    if (typeof window !== 'undefined') {
+        window._playerMapMarkersInit = false;
+    }
+    
     currentUser = null;
     userType = null;
     sessionStorage.removeItem('currentUser');

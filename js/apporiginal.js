@@ -376,7 +376,7 @@ let playerDMMapMarkers = [];
 let playerMapPlaceMode = false;
 let playerMapMarkersPanelOpen = false;
 let playerMapPlaceContext = null;
-let playerMapZoom = window.innerWidth < 768 ? 1.5 : 1; // Zoom inicial: 1.5x en móviles, 1x en escritorio
+let playerMapZoom = 1;
 const PLAYER_MAP_MIN_ZOOM = 1;
 const PLAYER_MAP_MAX_ZOOM = 3;
 const PLAYER_MAP_LABELS_ZOOM = 2.95;
@@ -388,7 +388,7 @@ let playerMapPointers = new Map();
 let playerMapLastPinchDist = null;
 let playerMapDragLast = null;
 let playerMapWasDragging = false;
-let dmMapZoom = window.innerWidth < 768 ? 1.5 : 1, dmMapPanX = 0, dmMapPanY = 0; // Zoom inicial: 1.5x en móviles, 1x en escritorio
+let dmMapZoom = 1, dmMapPanX = 0, dmMapPanY = 0;
 let dmMapViewportEl = null, dmMapStageEl = null;
 let dmMapPointers = new Map();
 let dmMapLastPinchDist = null, dmMapDragLast = null, dmMapWasDragging = false;
@@ -609,9 +609,6 @@ function getPlayerMapLevelKey() {
     return String(lev.name || ('Nivel ' + (playerMapLevelIndex + 1))).trim();
 }
 
-// FIX: Variable global para guardar el listener de marcadores
-var _playerMapMarkersUnsubscribe = null;
-
 function loadPlayerMapMarkers() {
     var user = getCurrentUser();
     if (!db || !user || !user.id || !isPlayer()) {
@@ -619,15 +616,7 @@ function loadPlayerMapMarkers() {
         playerMapCustomMarkers = [];
         return Promise.resolve();
     }
-    
-    // FIX: Cerrar listener anterior si existe (evita duplicados)
-    if (_playerMapMarkersUnsubscribe) {
-        _playerMapMarkersUnsubscribe();
-        _playerMapMarkersUnsubscribe = null;
-    }
-    
-    // FIX: Usar onSnapshot en vez de get() para sincronización en tiempo real
-    _playerMapMarkersUnsubscribe = db.collection('player_map_markers').doc(user.id).onSnapshot(function (doc) {
+    return db.collection('player_map_markers').doc(user.id).get().then(function (doc) {
         var data = doc.exists ? doc.data() : {};
         var markers = Array.isArray(data.markers) ? data.markers : [];
         var customs = Array.isArray(data.customMarkers) ? data.customMarkers : [];
@@ -638,19 +627,12 @@ function loadPlayerMapMarkers() {
         }
         if (typeof renderPlayerMapMarkers === 'function') renderPlayerMapMarkers();
         if (typeof renderPlayerMapFreeMarkersDropdown === 'function') renderPlayerMapFreeMarkersDropdown();
-    }, function (e) {
+    }).catch(function (e) {
         console.error('Error loading player map markers:', e);
         migrateFromLocalStorage();
         if (typeof renderPlayerMapMarkers === 'function') renderPlayerMapMarkers();
         if (typeof renderPlayerMapFreeMarkersDropdown === 'function') renderPlayerMapFreeMarkersDropdown();
     });
-    
-    // FIX: Registrar el listener para que se cierre al cambiar de usuario
-    if (typeof registerUnsub === 'function') {
-        registerUnsub('player', null, _playerMapMarkersUnsubscribe);
-    }
-    
-    return Promise.resolve();
 }
 
 function migrateFromLocalStorage() {
@@ -771,9 +753,7 @@ function renderPlayerMapMarkers() {
         const icon = type === 'custom' ? (m.icon || '🔥') : '🏰';
         const label = type === 'custom' ? (m.label || 'Marcador') : (m.cityName || 'Ciudad');
         const customAttr = type === 'custom' ? `data-custom-id="${escAttr(m.customId || '')}"` : '';
-        const isMyLocation = type === 'city' && (m.cityId || '') === (playerUbicacionActual || '');
-        const myLocationClass = isMyLocation ? ' player-map-marker--my-location' : '';
-        return `<div class="player-map-marker${myLocationClass}" ${cityAttrs} ${customAttr} style="left:${left}%; top:${top}%;">
+        return `<div class="player-map-marker" ${cityAttrs} ${customAttr} style="left:${left}%; top:${top}%;">
             <span class="player-map-marker-pin">${esc(icon)}</span>
             <span class="player-map-marker-label">${esc(label)}</span>
         </div>`;
@@ -1548,30 +1528,19 @@ function openDMCityFromMap(cityId) {
 }
 
 function initPlayerMapMarkers() {
-    // FIX: Permitir reinicialización al cambiar de usuario
-    // Los event listeners solo se agregan una vez para evitar duplicados
     if (!window._playerMapMarkersInit) {
         window._playerMapMarkersInit = true;
-        
-        // Event listeners (solo una vez)
+        loadPlayerMapMarkers().then(function () {
+            renderPlayerMapFreeMarkersDropdown();
+            renderPlayerMapMarkers();
         var markersBtn = document.getElementById('player-map-markers-toggle-btn');
-        if (markersBtn && !markersBtn._hasListener) {
-            markersBtn._hasListener = true;
-            markersBtn.addEventListener('click', function () { setPlayerMapMarkersPanel(!playerMapMarkersPanelOpen); });
-        }
+        if (markersBtn) markersBtn.addEventListener('click', function () { setPlayerMapMarkersPanel(!playerMapMarkersPanelOpen); });
         var rutasBtn = document.getElementById('player-map-rutas-toggle-btn');
-        if (rutasBtn && !rutasBtn._hasListener) {
-            rutasBtn._hasListener = true;
-            rutasBtn.addEventListener('click', function () { if (typeof togglePlayerRutasPanel === 'function') togglePlayerRutasPanel(); });
-        }
+        if (rutasBtn) rutasBtn.addEventListener('click', function () { if (typeof togglePlayerRutasPanel === 'function') togglePlayerRutasPanel(); });
         var bitacoraBtn = document.getElementById('player-map-bitacora-toggle-btn');
-        if (bitacoraBtn && !bitacoraBtn._hasListener) {
-            bitacoraBtn._hasListener = true;
-            bitacoraBtn.addEventListener('click', function () { if (typeof togglePlayerBitacoraPanel === 'function') togglePlayerBitacoraPanel(); });
-        }
+        if (bitacoraBtn) bitacoraBtn.addEventListener('click', function () { if (typeof togglePlayerBitacoraPanel === 'function') togglePlayerBitacoraPanel(); });
         const stage = document.getElementById('player-map-stage');
-        if (stage && !stage._hasClickListener) {
-            stage._hasClickListener = true;
+        if (stage) {
             stage.addEventListener('click', function (e) {
                 if (playerMapWasDragging) {
                     playerMapWasDragging = false;
@@ -1683,14 +1652,8 @@ function initPlayerMapMarkers() {
         }, 300);
         initPlayerMapViewport();
         if (typeof initPlayerMapTouch === 'function') initPlayerMapTouch();
+        });
     }
-    
-    // FIX: Cargar marcadores cada vez que se llama initPlayerMapMarkers
-    // Esto asegura que se recarguen al cambiar de usuario
-    loadPlayerMapMarkers().then(function () {
-        renderPlayerMapFreeMarkersDropdown();
-        renderPlayerMapMarkers();
-    });
 }
 
 function updatePlayerMapPlaceModeUI() {
@@ -2869,7 +2832,6 @@ async function setPlayerUbicacion(cityId) {
         showToast('No se pudo guardar la ubicación', true);
     }
     renderPlayerRutas();
-    if (typeof renderPlayerMapMarkers === 'function') renderPlayerMapMarkers();
 }
 
 // ==================== RUTAS CONOCIDAS ====================
@@ -2889,13 +2851,17 @@ function loadRutasConocidas() {
 
 function toggleDMRutasSection() {
     const content = document.getElementById('dm-rutas-content');
-    if (!content) return;
-    const isVisible = content.style.display !== 'none';
-    content.style.display = isVisible ? 'none' : 'block';
     const btn = document.getElementById('dm-rutas-toggle-btn');
-    if (btn) {
-        btn.textContent = isVisible ? '▶ Mostrar rutas' : '▼ Ocultar rutas';
-        btn.title = isVisible ? 'Mostrar la sección Rutas conocidas' : 'Ocultar la sección Rutas conocidas';
+    if (!content || !btn) return;
+    const isVisible = content.style.display !== 'none';
+    if (isVisible) {
+        content.style.display = 'none';
+        btn.textContent = '▶ Mostrar rutas';
+        btn.title = 'Mostrar la sección Rutas conocidas';
+    } else {
+        content.style.display = 'block';
+        btn.textContent = '▼ Ocultar rutas';
+        btn.title = 'Ocultar la sección Rutas conocidas';
     }
 }
 
@@ -4328,7 +4294,7 @@ async function processBatallaPayment() {
             modalId: 'player-batalla-modal',
             primaryButton: {
                 label: 'Ir a Battle Tracker',
-                onclick: "openBattleTracker()"
+                onclick: "window.open('battle-tracker.html','_blank')"
             }
         });
         recEl.style.display = 'block';
@@ -4347,39 +4313,6 @@ async function processBatallaPayment() {
     
     showToast('Has pagado ' + total.toLocaleString() + ' GP para la batalla. ¡Buena suerte!');
 }
-
-/** Abre el Battle Tracker y pasa la misma lista de aventureros que el login (Firestore players, visible, ordenados por nombre). */
-function openBattleTracker() {
-    function openWithList(list) {
-        try {
-            localStorage.setItem('dragonkeep_tracker_players', JSON.stringify(list));
-        } catch (e) {}
-        window.open('battle-tracker.html', '_blank');
-    }
-    if (!db) {
-        openWithList([]);
-        return;
-    }
-    db.collection('players').limit(200).get()
-        .then(function (snap) {
-            var list = (snap.docs || [])
-                .map(function (doc) { var d = doc.data(); return { id: doc.id, nombre: (d.nombre || d.name || 'Sin nombre').toString().trim() }; })
-                .filter(function (p) { return p.nombre; });
-            var visible = (snap.docs || []).map(function (doc) { var d = doc.data(); return d.visible; });
-            var listWithVisible = (snap.docs || []).map(function (doc, i) {
-                var d = doc.data();
-                if (d.visible === false) return null;
-                return { id: doc.id, nombre: (d.nombre || d.name || 'Sin nombre').toString().trim() };
-            }).filter(Boolean);
-            listWithVisible.sort(function (a, b) { return (a.nombre || '').localeCompare(b.nombre || '', 'es'); });
-            openWithList(listWithVisible);
-        })
-        .catch(function (e) {
-            console.warn('Battle Tracker: no se pudo cargar lista de aventureros', e);
-            openWithList([]);
-        });
-}
-window.openBattleTracker = openBattleTracker;
 
 window.openPlayerBatallaModal = openPlayerBatallaModal;
 // compatibilidad: antes se llamaba toggleBatallaNpc
@@ -4548,7 +4481,7 @@ function openPlayerArtesaniasModal(shopId) {
     if (!shop) return;
     playerArtesaniasShopId = shopId;
     playerArtesaniasCart = [];
-    playerArtesaniasTab = 'todos';
+    playerArtesaniasTab = 'flechas';
     const bodyEl = document.getElementById('player-artesanias-body');
     const recEl = document.getElementById('player-artesanias-receipt');
     if (bodyEl) bodyEl.style.display = 'block';
@@ -4558,12 +4491,10 @@ function openPlayerArtesaniasModal(shopId) {
     const artSearchEl = document.getElementById('player-artesanias-search');
     if (artSearchEl) artSearchEl.value = '';
     document.querySelectorAll('.player-artesanias-tab').forEach(b => {
-        b.classList.toggle('active', b.dataset.tab === 'todos');
-        b.classList.toggle('btn-secondary', b.dataset.tab !== 'todos');
+        b.classList.toggle('active', b.dataset.tab === 'flechas');
+        b.classList.toggle('btn-secondary', b.dataset.tab !== 'flechas');
     });
-    var todosGrid = document.getElementById('player-artesanias-todos-grid');
-    if (todosGrid) todosGrid.style.display = 'block';
-    document.getElementById('player-artesanias-flechas-grid').style.display = 'none';
+    document.getElementById('player-artesanias-flechas-grid').style.display = 'block';
     document.getElementById('player-artesanias-ropa-grid').style.display = 'none';
     document.getElementById('player-artesanias-servicios-grid').style.display = 'none';
     const user = getCurrentUser();
@@ -4578,11 +4509,9 @@ function openPlayerArtesaniasModal(shopId) {
     if (!window._playerArtesaniasListeners) {
         window._playerArtesaniasListeners = true;
         document.querySelectorAll('.player-artesanias-tab').forEach(btn => {
-                btn.addEventListener('click', () => {
+            btn.addEventListener('click', () => {
                 playerArtesaniasTab = btn.dataset.tab;
                 document.querySelectorAll('.player-artesanias-tab').forEach(b => { b.classList.toggle('active', b.dataset.tab === playerArtesaniasTab); b.classList.toggle('btn-secondary', b.dataset.tab !== playerArtesaniasTab); });
-                var todosGrid = document.getElementById('player-artesanias-todos-grid');
-                if (todosGrid) todosGrid.style.display = playerArtesaniasTab === 'todos' ? 'block' : 'none';
                 document.getElementById('player-artesanias-flechas-grid').style.display = playerArtesaniasTab === 'flechas' ? 'block' : 'none';
                 document.getElementById('player-artesanias-ropa-grid').style.display = playerArtesaniasTab === 'ropa' ? 'block' : 'none';
                 document.getElementById('player-artesanias-servicios-grid').style.display = playerArtesaniasTab === 'servicios' ? 'block' : 'none';
@@ -4615,10 +4544,6 @@ function renderPlayerArtesaniasGrids() {
             <button type="button" class="btn btn-small player-artesanias-add-btn" onclick="playerArtesaniasAddToCart(${invIdx})">+ Añadir</button></div>
         </div>`;
     };
-    var todosGridEl = document.getElementById('player-artesanias-todos-grid');
-    var allItems = inv;
-    if (q) allItems = inv.filter(match);
-    if (todosGridEl) todosGridEl.innerHTML = allItems.length ? '<div class="player-artesanias-cat-title">📋 Todos los ítems</div>' + allItems.map(it => renderCard(it, inv.indexOf(it))).join('') : '<p class="player-artesanias-no-results">No hay ítems en esta tienda</p>';
     document.getElementById('player-artesanias-flechas-grid').innerHTML = flechas.length ? '<div class="player-artesanias-cat-title">🏹 Flechas</div>' + flechas.map(it => renderCard(it, inv.indexOf(it))).join('') : '<p class="player-artesanias-no-results">No hay flechas en esta tienda</p>';
     document.getElementById('player-artesanias-ropa-grid').innerHTML = ropa.length ? '<div class="player-artesanias-cat-title">👕 Ropa y Equipo</div>' + ropa.map(it => renderCard(it, inv.indexOf(it))).join('') : '<p class="player-artesanias-no-results">No hay ropa ni equipo</p>';
     document.getElementById('player-artesanias-servicios-grid').innerHTML = servicios.length ? '<div class="player-artesanias-cat-title">🔧 Servicios</div>' + servicios.map(it => renderCard(it, inv.indexOf(it))).join('') : '<p class="player-artesanias-no-results">No hay servicios</p>';
@@ -4762,7 +4687,7 @@ function openPlayerEmporioModal(shopId) {
     if (!shop) return;
     playerEmporioShopId = shopId;
     playerEmporioCart = [];
-    playerEmporioTab = 'todos';
+    playerEmporioTab = 'materiales';
     const bodyEl = document.getElementById('player-emporio-body');
     const recEl = document.getElementById('player-emporio-receipt');
     if (bodyEl) bodyEl.style.display = 'block';
@@ -4772,12 +4697,12 @@ function openPlayerEmporioModal(shopId) {
     const empSearchEl = document.getElementById('player-emporio-search');
     if (empSearchEl) empSearchEl.value = '';
     document.querySelectorAll('.player-emporio-tab').forEach(b => {
-        b.classList.toggle('active', b.dataset.section === 'todos');
-        b.classList.toggle('btn-secondary', b.dataset.section !== 'todos');
+        b.classList.toggle('active', b.dataset.section === 'materiales');
+        b.classList.toggle('btn-secondary', b.dataset.section !== 'materiales');
     });
-    ['todos', 'materiales', 'raros', 'mapas', 'otros'].forEach(sec => {
+    ['materiales', 'raros', 'mapas', 'otros'].forEach(sec => {
         const grid = document.getElementById('player-emporio-grid-' + sec);
-        if (grid) grid.style.display = sec === 'todos' ? 'block' : 'none';
+        if (grid) grid.style.display = sec === 'materiales' ? 'block' : 'none';
     });
     const user = getCurrentUser();
     if (user && user.id) {
@@ -4794,7 +4719,7 @@ function openPlayerEmporioModal(shopId) {
             btn.addEventListener('click', () => {
                 playerEmporioTab = btn.dataset.section;
                 document.querySelectorAll('.player-emporio-tab').forEach(b => { b.classList.toggle('active', b.dataset.section === playerEmporioTab); b.classList.toggle('btn-secondary', b.dataset.section !== playerEmporioTab); });
-                ['todos', 'materiales', 'raros', 'mapas', 'otros'].forEach(sec => {
+                ['materiales', 'raros', 'mapas', 'otros'].forEach(sec => {
                     const grid = document.getElementById('player-emporio-grid-' + sec);
                     if (grid) grid.style.display = sec === playerEmporioTab ? 'block' : 'none';
                 });
@@ -4812,7 +4737,6 @@ function renderPlayerEmporioGrids() {
     const q = playerEmporioSearchTerm;
     const match = (it) => !q || (it.name || '').toLowerCase().includes(q) || (getItemDesc(it) || '').toLowerCase().includes(q) || ((it.rarity || '').toLowerCase().includes(q));
     const sectionItems = (sec) => {
-        if (sec === 'todos') return q ? inv.filter(match) : inv;
         const items = inv.filter(it => (it.section || 'otros').toLowerCase() === sec);
         return q ? items.filter(match) : items;
     };
@@ -4828,11 +4752,6 @@ function renderPlayerEmporioGrids() {
             <button type="button" class="btn btn-small player-emporio-add-btn" onclick="playerEmporioAddToCart(${invIdx})">+ Añadir</button></div>
         </div>`;
     };
-    var todosGridEl = document.getElementById('player-emporio-grid-todos');
-    if (todosGridEl) {
-        const allItems = sectionItems('todos');
-        todosGridEl.innerHTML = allItems.length ? '<div class="player-emporio-cat-title">📋 Todos los ítems</div>' + allItems.map(it => renderCard(it, inv.indexOf(it))).join('') : '<p class="player-emporio-no-results">No hay ítems en esta tienda</p>';
-    }
     EMPORIO_SECTIONS.forEach(sec => {
         const grid = document.getElementById('player-emporio-grid-' + sec);
         if (!grid) return;
@@ -5720,11 +5639,9 @@ function openPlayerTavernShop(shopId) {
     const tavernSearchTop = document.getElementById('player-tavern-search');
     const tavernBebidasSearch = document.getElementById('player-tavern-bebidas-search');
     const tavernCocinaSearch = document.getElementById('player-tavern-cocina-search');
-    const tavernOtrosSearch = document.getElementById('player-tavern-otros-search');
     if (tavernSearchTop) tavernSearchTop.value = '';
     if (tavernBebidasSearch) tavernBebidasSearch.value = '';
     if (tavernCocinaSearch) tavernCocinaSearch.value = '';
-    if (tavernOtrosSearch) tavernOtrosSearch.value = '';
     document.querySelectorAll('.player-tavern-tab').forEach(b => {
         b.classList.toggle('active', b.dataset.tab === 'tavern-entrada');
         b.classList.toggle('btn-secondary', b.dataset.tab !== 'tavern-entrada');
@@ -5741,7 +5658,6 @@ function openPlayerTavernShop(shopId) {
     }
     renderTavernBebidas();
     renderTavernCocina();
-    renderTavernOtros();
     renderTavernCart();
     if (!window._playerTavernTabListeners) {
         window._playerTavernTabListeners = true;
@@ -5767,11 +5683,8 @@ function openPlayerTavernShop(shopId) {
                     playerTavernSearchTerm = (tavernSearchTop.value || '').toLowerCase().trim();
                     if (tavernBebidasSearch) tavernBebidasSearch.value = tavernSearchTop.value;
                     if (tavernCocinaSearch) tavernCocinaSearch.value = tavernSearchTop.value;
-                    var tavernOtrosSearch = document.getElementById('player-tavern-otros-search');
-                    if (tavernOtrosSearch) tavernOtrosSearch.value = tavernSearchTop.value;
                     renderTavernBebidas();
                     renderTavernCocina();
-                    renderTavernOtros();
                 }, 250));
             }
         }
@@ -5867,26 +5780,6 @@ function renderTavernCocina() {
     grid.innerHTML = html;
 }
 
-function renderTavernOtros() {
-    let items = getTavernItems().filter(it => it.type !== 'drink' && it.type !== 'food');
-    const q = playerTavernSearchTerm;
-    if (q) items = items.filter(it => (it.name || '').toLowerCase().includes(q) || (it.effect || it.desc || '').toLowerCase().includes(q));
-    const grid = document.getElementById('player-tavern-otros-grid');
-    if (!grid) return;
-    const card = (it) => {
-        const texto = getItemDesc(it) || '—';
-        return `<div class="player-tavern-product-card special">
-            <div class="player-tavern-product-name">${it.name}</div>
-            <div class="player-tavern-effect"><span>✨</span><span>${texto}</span></div>
-            <div class="player-tavern-product-footer">
-                <span class="player-tavern-product-price">${it.price} GP</span>
-                <button type="button" class="btn btn-small" onclick="addToTavernCart('${it.id}')">+ Añadir</button>
-            </div>
-        </div>`;
-    };
-    grid.innerHTML = items.length ? '<div class="player-tavern-category-title">📦 Otros</div>' + items.map(card).join('') : '<p style="color:#8b7355; padding:10px;">No hay ítems en esta sección.</p>';
-}
-
 function addToTavernCart(id) {
     if (id === 'entry-free' || id === 'entry-vip') return;
     const items = getTavernItems();
@@ -5924,8 +5817,6 @@ function renderTavernCart() {
     document.getElementById('player-tavern-cart-items').innerHTML = html;
     const cocinaEl = document.getElementById('player-tavern-cart-items-cocina');
     if (cocinaEl) cocinaEl.innerHTML = html;
-    const otrosCartEl = document.getElementById('player-tavern-cart-items-otros');
-    if (otrosCartEl) otrosCartEl.innerHTML = html;
     const total = playerTavernCart.reduce((s, i) => s + i.price * i.qty, 0);
     const totalHtml = playerTavernCart.length ? `
         <div class="player-tavern-cart-total">
@@ -5934,11 +5825,9 @@ function renderTavernCart() {
         </div>` : '';
     document.getElementById('player-tavern-cart-total').innerHTML = totalHtml;
     if (document.getElementById('player-tavern-cart-total-cocina')) document.getElementById('player-tavern-cart-total-cocina').innerHTML = totalHtml;
-    if (document.getElementById('player-tavern-cart-total-otros')) document.getElementById('player-tavern-cart-total-otros').innerHTML = totalHtml;
     const totalQty = playerTavernCart.reduce((s, i) => s + i.qty, 0);
     updateShopCartBadge('player-tavern-bebidas-cart-badge', totalQty);
     updateShopCartBadge('player-tavern-cocina-cart-badge', totalQty);
-    updateShopCartBadge('player-tavern-otros-cart-badge', totalQty);
 }
 
 async function playerTavernCheckout() {
@@ -6284,13 +6173,7 @@ function toggleShopCart(btn) {
         return;
     }
     var layout = btn.closest('.player-shop-layout');
-    if (layout) {
-        layout.classList.toggle('player-shop-cart-visible');
-        var container = layout.parentElement;
-        if (container) container.classList.toggle('player-shop-viewing-cart', layout.classList.contains('player-shop-cart-visible'));
-        var tavernBody = layout.closest('#player-tavern-body');
-        if (tavernBody) tavernBody.classList.toggle('tavern-viewing-cart', layout.classList.contains('player-shop-cart-visible'));
-    }
+    if (layout) layout.classList.toggle('player-shop-cart-visible');
 }
 
 function backToShop(btn) {

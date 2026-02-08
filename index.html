@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>D&D Companion</title>
+    <title>DragonKeep</title>
     <meta name="theme-color" content="#2c1810">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="D&D Companion">
+    <meta name="apple-mobile-web-app-title" content="DragonKeep">
+    <link rel="icon" type="image/png" href="./icons/icon-192.png">
     <link rel="apple-touch-icon" href="./icons/icon-192.png">
     <link rel="manifest" href="./manifest.webmanifest">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
@@ -44,7 +45,7 @@
             </div>
             <div class="nav-tabs-row2">
                 <button class="nav-tab nav-tab-type-transactions" data-tab="transactions">📜 Historial</button>
-                <button class="nav-tab nav-tab-type-battle" type="button" onclick="window.open('battle-tracker.html', '_blank')" title="Abrir en nueva pestaña">⚔️ Battle Tracker</button>
+                <button class="nav-tab nav-tab-type-battle" type="button" onclick="openBattleTracker()" title="Abrir en nueva pestaña">⚔️ Battle Tracker</button>
                 <button class="nav-tab nav-tab-logout" type="button" onclick="closeMobileNav('dm'); logout();">🚪 Salir</button>
             </div>
         </nav>
@@ -52,9 +53,11 @@
 
         <!-- MAPA -->
         <section id="map" class="tab-content active">
-            <div class="section-header">
+            <div class="section-header section-header-map">
                 <h2 id="map-title-dm">🗺️ Mapa</h2>
-                <button type="button" class="btn btn-small" id="map-edit-toggle-btn" onclick="toggleMapEditMode()" title="Mostrar u ocultar configuración del mapa">✏️ Editar mapa</button>
+                <div class="section-header-map-btn-wrap">
+                    <button type="button" class="btn btn-small" id="map-edit-toggle-btn" onclick="toggleMapEditMode()" title="Mostrar u ocultar configuración del mapa">✏️ Editar mapa</button>
+                </div>
             </div>
             <div id="map-edit-options" style="display:none;">
                 <div class="map-default-level-row map-default-level-row-dashboard">
@@ -89,11 +92,6 @@
                 <span id="dm-map-level-name" class="player-map-level-name">—</span>
                 <button type="button" class="btn btn-small player-map-level-btn" id="dm-map-level-up" onclick="dmMapLevelUp()" title="Nivel siguiente" aria-label="Subir de nivel">↓</button>
             </div>
-            <div class="player-map-zoom-controls">
-                <button type="button" class="btn btn-small" id="dm-map-zoom-out" title="Alejar mapa">➖</button>
-                <button type="button" class="btn btn-small" id="dm-map-zoom-in" title="Acercar mapa">➕</button>
-                <button type="button" class="btn btn-small btn-secondary" id="dm-map-zoom-reset" title="Restablecer zoom">🔄 Reset</button>
-            </div>
             <div class="player-map-wrap">
                 <div class="player-map-viewport" id="dm-map-viewport">
                     <div class="player-map-stage" id="dm-map-stage">
@@ -101,6 +99,10 @@
                         <div class="player-map-markers-layer" id="dm-map-markers-layer"></div>
                     </div>
                 </div>
+            </div>
+            <div class="player-map-zoom-controls">
+                <button type="button" class="btn btn-small" id="dm-map-zoom-out" title="Alejar mapa">➖</button>
+                <button type="button" class="btn btn-small" id="dm-map-zoom-in" title="Acercar mapa">➕</button>
             </div>
             <div class="player-map-ubicacion" style="margin-top:16px;">
                 <button type="button" class="btn btn-small player-map-rutas-toggle" onclick="toggleDMRutasSection()" title="Rutas conocidas">🛤️ Rutas conocidas</button>
@@ -151,11 +153,7 @@
                 </div>
             </div>
             <div class="dm-map-rutas-section">
-                <div class="section-header" style="margin-top:24px; display:flex; flex-wrap:wrap; align-items:center; gap:10px; justify-content:space-between;">
-                    <h2 style="margin:0;">🛤️ Rutas conocidas</h2>
-                    <button type="button" class="btn btn-small btn-secondary" id="dm-rutas-toggle-btn" onclick="toggleDMRutasSection()" title="Mostrar u ocultar la sección Rutas conocidas">▶ Mostrar rutas</button>
-                </div>
-                <div id="dm-rutas-content" style="display:none;">
+                <div id="dm-rutas-content" style="display:none; margin-top:24px;">
                     <p style="color:#8b7355; margin-bottom:16px;">Rutas entre ciudades: salida, llegada, medio de transporte y duración. Los aventureros las consultan en el mapa.</p>
                     <div style="margin-bottom:12px;">
                         <button type="button" class="btn btn-small" id="ruta-add-btn" onclick="openRutaModal()">➕ Añadir ruta</button>
@@ -373,7 +371,7 @@
             </div>
             <div class="nav-tabs-row2">
                 <button class="nav-tab nav-tab-type-missions" data-tab="player-missions">📋 Misiones<span class="nav-badge nav-badge-missions nav-badge--hidden" id="missions-pending-badge" aria-label="Misiones por aceptar"></span></button>
-                <button class="nav-tab nav-tab-type-battle" type="button" onclick="window.open('battle-tracker.html', '_blank')" title="Abrir en nueva pestaña">⚔️ Battle Tracker</button>
+                <button class="nav-tab nav-tab-type-battle" type="button" onclick="openBattleTracker()" title="Abrir en nueva pestaña">⚔️ Battle Tracker</button>
                 <button class="nav-tab nav-tab-logout" type="button" onclick="closeMobileNav('player'); logout();">🚪 Salir</button>
             </div>
         </nav>
@@ -480,7 +478,7 @@
                     <div>
                         <h2>🏘️ Ciudades y Pueblos</h2>
                     </div>
-                    <button type="button" class="btn btn-small btn-secondary" onclick="if(typeof refreshPlayerWorld==='function'){refreshPlayerWorld(); typeof showToast==='function'&&showToast('Ciudades y tiendas actualizados');}" title="Actualizar lista de ciudades y tiendas (por si el DM añadió o cambió algo)">🔄 Refrescar mundo</button>
+                    <button type="button" class="btn btn-small btn-secondary" onclick="if(typeof refreshPlayerWorld==='function'){refreshPlayerWorld();}if(typeof showToast==='function'){showToast('Ciudades y tiendas actualizados');}" title="Actualizar lista de ciudades y tiendas (por si el DM añadió o cambió algo)">🔄 Refrescar mundo</button>
                 </div>
                 <p style="color:#8b7355; margin-bottom:20px;">Ciudades que explora tu grupo. Entra en cada una para ver sus tiendas.</p>
                 <div id="player-cities-container" class="cards-grid"></div>
@@ -1111,7 +1109,8 @@
                         <input type="text" class="player-shop-search-input" id="player-artesanias-search" placeholder="Flechas, ropa, servicios...">
                     </div>
                     <div class="player-shop-filters player-artesanias-tabs">
-                        <button type="button" class="btn btn-small player-artesanias-tab active" data-tab="flechas">🏹 Flechas</button>
+                        <button type="button" class="btn btn-small player-artesanias-tab active" data-tab="todos">📋 Todos</button>
+                        <button type="button" class="btn btn-small btn-secondary player-artesanias-tab" data-tab="flechas">🏹 Flechas</button>
                         <button type="button" class="btn btn-small btn-secondary player-artesanias-tab" data-tab="ropa">👕 Ropa y Equipo</button>
                         <button type="button" class="btn btn-small btn-secondary player-artesanias-tab" data-tab="servicios">🔧 Servicios</button>
                     </div>
@@ -1121,7 +1120,8 @@
                         <button type="button" class="btn btn-small player-shop-cart-toggle-btn" onclick="toggleShopCart(this)" aria-label="Ver carrito"><span class="player-shop-cart-toggle-label-default">🛒 Ir al carrito <span class="player-shop-cart-badge" id="player-artesanias-cart-badge" data-count="0">0</span></span><span class="player-shop-cart-toggle-label-back">Seguir comprando</span></button>
                     </div>
                     <div class="player-shop-catalog-wrap" style="flex:2; min-width:300px;">
-                        <div id="player-artesanias-flechas-grid" class="player-artesanias-grid"></div>
+                        <div id="player-artesanias-todos-grid" class="player-artesanias-grid"></div>
+                        <div id="player-artesanias-flechas-grid" class="player-artesanias-grid" style="display:none;"></div>
                         <div id="player-artesanias-ropa-grid" class="player-artesanias-grid" style="display:none;"></div>
                         <div id="player-artesanias-servicios-grid" class="player-artesanias-grid" style="display:none;"></div>
                     </div>
@@ -1156,7 +1156,8 @@
                         <input type="text" class="player-shop-search-input" id="player-emporio-search" placeholder="Materiales, mapas, objetos raros...">
                     </div>
                     <div class="player-shop-filters player-emporio-tabs">
-                        <button type="button" class="btn btn-small player-emporio-tab active" data-section="materiales">🧪 Materiales para hechizos</button>
+                        <button type="button" class="btn btn-small player-emporio-tab active" data-section="todos">📋 Todos</button>
+                        <button type="button" class="btn btn-small btn-secondary player-emporio-tab" data-section="materiales">🧪 Materiales para hechizos</button>
                         <button type="button" class="btn btn-small btn-secondary player-emporio-tab" data-section="raros">💎 Objetos raros e importados</button>
                         <button type="button" class="btn btn-small btn-secondary player-emporio-tab" data-section="mapas">🗺️ Mapas</button>
                         <button type="button" class="btn btn-small btn-secondary player-emporio-tab" data-section="otros">📦 Otros</button>
@@ -1167,7 +1168,8 @@
                         <button type="button" class="btn btn-small player-shop-cart-toggle-btn" onclick="toggleShopCart(this)" aria-label="Ver carrito"><span class="player-shop-cart-toggle-label-default">🛒 Ir al carrito <span class="player-shop-cart-badge" id="player-emporio-cart-badge" data-count="0">0</span></span><span class="player-shop-cart-toggle-label-back">Seguir comprando</span></button>
                     </div>
                     <div class="player-shop-catalog-wrap" style="flex:2; min-width:300px;">
-                        <div id="player-emporio-grid-materiales" class="player-emporio-grid"></div>
+                        <div id="player-emporio-grid-todos" class="player-emporio-grid"></div>
+                        <div id="player-emporio-grid-materiales" class="player-emporio-grid" style="display:none;"></div>
                         <div id="player-emporio-grid-raros" class="player-emporio-grid" style="display:none;"></div>
                         <div id="player-emporio-grid-mapas" class="player-emporio-grid" style="display:none;"></div>
                         <div id="player-emporio-grid-otros" class="player-emporio-grid" style="display:none;"></div>
@@ -1309,6 +1311,7 @@
                     </div>
                     <div class="player-shop-filters player-tavern-tabs">
                         <button type="button" class="btn btn-small player-tavern-tab active" data-tab="tavern-entrada">🚪 Entrada</button>
+                        <button type="button" class="btn btn-small btn-secondary player-tavern-tab" data-tab="tavern-otros">📦 Otros</button>
                         <button type="button" class="btn btn-small btn-secondary player-tavern-tab" data-tab="tavern-bebidas">🍺 Bebidas</button>
                         <button type="button" class="btn btn-small btn-secondary player-tavern-tab" data-tab="tavern-cocina">👨‍🍳 Cocina</button>
                     </div>
@@ -1328,6 +1331,27 @@
                             <p style="color:#8b7355; font-size:0.9em; margin-bottom:12px;">Acceso exclusivo a la zona premium.</p>
                             <div id="player-tavern-vip-price" style="color:#f4d03f; font-weight:bold; margin:12px 0;">10 GP</div>
                             <button type="button" class="btn" style="background:linear-gradient(135deg,#f4d03f,#d4a574); color:#1a1a1a;" onclick="playerTavernEnter('vip')">⭐ Entrar como VIP</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="tavern-otros" class="player-tavern-tab-content" style="display:none;">
+                    <div class="player-shop-search-wrap">
+                        <button type="button" class="player-shop-search-toggle" aria-expanded="false" onclick="var w=this.closest('.player-shop-search-wrap'); w.classList.toggle('expanded'); this.setAttribute('aria-expanded', w.classList.contains('expanded'));">🔍 Búsqueda</button>
+                        <div class="player-shop-search-row">
+                            <input type="text" class="player-shop-search-input" id="player-tavern-otros-search" placeholder="Nombre del ítem...">
+                        </div>
+                    </div>
+                    <div class="player-shop-layout" style="display:flex; gap:20px; flex-wrap:wrap;">
+                        <div class="player-shop-cart-toggle-row">
+                            <button type="button" class="btn btn-small player-shop-cart-toggle-btn" onclick="toggleShopCart(this)" aria-label="Ver carrito"><span class="player-shop-cart-toggle-label-default">🛒 Ir al carrito <span class="player-shop-cart-badge" id="player-tavern-otros-cart-badge" data-count="0">0</span></span><span class="player-shop-cart-toggle-label-back">Seguir comprando</span></button>
+                        </div>
+                        <div class="player-shop-catalog-wrap" style="flex:2; min-width:280px;">
+                            <div id="player-tavern-otros-grid" class="player-tavern-products-grid"></div>
+                        </div>
+                        <div class="player-tavern-cart-wrap player-shop-cart-wrap" style="flex:1; min-width:260px;">
+                            <div style="font-family:'Cinzel',serif; color:#f4d03f; margin-bottom:12px;">🛒 Tu pedido</div>
+                            <div id="player-tavern-cart-items-otros"></div>
+                            <div id="player-tavern-cart-total-otros"></div>
                         </div>
                     </div>
                 </div>
@@ -2923,7 +2947,7 @@
             <div class="modal-body">
                 <div class="form-group">
                     <label>Tipo de usuario</label>
-                    <select id="login-user-type" onchange="toggleLoginFields()">
+                    <select id="login-user-type" onchange="typeof toggleLoginFields==='function'&&toggleLoginFields()">
                         <option value="dm">👑 Dungeon Master</option>
                         <option value="player">⚔️ Aventurero</option>
                     </select>

@@ -1,6 +1,6 @@
 {
-  "name": "D&D Companion",
-  "short_name": "D&D Companion",
+  "name": "DragonKeep",
+  "short_name": "DragonKeep",
   "description": "Dashboard para Dungeon Master y app de personajes",
   "start_url": "./",
   "scope": "./",

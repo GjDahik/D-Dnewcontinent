@@ -1,5 +1,5 @@
-/* Service Worker para D&D Companion - GitHub Pages subpath */
-const CACHE_NAME = 'dnd-companion-v1';
+/* Service Worker para DragonKeep - GitHub Pages subpath */
+const CACHE_NAME = 'dragonkeep-v1';
 
 /** Base path del SW (ej. /dm-dashboard-modular/) para que funcione bajo subpath */
 function getBase() {

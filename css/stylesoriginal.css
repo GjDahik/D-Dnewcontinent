@@ -718,18 +718,6 @@ body {
     position: absolute;
     right: 0;
 }
-.section-header-map {
-    flex-direction: column;
-    gap: 12px;
-}
-.section-header-map .section-header-map-btn-wrap {
-    width: 100%;
-    text-align: center;
-}
-.section-header-map .section-header-map-btn-wrap .btn {
-    position: static;
-    transform: none;
-}
 
 .map-config-row {
     display: flex;
@@ -2025,16 +2013,6 @@ body {
     border-radius: 50%;
     box-shadow: 0 2px 6px rgba(0,0,0,0.5);
 }
-/* Marcador de "Mi ubicación": resaltado cuando el jugador elige esa ciudad */
-.player-map-marker--my-location .player-map-marker-pin {
-    background: rgba(80, 35, 35, 0.95);
-    border: 2px solid #c62828;
-    box-shadow: 0 2px 8px rgba(198, 40, 40, 0.6);
-}
-.player-map-marker--my-location .player-map-marker-label {
-    border-color: rgba(198, 40, 40, 0.8);
-    color: #ef9a9a;
-}
 /* Marcadores en móvil: diseño refinado, minimal, legible */
 @media (max-width: 768px) {
     .player-map-marker-pin {
@@ -2621,13 +2599,10 @@ body {
 .player-mistfall-shop-posada { --shop-accent: #8b7355; --shop-glow: rgba(139,115,85,0.3); }
 .player-mistfall-shop-habitantes { --shop-accent: #9a8b6a; --shop-glow: rgba(154,139,106,0.3); }
 
-/* Establecimiento recomendado: doble ancho + placa + contenido centrado */
-.player-mistfall-shop-recomendado { grid-column: 1 / -1; position: relative; padding-top: 44px; justify-content: center; }
-.player-mistfall-shop-recomendado .player-mistfall-shop-icon { text-align: center; flex-shrink: 0; }
-.player-mistfall-shop-recomendado .player-mistfall-shop-info { text-align: center; flex: 0 1 auto; }
+/* Establecimiento recomendado: doble ancho + placa */
+.player-mistfall-shop-recomendado { grid-column: 1 / -1; position: relative; padding-top: 44px; }
 .player-mistfall-recomendado-placa {
     position: absolute; top: 0; left: 0; right: 0;
-    width: 100%; box-sizing: border-box; display: block;
     font-family: 'Cinzel', serif; font-size: 0.75em; letter-spacing: 3px; text-transform: uppercase;
     text-align: center; padding: 10px 12px; background: linear-gradient(90deg, transparent, rgba(212,175,55,0.25), transparent);
     color: #d4af37; border-bottom: 1px solid rgba(212,175,55,0.4); border-radius: 4px 4px 0 0;
@@ -2820,36 +2795,28 @@ body {
     margin-bottom: 16px;
     visibility: visible !important;
 }
-/* Ocultar búsqueda y filtros cuando el usuario está viendo el carrito */
-.player-shop-viewing-cart .player-shop-search-wrap {
-    display: none !important;
-}
-/* Botón "Búsqueda y filtros" más reconocible: destaca en todas las tiendas */
+/* En todas las tiendas (app jugador): búsqueda desplegable en cualquier pantalla. El botón debe verse siempre. */
 .player-shop-search-toggle {
     display: flex !important;
     align-items: center;
-    justify-content: flex-start;
-    gap: 10px;
+    gap: 8px;
     width: 100%;
-    min-height: 48px;
-    padding: 12px 18px;
-    background: linear-gradient(180deg, #2a2520 0%, #1a1612 100%);
-    border: 2px solid #8b7355;
-    border-radius: 8px;
-    color: #e8dcc8;
-    font-family: 'Cinzel', serif;
-    font-size: 1.05em;
-    font-weight: 600;
+    min-height: 44px;
+    padding: 10px 14px;
+    background: #1a1a1a;
+    border: 1px solid #4a3c31;
+    border-radius: 6px;
+    color: #d4c4a8;
+    font-family: inherit;
+    font-size: 1em;
     cursor: pointer;
     text-align: left;
     visibility: visible !important;
-    transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    transition: border-color 0.2s, background 0.2s;
 }
 .player-shop-search-toggle:hover {
-    border-color: #c9a227;
-    background: linear-gradient(180deg, #352e26 0%, #252018 100%);
-    box-shadow: 0 2px 12px rgba(201, 162, 39, 0.2);
+    border-color: #8b7355;
+    background: rgba(0,0,0,0.4);
 }
 .player-shop-search-wrap .player-shop-search-row {
     display: none;
@@ -3013,10 +2980,6 @@ body {
 
 /* Taberna: ocultar búsqueda y tabs hasta que el jugador haya elegido una entrada (Normal/VIP). */
 #player-tavern-body.tavern-showing-entrada .player-tavern-search-wrap {
-    display: none !important;
-}
-/* Taberna: ocultar "Búsqueda y filtros" (y tabs) cuando el usuario está viendo el carrito. */
-#player-tavern-body.tavern-viewing-cart .player-tavern-search-wrap {
     display: none !important;
 }
 /* Taberna: una sola búsqueda arriba (junto a los tabs). Ocultar las búsquedas dentro de Bebidas y Cocina. */
@@ -3746,33 +3709,41 @@ body {
 }
 .player-plaque-oro {
     margin: 0;
-    padding: 4px 0;
-    background: none;
-    border: none;
-    border-radius: 0;
+    padding: 8px 14px;
+    background: linear-gradient(135deg, rgba(212, 175, 55, 0.25) 0%, rgba(139, 90, 43, 0.35) 100%);
+    border: 1px solid rgba(212, 175, 55, 0.5);
+    border-radius: 6px;
     color: #f4e4a6;
     font-family: 'Cinzel', serif;
-    font-size: 1em;
-    font-weight: 600;
-    font-style: normal;
+    font-size: 1.15em;
+    font-weight: 700;
     letter-spacing: 1px;
-    text-shadow: 1px 1px 0 rgba(0,0,0,0.8);
-    box-shadow: none;
+    text-shadow: 
+        0 0 10px rgba(212, 175, 55, 0.4),
+        1px 1px 0 rgba(0,0,0,0.8);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.15), 0 2px 6px rgba(0,0,0,0.3);
+}
+.player-plaque-oro:hover {
+    background: linear-gradient(135deg, rgba(212, 175, 55, 0.35) 0%, rgba(139, 90, 43, 0.45) 100%);
 }
 .player-plaque-banco {
     margin: 0;
-    padding: 4px 0;
-    background: none;
-    border: none;
-    border-radius: 0;
+    padding: 8px 14px;
+    background: linear-gradient(135deg, rgba(90, 138, 90, 0.25) 0%, rgba(56, 100, 56, 0.35) 100%);
+    border: 1px solid rgba(90, 138, 90, 0.5);
+    border-radius: 6px;
     color: #b8e0b8;
     font-family: 'Cinzel', serif;
-    font-size: 1em;
-    font-weight: 600;
-    font-style: normal;
+    font-size: 1.15em;
+    font-weight: 700;
     letter-spacing: 1px;
-    text-shadow: 1px 1px 0 rgba(0,0,0,0.8);
-    box-shadow: none;
+    text-shadow: 
+        0 0 10px rgba(90, 138, 90, 0.4),
+        1px 1px 0 rgba(0,0,0,0.8);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.15), 0 2px 6px rgba(0,0,0,0.3);
+}
+.player-plaque-banco:hover {
+    background: linear-gradient(135deg, rgba(90, 138, 90, 0.35) 0%, rgba(56, 100, 56, 0.45) 100%);
 }
 
 /* Placa metálica del DM (nombre, igual que jugadores) */
@@ -3941,28 +3912,4 @@ body {
 
 .mi-casa-notes-block {
     box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-}
-
-/* ========================================
-   AJUSTES DE MAPA PARA MÓVILES - contenedor proporcionado al ancho
-   ======================================== */
-@media (max-width: 768px) {
-    /* Contenedor 16:9 como la imagen del mapa para que no quede espacio vacío */
-    .player-map-viewport {
-        width: 100% !important;
-        aspect-ratio: 16 / 9;
-        height: auto !important;
-        min-height: 180px !important;
-        max-height: 60vh;
-    }
-    
-    .player-map-wrap {
-        padding: 12px;
-    }
-    
-    .player-map-img {
-        width: 100% !important;
-        height: auto !important;
-        display: block;
-    }
 }

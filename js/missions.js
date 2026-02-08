@@ -569,7 +569,8 @@ function renderPlayerMissionsLists(activas, historial, playerId, subtab, playerN
                     ${partyLabel ? `<p class="mission-card-extra" style="color:#8fbc8f;">👥 ${partyLabel}</p>` : ''}
                     <div class="mission-card-actions">
                         ${!progressStatus ? `<button type="button" class="btn btn-small" onclick="updatePlayerMissionProgress('${esc(m.id)}', 'accepted')">Aceptar misión</button><button type="button" class="btn btn-small btn-secondary" onclick="updatePlayerMissionProgress('${esc(m.id)}', 'rejected')">Rechazar</button>` : ''}
-                        ${progressStatus === PLAYER_PROGRESS_STATUS.accepted ? `<button type="button" class="btn btn-small" onclick="updatePlayerMissionProgress('${esc(m.id)}', 'in_progress')">En curso</button>` : ''}
+                        ${progressStatus === PLAYER_PROGRESS_STATUS.accepted ? `<button type="button" class="btn btn-small" onclick="updatePlayerMissionProgress('${esc(m.id)}', 'in_progress')">En curso</button><button type="button" class="btn btn-small btn-secondary" onclick="clearPlayerMissionProgress('${esc(m.id)}')" title="Dejar la misión">Abandonar misión</button>` : ''}
+                        ${progressStatus === PLAYER_PROGRESS_STATUS.in_progress ? `<button type="button" class="btn btn-small" onclick="updatePlayerMissionProgress('${esc(m.id)}', 'accepted')" title="Volver a estado Aceptada">Quitar de en curso</button><button type="button" class="btn btn-small btn-secondary" onclick="clearPlayerMissionProgress('${esc(m.id)}')" title="Dejar la misión por completo">Abandonar misión</button>` : ''}
                     </div>
                     ${notesSection}
                 </div>`;
@@ -706,6 +707,34 @@ function updatePlayerMissionProgress(missionId, status) {
             else if (status === PLAYER_PROGRESS_STATUS.rejected) showToast('Misión rechazada');
         }).catch(e => showToast('Error: ' + e.message, true));
     }).catch(e => showToast('Error: ' + e.message, true));
+}
+
+/** Quita al jugador actual de la misión (borra su entrada en playerProgress). La misión vuelve a mostrarse como "Disponible" para ese jugador. */
+function clearPlayerMissionProgress(missionId) {
+    const user = getCurrentUser();
+    if (!user || !user.id || !isPlayer() || !missionId) return;
+    const ref = db.collection('missions').doc(missionId);
+    ref.get().then(doc => {
+        if (!doc.exists) return;
+        const data = doc.data();
+        const playerProgress = data.playerProgress || {};
+        if (!(playerProgress[user.id] || playerProgress[String(user.id)])) {
+            showToast('No estás en esta misión', true);
+            return;
+        }
+        const updates = { updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+        if (typeof firebase.firestore.FieldValue.delete === 'function') {
+            updates['playerProgress.' + user.id] = firebase.firestore.FieldValue.delete();
+        } else {
+            const newProgress = { ...playerProgress };
+            delete newProgress[user.id];
+            delete newProgress[String(user.id)];
+            updates.playerProgress = newProgress;
+        }
+        return ref.update(updates);
+    }).then(() => {
+        showToast('Has abandonado la misión. Volverá a aparecer como disponible si el DM la tiene visible.');
+    }).catch(e => showToast('Error: ' + (e && e.message) || 'Error al abandonar', true));
 }
 
 // ==================== ESCUCHA LA LEYENDA (audio MP3 por link) ====================

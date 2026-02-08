@@ -1,4 +1,4 @@
-# 🏰 D&D Companion
+# 🏰 DragonKeep
 
 **Dashboard para Dungeon Master** y **app de personajes** en una sola entrada. Login compartido por tipo de usuario (DM o Personaje), nombre y PIN. Diseñado para campañas de D&D y juegos de rol por turnos.
 

@@ -1,5 +1,5 @@
 rules_version = '2';
-// Reglas de Firestore para D&D Companion (nueva-valdoria).
+// Reglas de Firestore para DragonKeep (nueva-valdoria).
 // La app usa autenticación custom (nombre + PIN en dms/players), no Firebase Auth,
 // por lo que no se puede restringir por request.auth.uid. Para uso personal/hobby
 // se permite lectura/escritura; mantén el enlace del dashboard privado.
