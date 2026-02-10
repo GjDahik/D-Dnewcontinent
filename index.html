@@ -30,7 +30,14 @@
                     </div>
                 </div>
                 <div class="header-actions">
-                    <button type="button" class="hamburger-btn" id="dm-hamburger-btn" onclick="toggleMobileNav('dm')" aria-label="Abrir menú">☰</button>
+                    <div class="app-brand">
+                        <img src="./icons/icon-192.png" alt="DragonKeep" class="app-brand-icon">
+                        <span class="app-brand-name">DragonKeep</span>
+                    </div>
+                    <div class="header-actions-right">
+                        <button type="button" class="header-logout-btn" onclick="logout('dm')" title="Salir">⎋</button>
+                        <button type="button" class="hamburger-btn" id="dm-hamburger-btn" onclick="toggleMobileNav('dm')" aria-label="Abrir menú">☰</button>
+                    </div>
                 </div>
             </div>
         </header>
@@ -48,7 +55,7 @@
             <div class="nav-tabs-row2">
                 <button class="nav-tab nav-tab-type-transactions" data-tab="transactions">📜 Historial</button>
                 <button class="nav-tab nav-tab-type-battle" type="button" onclick="openBattleTracker()" title="Abrir en nueva pestaña">⚔️ Battle Tracker</button>
-                <button class="nav-tab nav-tab-logout" type="button" onclick="closeMobileNav('dm'); logout();">🚪 Salir</button>
+                <button class="nav-tab nav-tab-logout" type="button" onclick="logout('dm')">⎋ Salir</button>
             </div>
         </nav>
         </div>
@@ -356,7 +363,14 @@
                     </div>
                 </div>
                 <div class="header-actions">
-                    <button type="button" class="hamburger-btn" id="player-hamburger-btn" onclick="toggleMobileNav('player')" aria-label="Abrir menú">☰</button>
+                    <div class="app-brand">
+                        <img src="./icons/icon-192.png" alt="DragonKeep" class="app-brand-icon">
+                        <span class="app-brand-name">DragonKeep</span>
+                    </div>
+                    <div class="header-actions-right">
+                        <button type="button" class="header-logout-btn" onclick="logout('player')" title="Salir">⎋</button>
+                        <button type="button" class="hamburger-btn" id="player-hamburger-btn" onclick="toggleMobileNav('player')" aria-label="Abrir menú">☰</button>
+                    </div>
                 </div>
             </div>
         </header>
@@ -374,7 +388,7 @@
             <div class="nav-tabs-row2">
                 <button class="nav-tab nav-tab-type-missions" data-tab="player-missions">📋 Misiones<span class="nav-badge nav-badge-missions nav-badge--hidden" id="missions-pending-badge" aria-label="Misiones por aceptar"></span></button>
                 <button class="nav-tab nav-tab-type-battle" type="button" onclick="openBattleTracker()" title="Abrir en nueva pestaña">⚔️ Battle Tracker</button>
-                <button class="nav-tab nav-tab-logout" type="button" onclick="closeMobileNav('player'); logout();">🚪 Salir</button>
+                <button class="nav-tab nav-tab-logout" type="button" onclick="logout('player')">⎋ Salir</button>
             </div>
         </nav>
         </div>

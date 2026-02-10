@@ -76,6 +76,103 @@ body {
     gap: 12px;
     position: relative;
 }
+.app-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #d4af37;
+    font-family: 'Cinzel', serif;
+    font-size: 1.05em;
+}
+.app-brand-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+}
+.app-brand-name {
+    white-space: nowrap;
+}
+
+.header-actions-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.header-logout-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    padding: 0 14px;
+    background: linear-gradient(180deg, #2a2522 0%, #1e1b18 100%);
+    border: 1px solid #4a3c31;
+    color: #f5f5f5;
+    font-size: 0.95em;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+.header-logout-btn:hover {
+    border-color: #8b5a2b;
+    background: linear-gradient(180deg, #352f2a 0%, #2a2522 100%);
+    box-shadow: 0 0 8px rgba(139, 90, 43, 0.35);
+}
+
+/* En escritorio: barra superior similar a móvil (icono + nombre app) */
+@media (min-width: 1201px) {
+    .header {
+        padding: 0;
+        margin-bottom: 24px;
+        position: relative;
+        background: none;
+        border-bottom: none;
+        padding-top: 56px;
+    }
+    .header-inner {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+    }
+    .header-actions {
+        order: -1;
+        flex-shrink: 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        min-height: 48px;
+        padding: 12px 16px;
+        background: linear-gradient(180deg, #1e1b18 0%, #1a1815 100%);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        z-index: 100;
+    }
+    .hamburger-btn,
+    .header-logout-btn {
+        display: inline-flex;
+    }
+    .header-inner .player-plaque,
+    .header-inner .dm-plaque {
+        order: 0;
+        margin-top: 20px;
+        margin-bottom: 16px;
+        padding: 20px 14px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    }
+    .header-inner .player-plaque .metal-plaque-content,
+    .header-inner .dm-plaque .metal-plaque-content {
+        gap: 10px;
+    }
+    .header h1 { font-size: 1.6em; }
+    .header p { font-size: 0.95em; }
+    .header::before, .header::after { display: none; }
+}
 .header-title-wrap {
     min-width: 0;
     flex: 1 1 auto;
@@ -247,22 +344,13 @@ body {
 .nav-tab-type-home:hover { border-color: #625a54; color: #8e867e; }
 .nav-tab-type-home.active { border-color: #625a54; color: #8e867e; box-shadow: 0 0 8px rgba(98, 90, 84, 0.25); }
 
-/* Salir: rojo, sin bajar saturación */
-.nav-tab-logout {
-    border-color: #8b4040;
-    color: #c86a6a;
-}
-.nav-tab-logout:hover {
-    border-color: #a85050;
-    color: #e88888;
-    background: linear-gradient(180deg, #3a2525 0%, #2a1a1a 100%);
-    box-shadow: 0 0 10px rgba(168, 80, 80, 0.35);
-}
-.nav-tab-logout.active {
-    border-color: #a85050;
-    color: #e88888;
-    background: linear-gradient(180deg, #3a2525 0%, #2a1a1a 100%);
-    box-shadow: 0 0 10px rgba(168, 80, 80, 0.35);
+/* Salir: usa el mismo estilo de botón que el resto; solo ajustamos color de texto en móvil */
+
+/* En escritorio: ocultar el tab de Salir (se usa el botón de la barra superior) */
+@media (min-width: 1201px) {
+    .nav-tab-logout {
+        display: none !important;
+    }
 }
 
 /* Filas de nav: display:contents para que los 8 botones fluyan en un solo flex y el número de líneas dependa solo del ancho (igual con 100% o 125% zoom) */
@@ -1747,10 +1835,13 @@ body {
     font-size: 1.05em;
     color: #e5ddd4;
     line-height: 1.5;
+    text-align: center;
 }
 .app-confirm-footer {
     border-top: 1px solid #4a3c31;
     padding: 14px 18px;
+    display: flex;
+    justify-content: center;
     gap: 10px;
 }
 .app-confirm-do-btn {
@@ -1951,13 +2042,9 @@ body {
     box-shadow: 0 2px 8px rgba(0,0,0,0.4);
 }
 .player-map-zoom-controls {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 8px;
-    margin: 10px 0;
-    width: 100%;
-    box-sizing: border-box;
+    /* Ocultar botones de zoom (+ / -) en todas las vistas,
+       pero mantener la funcionalidad de zoom (rueda, gestos, etc.) */
+    display: none !important;
 }
 .player-map-zoom-controls .btn {
     min-width: 44px;
@@ -2001,7 +2088,7 @@ body {
     .player-map-viewport.is-zoomed .player-map-marker-label {
         display: block;
     }
-    /* En móvil: ocultar zoom y centrar dropdown "Mi ubicación" */
+    /* En móvil: ocultar zoom y poner \"Mi ubicación\" a ancho completo, como los otros botones */
     .player-map-below-row {
         grid-template-columns: 1fr;
     }
@@ -2009,7 +2096,7 @@ body {
         grid-column: 1;
         display: flex !important;
         flex-direction: column !important;
-        align-items: center !important;
+        align-items: stretch !important;
         justify-content: center !important;
         text-align: center;
         width: 100%;
@@ -2018,10 +2105,10 @@ body {
         text-align: center;
     }
     .player-map-below-row .player-map-ubicacion .player-map-ubicacion-select {
-        width: auto !important;
-        max-width: 100%;
-        margin-left: auto;
-        margin-right: auto;
+        width: 100% !important;
+        max-width: none;
+        margin-left: 0;
+        margin-right: 0;
     }
     .player-map-below-row .player-map-zoom-controls {
         display: none !important;
@@ -2257,25 +2344,17 @@ body {
     min-width: 150px;
     max-width: 220px;
 }
-/* Fila debajo del mapa: Mi ubicación (izq) + zoom centro; fuera del mapa */
+/* Fila debajo del mapa: solo \"Mi ubicación\", centrado bajo el mapa */
 .player-map-below-row {
-    display: grid;
-    grid-template-columns: 1fr minmax(max-content, auto) 1fr;
+    display: flex;
     align-items: center;
+    justify-content: flex-start; /* En escritorio: alineado a la izquierda */
     gap: 12px;
     margin-top: 12px;
 }
 .player-map-below-row .player-map-ubicacion {
     margin-top: 0;
     justify-content: flex-start;
-    grid-column: 1;
-}
-.player-map-below-row .player-map-zoom-controls {
-    margin: 0;
-    width: auto;
-    min-width: max-content;
-    grid-column: 2;
-    justify-self: center;
 }
 .player-map-ubicacion {
     margin-top: 20px;
@@ -3198,7 +3277,11 @@ body {
 
 /* RESPONSIVE */
 @media (max-width: 1200px) {
-    body { padding: 10px; }
+    body { 
+        padding: 10px; 
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
 
     /* En móvil: header = barra fija arriba siempre; placa debajo en el contenido */
     .header {
@@ -3220,7 +3303,7 @@ body {
         order: -1;
         flex-shrink: 0;
         display: flex;
-        justify-content: flex-end;
+        justify-content: space-between;
         align-items: center;
         min-height: 48px;
         padding: 12px 16px;
@@ -3232,6 +3315,9 @@ body {
         right: 0;
         width: 100%;
         z-index: 100;
+    }
+    .app-brand {
+        display: inline-flex;
     }
     /* Placa del jugador/DM: bloque separado en el contenido, debajo del header */
     .header-inner .player-plaque,
@@ -3254,7 +3340,7 @@ body {
     .header p { font-size: 0.95em; }
     .header::before, .header::after { display: none; }
 
-    /* Menú hamburguesa: mostrar botón y convertir nav en drawer */
+    /* Menú hamburguesa: mostrar botón y convertir nav en drawer (solo hamburguesa en móvil) */
     .hamburger-btn {
         display: inline-flex;
     }
@@ -3321,14 +3407,8 @@ body {
         flex-shrink: 0;
     }
     .nav-wrapper .nav-tab-logout {
-        border-color: #6a4040 !important;
-        color: #d4a0a0 !important;
+        color: #ffffff !important;
         margin-top: 8px;
-    }
-    .nav-wrapper .nav-tab-logout:hover {
-        background: linear-gradient(180deg, #3a2525 0%, #2a1a1a 100%) !important;
-        border-color: #8b5050 !important;
-        color: #e8b0b0 !important;
     }
 
     /* En móvil la nav y la hamburguesa no se ocultan al entrar en ciudad (solo se ocultan en PC) */

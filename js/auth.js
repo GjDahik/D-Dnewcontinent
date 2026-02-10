@@ -86,7 +86,20 @@ async function loginPlayer(nombre, pin) {
 }
 
 // ==================== LOGOUT ====================
-function logout() {
+var LOGOUT_MESSAGES = [
+    '¿Seguro que quieres salir de DragonKeep? El dragón ya te estaba tomando cariño.',
+    'Si sales ahora, los goblins van a creer que ganaron. ¿Cerrar sesión igual?',
+    'Las tabernas se apagan cuando cierras sesión. ¿Apagamos las luces?',
+    'Tus aventureros se quedarán en pausa mirando al vacío. ¿Cerrar sesión?',
+    'Los dioses del dado observan tu decisión… ¿Quieres salir de DragonKeep?',
+    'Cerrar sesión ahora guardará la partida en un lugar seguro. ¿Continuar?',
+    'El mapa se enrollará y guardará en el cofre. ¿Cerrar sesión?',
+    'Hasta los dragones necesitan dormir. ¿Cerrar sesión por hoy?',
+    'Tu grupo monta el campamento y se prepara para descansar. ¿Cerrar sesión?',
+    'Prometemos no tocar tu loot mientras no estés. ¿Cerrar sesión?'
+];
+
+function doLogoutNow() {
     if (typeof closeAllSubscriptions === 'function') closeAllSubscriptions();
     
     // FIX: Limpiar variables de marcadores del jugador para evitar contaminación entre usuarios
@@ -105,6 +118,30 @@ function logout() {
     sessionStorage.removeItem('userType');
     showToast('Sesión cerrada');
     showLoginModal();
+}
+
+function logout(context) {
+    // context: 'dm' o 'player' (opcional)
+    if (typeof closeMobileNav === 'function' && (context === 'dm' || context === 'player')) {
+        closeMobileNav(context);
+    }
+    if (typeof showAppConfirm === 'function') {
+        var msgList = Array.isArray(LOGOUT_MESSAGES) && LOGOUT_MESSAGES.length ? LOGOUT_MESSAGES : [
+            '¿Quieres salir de DragonKeep? Podrás volver a entrar cuando quieras.'
+        ];
+        var randomMessage = msgList[Math.floor(Math.random() * msgList.length)];
+        showAppConfirm({
+            title: 'Cerrar sesión',
+            message: randomMessage,
+            cancelText: 'Quedarme',
+            confirmText: 'Cerrar sesión',
+            danger: true,
+            onConfirm: doLogoutNow
+        });
+    } else {
+        // Fallback sin modal bonito
+        doLogoutNow();
+    }
 }
 
 // ==================== CHECK AUTHENTICATION ====================
