@@ -109,35 +109,18 @@ function loadWorld() {
 }
 
 function renderCities() {
-    console.log('renderCities llamado');
-    
-    // Usar las variables globales directamente
     const cities = citiesData || [];
     const npcs = npcsData || [];
     const shops = shopsData || [];
-    
-    console.log('Datos:', {
-        citiesCount: cities.length,
-        npcsCount: npcs.length,
-        shopsCount: shops.length,
-        citiesDataExists: typeof citiesData !== 'undefined',
-        citiesIsArray: Array.isArray(cities)
-    });
-    
-    // Intentar encontrar el contenedor varias veces
     let container = document.getElementById('cities-container');
     if (!container) {
-        console.warn('cities-container no encontrado, esperando...');
-        // Esperar un poco y volver a intentar
         setTimeout(function() {
             container = document.getElementById('cities-container');
             if (container) {
-                console.log('Contenedor encontrado en segundo intento');
                 renderCities();
             } else {
-                console.error('ERROR: cities-container NO EXISTE en el DOM');
-                // Intentar crear un mensaje de error visible
-                const citiesSection = document.getElementById('cities');
+                console.error('cities-container no existe en el DOM');
+                var citiesSection = document.getElementById('cities');
                 if (citiesSection) {
                     citiesSection.innerHTML += '<div style="background:red;color:white;padding:20px;margin:20px;">ERROR: El contenedor cities-container no existe</div>';
                 }
@@ -145,9 +128,6 @@ function renderCities() {
         }, 1000);
         return;
     }
-    
-    console.log('Contenedor encontrado:', container);
-    
     if (!cities || !Array.isArray(cities)) {
         console.error('Error: citiesData no es un array válido');
         container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🏘️</div><p>Error al cargar ciudades</p></div>';
@@ -155,19 +135,13 @@ function renderCities() {
     }
     
     if (!cities.length) {
-        console.log('No hay ciudades en el array');
         container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🏘️</div><p>No hay ciudades. ¡Crea la primera!</p></div>';
         return;
     }
-    
-    console.log('Renderizando', cities.length, 'ciudades');
-    console.log('Primeras 3 ciudades:', cities.slice(0, 3));
-    
     try {
         const sortedCities = [...cities].sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
         let htmlContent = '';
         sortedCities.forEach((city, index) => {
-            console.log(`Procesando ciudad ${index + 1}:`, city.nombre);
             const cached = _cityDataCache[city.id];
             const cityNpcs = cached ? (cached.npcs || []).slice().sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es')) : [];
             const cityShops = cached ? (cached.shops || []).slice().sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es')) : [];
@@ -282,10 +256,7 @@ function renderCities() {
             </div>`;
             htmlContent += html;
         });
-        
-        console.log('HTML generado, longitud:', htmlContent.length);
         container.innerHTML = htmlContent;
-        console.log('Ciudades renderizadas exitosamente. Contenedor ahora tiene:', container.children.length, 'elementos hijos');
         if (typeof renderDMMapMarkersDropdown === 'function' && typeof isDM === 'function' && isDM()) renderDMMapMarkersDropdown();
     } catch (error) {
         console.error('Error renderizando ciudades:', error);

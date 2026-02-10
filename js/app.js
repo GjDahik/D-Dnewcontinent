@@ -10,6 +10,67 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
+// ==================== CONTADOR DE READS (solo desarrollo / diagnóstico) ====================
+// Ver también: Firebase Console → Firestore → Usage (gráfica de lecturas por día).
+// En consola del navegador: firestoreReadCount(), firestoreReadCountBreakdown(), firestoreReadCountReset().
+(function patchFirestoreReadCount() {
+    var total = 0;
+    var logByPath = {};
+    function pathOf(ref) {
+        try {
+            if (ref && ref.path) return ref.path;
+            if (ref && ref._delegate && ref._delegate.path) return ref._delegate.path;
+        } catch (e) {}
+        return '?';
+    }
+    function addReads(n, path, kind) {
+        if (n <= 0) return;
+        total += n;
+        var key = (path || '?') + ' (' + (kind || 'get') + ')';
+        logByPath[key] = (logByPath[key] || 0) + n;
+        console.log('[Firestore reads] +' + n + ' (total: ' + total + ') ' + key);
+    }
+    try {
+        var QueryProto = db.collection('_').constructor.prototype;
+        var DocRefProto = db.collection('_').doc('_').constructor.prototype;
+        ['get', 'onSnapshot'].forEach(function (method) {
+            [QueryProto, DocRefProto].forEach(function (proto) {
+                if (!proto || !proto[method]) return;
+                var original = proto[method];
+                proto[method] = function () {
+                    var self = this;
+                    var path = pathOf(self);
+                    if (method === 'get') {
+                        return original.apply(this, arguments).then(function (snap) {
+                            var n = (snap && snap.size != null) ? snap.size : (snap && snap.docs ? snap.docs.length : (snap && snap.exists ? 1 : 0));
+                            addReads(n, path, 'get');
+                            return snap;
+                        });
+                    }
+                    var args = Array.prototype.slice.call(arguments);
+                    var last = args.length - 1;
+                    if (typeof args[last] === 'function') {
+                        args[last] = (function (cb) {
+                            return function (snap) {
+                                var n = (snap && snap.size != null) ? snap.size : (snap && snap.docs ? snap.docs.length : (snap && snap.exists ? 1 : 0));
+                                addReads(n, path, 'onSnapshot');
+                                return cb.apply(this, arguments);
+                            };
+                        })(args[last]);
+                    }
+                    return original.apply(this, args);
+                };
+            });
+        });
+        window.firestoreReadCount = function () { return total; };
+        window.firestoreReadCountReset = function () { total = 0; logByPath = {}; console.log('[Firestore reads] Contador reiniciado.'); };
+        window.firestoreReadCountBreakdown = function () { console.table(logByPath); return logByPath; };
+        console.log('[Firestore] Contador de reads activo. Usa firestoreReadCount(), firestoreReadCountBreakdown() o firestoreReadCountReset().');
+    } catch (e) {
+        console.warn('[Firestore] No se pudo activar el contador de reads:', e);
+    }
+})();
+
 // ==================== PWA - BASE PATH Y SERVICE WORKER ====================
 /** Base path para GitHub Pages (ej. /dm-dashboard-modular/). Usado para manifest, SW y rutas. */
 var PWA_BASE = (function () {
@@ -434,10 +495,17 @@ function updateFooterTagline() {
     el.textContent = FOOTER_TAGLINES[i];
 }
 
+var _mapSettingsCache = null; // evita leer settings/map más de una vez por sesión
 async function loadMapImage() {
     try {
-        const snap = await db.collection('settings').doc('map').get();
-        const data = snap.exists ? snap.data() : {};
+        var data;
+        if (_mapSettingsCache !== null) {
+            data = _mapSettingsCache;
+        } else {
+            const snap = await db.collection('settings').doc('map').get();
+            data = snap.exists ? snap.data() : {};
+            _mapSettingsCache = data;
+        }
         if (Array.isArray(data.levels) && data.levels.length > 0) {
             mapLevels = data.levels.map(l => ({ ...l, visible: l.visible !== false }));
         } else {
@@ -1961,6 +2029,7 @@ async function deleteMapLevel(index) {
 
 async function saveMapLevels() {
     await db.collection('settings').doc('map').set({ levels: mapLevels }, { merge: true });
+    _mapSettingsCache = null;
 }
 
 async function setDefaultMapLevel(index) {
@@ -1969,6 +2038,7 @@ async function setDefaultMapLevel(index) {
     defaultMapLevelIndex = idx;
     updateMapDMView();
     await db.collection('settings').doc('map').set({ defaultLevelIndex: idx }, { merge: true });
+    _mapSettingsCache = null;
     const visibleLevels = getVisibleMapLevels();
     if (mapLevels[idx] && mapLevels[idx].visible !== false) {
         let pos = 0;
@@ -6196,17 +6266,10 @@ async function showDashboard() {
         if (dmNameEl) dmNameEl.textContent = user.nombre || '—';
         if (typeof loadPlayers === 'function') loadPlayers();
         if (typeof loadWorld === 'function') {
-            console.log('Llamando loadWorld desde showDashboard');
             loadWorld();
-            // También intentar renderizar después de un delay por si acaso
             setTimeout(function() {
-                if (typeof renderCities === 'function') {
-                    console.log('Renderizando ciudades después del delay');
-                    renderCities();
-                }
+                if (typeof renderCities === 'function') renderCities();
             }, 1000);
-        } else {
-            console.error('loadWorld no está definido');
         }
         // loadTransactions() se llama solo al abrir la pestaña Historial (evita listener constante)
         if (typeof loadNotificationRecipients === 'function') loadNotificationRecipients();
@@ -6331,14 +6394,7 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
         if (window.innerWidth <= 768 && container) {
             closeMobileNav(container.id === 'main-container' ? 'dm' : 'player');
         }
-        // Si se hace clic en el tab de ciudades, forzar renderizado
         const tabName = tab.getAttribute('data-tab');
-        if (tabName === 'cities' && typeof renderCities === 'function') {
-            console.log('Tab de ciudades clickeado, forzando renderizado...');
-            setTimeout(function() {
-                renderCities();
-            }, 100);
-        }
         if (!tab.dataset.tab) return; // ej. botón "+ DM", Home, Battle Tracker
         if (!container) return;
         const nav = container.querySelector('.nav-tabs');
@@ -6356,12 +6412,8 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
             if (typeof closeAll === 'function') closeAll('tab', 'transactions');
         }
         
-        // Si se hace clic en el tab de ciudades, forzar renderizado
         if (tab.dataset.tab === 'cities' && typeof renderCities === 'function') {
-            console.log('Tab de ciudades activado, forzando renderizado...');
-            setTimeout(function() {
-                renderCities();
-            }, 200);
+            setTimeout(function() { renderCities(); }, 150);
         }
         
         // Si se hace clic en el tab CDD & Correo, cargar Cartas del destino (panel por defecto) y notificaciones
