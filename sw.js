@@ -1,5 +1,5 @@
 /* Service Worker para DragonKeep - GitHub Pages subpath */
-const CACHE_NAME = 'dragonkeep-v1';
+const CACHE_NAME = 'dragonkeep-v2';
 
 /** Base path del SW (ej. /dm-dashboard-modular/) para que funcione bajo subpath */
 function getBase() {
