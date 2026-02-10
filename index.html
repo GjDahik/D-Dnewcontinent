@@ -11,7 +11,9 @@
     <meta name="apple-mobile-web-app-title" content="DragonKeep">
     <link rel="icon" type="image/png" href="./icons/icon-192.png">
     <link rel="apple-touch-icon" href="./icons/icon-192.png">
-    <link rel="manifest" href="./manifest.webmanifest">
+    <script>
+      (function(){ if (location.protocol === 'http:' || location.protocol === 'https:') { var l = document.createElement('link'); l.rel = 'manifest'; l.href = './manifest.webmanifest'; document.head.appendChild(l); } })();
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/styles.css">
 </head>
@@ -385,6 +387,42 @@
                 <span id="player-map-level-name" class="player-map-level-name">—</span>
                 <button type="button" class="btn btn-small player-map-level-btn" id="player-map-level-down" onclick="playerMapLevelDown()" title="Nivel inferior" aria-label="Bajar de nivel">↑</button>
             </div>
+            <div class="player-map-module">
+                <button type="button" class="btn btn-small player-map-bitacora-toggle" id="player-map-markers-toggle-btn" aria-expanded="false" title="Abrir o cerrar Marcadores">🎯 Marcadores</button>
+                <div class="player-map-markers" id="player-map-markers-panel" style="display:none;">
+                <div class="player-map-markers-section">
+                    <h3 class="player-map-markers-title">🎯 Añadir marcador</h3>
+                    <div class="player-map-markers-row">
+                        <label for="player-map-free-icon" class="player-map-markers-subtitle">Tipo:</label>
+                        <select id="player-map-free-icon" class="player-map-ubicacion-select player-map-icon-select" aria-label="Tipo de marcador">
+                            <option value="">— Selecciona tipo —</option>
+                            <option value="0">🔥 Peligro</option>
+                            <option value="1">⚔️ Batalla</option>
+                            <option value="2">🏕️ Campamento</option>
+                            <option value="3">💎 Tesoro</option>
+                            <option value="4">❓ Misterio</option>
+                            <option value="5">🌟 Evento</option>
+                            <option value="6">🕯️ Ritual</option>
+                            <option value="7">🐉 Dragón</option>
+                            <option value="8">👹 Monstruo</option>
+                            <option value="9">⛩️ Cueva/Dungeon</option>
+                            <option value="10">💀 Muerte/Cementerio</option>
+                        </select>
+                        <button type="button" class="btn btn-small" id="player-map-free-toggle" onclick="startPlayerMapFreeMode()" title="Colocar en el mapa">🧭 Colocar en mapa</button>
+                    </div>
+                    <div class="player-map-markers-row player-map-markers-row--spaced">
+                        <label for="player-map-free-existing" class="player-map-markers-subtitle">Tus marcadores:</label>
+                        <select id="player-map-free-existing" class="player-map-ubicacion-select" aria-label="Marcadores colocados">
+                            <option value="">— Ninguno —</option>
+                        </select>
+                        <button type="button" class="btn btn-small btn-secondary" id="player-map-move-btn" onclick="startPlayerMapMoveMode()" title="Mover marcador a otra posición">📌 Mover</button>
+                        <button type="button" class="btn btn-small btn-secondary" onclick="removePlayerMapFreeMarker()" title="Quitar marcador">🗑️ Quitar</button>
+                    </div>
+                    <p class="player-map-markers-hint" id="player-map-free-hint">Elige un tipo, pulsa "Colocar en mapa" y toca el mapa.</p>
+                </div>
+            </div>
+                <p class="player-map-markers-hint" id="player-map-markers-hint" style="display:none;"></p>
+            </div>
             <div class="player-map-wrap">
                 <div class="player-map-viewport" id="player-map-viewport">
                     <div class="player-map-stage" id="player-map-stage">
@@ -392,16 +430,19 @@
                         <div class="player-map-markers-layer" id="player-map-markers-layer"></div>
                     </div>
                 </div>
+                <button type="button" class="btn player-map-listo-float" id="player-map-listo-float" onclick="finishPlayerMapFreePlacement()" style="display:none;" title="Terminar y guardar">💾</button>
             </div>
-            <div class="player-map-zoom-controls">
-                <button type="button" class="btn btn-small" id="player-map-zoom-out" title="Alejar mapa">➖</button>
-                <button type="button" class="btn btn-small" id="player-map-zoom-in" title="Acercar mapa">➕</button>
-            </div>
-            <div class="player-map-ubicacion">
-                <label for="player-map-ubicacion-select" class="player-map-ubicacion-label">📍 Mi ubicación</label>
-                <select id="player-map-ubicacion-select" class="player-map-ubicacion-select" aria-label="Ciudad en la que te encuentras" onchange="setPlayerUbicacion(this.value)">
-                    <option value="">— Selecciona tu ciudad —</option>
-                </select>
+            <div class="player-map-below-row">
+                <div class="player-map-ubicacion">
+                    <label for="player-map-ubicacion-select" class="player-map-ubicacion-label">📍 Mi ubicación</label>
+                    <select id="player-map-ubicacion-select" class="player-map-ubicacion-select" aria-label="Ciudad en la que te encuentras" onchange="setPlayerUbicacion(this.value)">
+                        <option value="">— Selecciona tu ciudad —</option>
+                    </select>
+                </div>
+                <div class="player-map-zoom-controls">
+                    <button type="button" class="btn btn-small" id="player-map-zoom-out" title="Alejar mapa">➖</button>
+                    <button type="button" class="btn btn-small" id="player-map-zoom-in" title="Acercar mapa">➕</button>
+                </div>
             </div>
             <div class="player-map-module">
                 <button type="button" class="btn btn-small player-map-rutas-toggle" id="player-map-rutas-toggle-btn" title="Abrir o cerrar Rutas conocidas">🛤️ Rutas conocidas</button>
@@ -409,18 +450,24 @@
                     <h3 class="player-map-rutas-title">🛤️ Consultar ruta</h3>
                     <p class="player-map-rutas-desc">Elige salida, llegada y medio. Si coincide con una ruta del DM, verás las noches de viaje.</p>
                     <div class="player-map-rutas-form">
-                        <label for="player-ruta-salida">Ciudad de salida</label>
-                        <select id="player-ruta-salida" class="player-ruta-select" onchange="playerRutaCalcular()">
-                            <option value="">— Selecciona —</option>
-                        </select>
-                        <label for="player-ruta-llegada">Ciudad de llegada</label>
-                        <select id="player-ruta-llegada" class="player-ruta-select" onchange="playerRutaCalcular()">
-                            <option value="">— Selecciona —</option>
-                        </select>
-                        <label for="player-ruta-medio">Medio de transporte</label>
-                        <select id="player-ruta-medio" class="player-ruta-select" onchange="playerRutaCalcular()">
-                            <option value="">— Selecciona —</option>
-                        </select>
+                        <div class="player-ruta-field">
+                            <label for="player-ruta-salida">Ciudad de salida</label>
+                            <select id="player-ruta-salida" class="player-ruta-select" onchange="playerRutaCalcular()">
+                                <option value="">— Selecciona —</option>
+                            </select>
+                        </div>
+                        <div class="player-ruta-field">
+                            <label for="player-ruta-llegada">Ciudad de llegada</label>
+                            <select id="player-ruta-llegada" class="player-ruta-select" onchange="playerRutaCalcular()">
+                                <option value="">— Selecciona —</option>
+                            </select>
+                        </div>
+                        <div class="player-ruta-field">
+                            <label for="player-ruta-medio">Medio de transporte</label>
+                            <select id="player-ruta-medio" class="player-ruta-select" onchange="playerRutaCalcular()">
+                                <option value="">— Selecciona —</option>
+                            </select>
+                        </div>
                     </div>
                     <div id="player-map-rutas-result" class="player-map-rutas-result"></div>
                 </div>
@@ -432,43 +479,6 @@
                     <p class="player-map-rutas-desc">Viajes que has empezado. Cada uno tiene notas por noche.</p>
                     <div id="player-bitacora-list" class="player-bitacora-list"></div>
                 </div>
-            </div>
-            <div class="player-map-module">
-                <button type="button" class="btn btn-small player-map-bitacora-toggle" id="player-map-markers-toggle-btn" aria-expanded="false" title="Abrir o cerrar Marcadores">🎯 Marcadores</button>
-                <div class="player-map-markers" id="player-map-markers-panel" style="display:none;">
-                <div class="player-map-markers-section">
-                    <h3 class="player-map-markers-title">✨ Crea tu marcador</h3>
-                    <div class="player-map-markers-row">
-                        <select id="player-map-free-icon" class="player-map-ubicacion-select player-map-icon-select" aria-label="Icono para marcador libre">
-                            <option value="🔥">🔥 Peligro</option>
-                            <option value="⚔️">⚔️ Batalla</option>
-                            <option value="🏕️">🏕️ Campamento</option>
-                            <option value="💎">💎 Tesoro</option>
-                            <option value="❓">❓ Misterio</option>
-                            <option value="🌟">🌟 Evento</option>
-                            <option value="🕯️">🕯️ Ritual</option>
-                            <option value="🐉">🐉 Dragón</option>
-                            <option value="👹">👹 Monstruo</option>
-                            <option value="⛩️">⛩️ Cueva/Dungeon</option>
-                            <option value="💀">💀 Muerte/Cementerio</option>
-                        </select>
-                        <input type="text" id="player-map-free-label" class="player-map-input" placeholder="Nombre del marcador" aria-label="Nombre del marcador libre">
-                        <button type="button" class="btn btn-small" onclick="createPlayerMapFreeMarker()">➕ Crear marcador</button>
-                    </div>
-                    <div class="player-map-markers-row">
-                        <h4 class="player-map-markers-subtitle">🎯 Marcadores disponibles</h4>
-                    </div>
-                    <div class="player-map-markers-row">
-                        <select id="player-map-free-existing" class="player-map-ubicacion-select" aria-label="Marcadores libres existentes">
-                            <option value="">— Marcadores creados —</option>
-                        </select>
-                        <button type="button" class="btn btn-small" id="player-map-free-toggle" onclick="startPlayerMapFreeMode()" title="Colocar marcador libre">🧭 Colocar libre</button>
-                        <button type="button" class="btn btn-small btn-secondary" id="player-map-free-save" onclick="finishPlayerMapFreePlacement()" disabled>💾 Guardar libre</button>
-                        <button type="button" class="btn btn-small btn-secondary" onclick="removePlayerMapFreeMarker()" title="Quitar marcador libre">🗑️ Quitar libre</button>
-                    </div>
-                    <p class="player-map-markers-hint" id="player-map-free-hint">Crea un marcador, selecciónalo y pulsa “Colocar libre”. Luego toca el mapa.</p>
-                </div>
-                <p class="player-map-markers-hint" id="player-map-markers-hint">Los marcadores de ciudad los coloca el DM. Pulsa “Marcadores” para gestionar tus iconos libres.</p>
             </div>
         </section>
         <section id="player-ciudades" class="tab-content">
@@ -880,6 +890,23 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('player-bitacora-note-modal')">Cerrar</button>
                 <button type="button" class="btn" onclick="saveBitacoraNoteFromModal()">💾 Guardar notas</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de confirmación (estilo app) -->
+    <div class="modal-overlay" id="app-confirm-modal">
+        <div class="modal app-confirm-modal" style="max-width: 420px;">
+            <div class="modal-header app-confirm-header">
+                <h3 id="app-confirm-modal-title" class="app-confirm-title">Confirmar</h3>
+                <button class="modal-close" onclick="closeModal('app-confirm-modal')" aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="modal-body app-confirm-body">
+                <p id="app-confirm-modal-message" class="app-confirm-message">¿Continuar?</p>
+            </div>
+            <div class="modal-footer app-confirm-footer">
+                <button type="button" class="btn btn-secondary" id="app-confirm-cancel-btn" onclick="closeModal('app-confirm-modal')">Cancelar</button>
+                <button type="button" class="btn app-confirm-do-btn" id="app-confirm-do-btn" onclick="runAppConfirmAndClose()">Aceptar</button>
             </div>
         </div>
     </div>

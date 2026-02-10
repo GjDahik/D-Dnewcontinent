@@ -4,6 +4,18 @@
 
 ---
 
+## 🚀 Cómo abrir la app (evitar CORS)
+
+Si abres `index.html` directamente (`file://`) el navegador puede bloquear el manifest y el service worker. **Sirve la carpeta por HTTP**:
+
+```bash
+npm start
+```
+
+Se abrirá en **http://localhost:3000**. Si no tienes Node, puedes usar Python: `python3 -m http.server 3000` y entrar en http://localhost:3000.
+
+---
+
 ## 🚀 Entrada y login
 
 - **`index.html`** — Punto de entrada único. DM y personajes usan el mismo enlace.

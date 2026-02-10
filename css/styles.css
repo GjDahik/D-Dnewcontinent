@@ -81,8 +81,11 @@ body {
     flex: 1 1 auto;
 }
 .nav-tabs {
-    display: flex; justify-content: center; gap: 10px;
-    margin-bottom: 30px; flex-wrap: wrap;
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
     align-items: center;
 }
 .nav-tab {
@@ -90,11 +93,15 @@ body {
     background: linear-gradient(180deg, #2a2522 0%, #1e1b18 100%);
     border: 1px solid #4a3c31;
     color: #8b7355;
-    padding: 12px 24px;
-    font-family: 'Cinzel', serif; font-size: 1em; cursor: pointer;
-    transition: all 0.3s ease; border-radius: 4px;
+    padding: 10px 14px;
+    font-family: 'Cinzel', serif;
+    font-size: 0.88em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-radius: 4px;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
 }
 
 /* Barra superior directorio: tabs centrados (PC y móvil) */
@@ -258,45 +265,18 @@ body {
     box-shadow: 0 0 10px rgba(168, 80, 80, 0.35);
 }
 
-/* Primera fila de nav: 5 botones; no se parten para evitar 3 filas */
-.nav-tabs-row1 {
-    display: flex;
-    flex-wrap: nowrap;
-    gap: 10px;
-    align-items: center;
-    min-width: 0;
-}
-/* Segunda fila de nav: Misiones, Battle Tracker, Salir (o Historial, Battle Tracker, Salir en DM) */
+/* Filas de nav: display:contents para que los 8 botones fluyan en un solo flex y el número de líneas dependa solo del ancho (igual con 100% o 125% zoom) */
+.nav-tabs-row1,
 .nav-tabs-row2 {
-    display: flex;
-    flex-wrap: nowrap;
-    gap: 10px;
-    align-items: center;
+    display: contents;
+}
+.nav-tabs .nav-tab {
+    flex-shrink: 1;
     min-width: 0;
 }
-
-/* En pantallas no tan grandes: exactamente 2 filas; nunca 3 */
 @media (max-width: 1024px) {
     .nav-tabs {
         row-gap: 12px;
-        flex-wrap: wrap;
-    }
-    .nav-tabs-row1 {
-        flex-basis: 100%;
-        justify-content: center;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        padding-bottom: 2px;
-    }
-    .nav-tabs-row1 .nav-tab {
-        flex-shrink: 0;
-    }
-    .nav-tabs-row2 {
-        flex-basis: 100%;
-        justify-content: center;
-    }
-    .nav-tabs-row2 .nav-tab {
-        flex-shrink: 0;
     }
 }
 
@@ -1741,6 +1721,55 @@ body {
     background: linear-gradient(180deg, rgba(139, 90, 43, 0.65) 0%, rgba(90, 60, 30, 0.75) 100%);
 }
 
+/* Modal confirmación genérico (estilo app) */
+.app-confirm-modal {
+    background: linear-gradient(180deg, rgba(26, 22, 18, 0.98) 0%, rgba(18, 15, 12, 0.98) 100%);
+    border: 1px solid #4a3c31;
+    box-shadow: 0 0 24px rgba(139, 90, 43, 0.2), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+.app-confirm-header {
+    border-bottom: 1px solid #4a3c31;
+    padding: 14px 18px;
+}
+.app-confirm-title {
+    margin: 0;
+    font-family: 'Cinzel', serif;
+    font-size: 1.2em;
+    color: #d4af37;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+.app-confirm-body {
+    padding: 20px 18px;
+}
+.app-confirm-message {
+    margin: 0;
+    font-size: 1.05em;
+    color: #e5ddd4;
+    line-height: 1.5;
+}
+.app-confirm-footer {
+    border-top: 1px solid #4a3c31;
+    padding: 14px 18px;
+    gap: 10px;
+}
+.app-confirm-do-btn {
+    background: linear-gradient(180deg, rgba(139, 90, 43, 0.5) 0%, rgba(90, 60, 30, 0.6) 100%);
+    border: 1px solid rgba(212, 175, 55, 0.5);
+    color: #f4e4a6;
+}
+.app-confirm-do-btn:hover {
+    background: linear-gradient(180deg, rgba(139, 90, 43, 0.65) 0%, rgba(90, 60, 30, 0.75) 100%);
+}
+.app-confirm-modal.app-confirm-modal--danger .app-confirm-do-btn {
+    background: linear-gradient(180deg, rgba(120, 40, 40, 0.6) 0%, rgba(80, 25, 25, 0.7) 100%);
+    border-color: rgba(180, 80, 80, 0.5);
+    color: #f4c4c4;
+}
+.app-confirm-modal.app-confirm-modal--danger .app-confirm-do-btn:hover {
+    background: linear-gradient(180deg, rgba(140, 50, 50, 0.7) 0%, rgba(100, 30, 30, 0.8) 100%);
+}
+
 /* Modal detalle de ítem (inventario jugador: ver toda la info como en tienda) */
 .player-inventory-detail-modal {
     background: linear-gradient(180deg, rgba(26, 22, 18, 0.98) 0%, rgba(18, 15, 12, 0.98) 100%);
@@ -1911,7 +1940,16 @@ body {
 
 .player-map-section { margin-bottom: 24px; }
 .player-section-title { font-family: 'Cinzel', serif; color: #d4af37; font-size: 1.4em; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 2px; }
-.player-map-wrap { text-align: center; background: linear-gradient(180deg, rgba(42, 42, 62, 0.9) 0%, rgba(26, 26, 46, 0.95) 100%); border: 2px solid #c9a227; border-radius: 12px; padding: 20px; }
+.player-map-wrap { position: relative; text-align: center; background: linear-gradient(180deg, rgba(42, 42, 62, 0.9) 0%, rgba(26, 26, 46, 0.95) 100%); border: 2px solid #c9a227; border-radius: 12px; padding: 20px; margin-top: 20px; }
+.player-map-listo-float {
+    position: absolute;
+    bottom: 16px;
+    right: 16px;
+    z-index: 20;
+    min-width: 52px;
+    min-height: 44px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
 .player-map-zoom-controls {
     display: flex;
     justify-content: center;
@@ -1962,6 +2000,31 @@ body {
     }
     .player-map-viewport.is-zoomed .player-map-marker-label {
         display: block;
+    }
+    /* En móvil: ocultar zoom y centrar dropdown "Mi ubicación" */
+    .player-map-below-row {
+        grid-template-columns: 1fr;
+    }
+    .player-map-below-row .player-map-ubicacion {
+        grid-column: 1;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        text-align: center;
+        width: 100%;
+    }
+    .player-map-below-row .player-map-ubicacion .player-map-ubicacion-label {
+        text-align: center;
+    }
+    .player-map-below-row .player-map-ubicacion .player-map-ubicacion-select {
+        width: auto !important;
+        max-width: 100%;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    .player-map-below-row .player-map-zoom-controls {
+        display: none !important;
     }
 }
 /* En móvil: etiquetas solo al tocar el marcador, no por zoom */
@@ -2100,18 +2163,20 @@ body {
     margin-top: 16px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 0;
     width: 100%;
     box-sizing: border-box;
 }
 .player-map-markers-section {
-    padding: 16px;
+    padding: 18px 20px;
     border-radius: 10px;
     border: 1px solid rgba(201,162,39,0.3);
     background: rgba(10, 10, 16, 0.6);
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 16px;
+    align-items: center;
+    text-align: center;
 }
 .player-map-markers-title {
     font-family: 'Cinzel', serif;
@@ -2119,12 +2184,19 @@ body {
     color: #d4af37;
     text-transform: uppercase;
     letter-spacing: 1px;
+    margin: 0 0 4px 0;
 }
 .player-map-markers-row {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 10px;
+    justify-content: center;
+    gap: 14px;
+}
+.player-map-markers-row.player-map-markers-row--spaced {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(201,162,39,0.2);
 }
 .player-map-markers-subtitle {
     margin: 0;
@@ -2133,11 +2205,23 @@ body {
     font-family: 'Cinzel', serif;
     letter-spacing: 1px;
     text-transform: uppercase;
+    min-width: 6em;
+}
+.player-map-markers .player-map-ubicacion-select {
+    min-width: 140px;
+    flex: 0 1 auto;
+    max-width: 220px;
 }
 .player-map-markers-hint {
     color: #8b7355;
     font-size: 0.85em;
-    margin: 0;
+    margin: 12px 0 0 0;
+    line-height: 1.4;
+    text-align: center;
+    max-width: 100%;
+}
+.player-map-markers-section + .player-map-markers-hint {
+    margin-top: 4px;
 }
 @media (max-width: 768px) {
     .player-map-markers .player-map-markers-row {
@@ -2173,11 +2257,32 @@ body {
     min-width: 150px;
     max-width: 220px;
 }
+/* Fila debajo del mapa: Mi ubicación (izq) + zoom centro; fuera del mapa */
+.player-map-below-row {
+    display: grid;
+    grid-template-columns: 1fr minmax(max-content, auto) 1fr;
+    align-items: center;
+    gap: 12px;
+    margin-top: 12px;
+}
+.player-map-below-row .player-map-ubicacion {
+    margin-top: 0;
+    justify-content: flex-start;
+    grid-column: 1;
+}
+.player-map-below-row .player-map-zoom-controls {
+    margin: 0;
+    width: auto;
+    min-width: max-content;
+    grid-column: 2;
+    justify-self: center;
+}
 .player-map-ubicacion {
     margin-top: 20px;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
+    justify-content: center;
     gap: 12px;
 }
 .player-map-module {
@@ -2233,6 +2338,10 @@ body {
     color: #e5ddd4;
     font-size: 1em;
 }
+/* Centrar texto del dropdown "Mi ubicación" debajo del mapa */
+.player-map-ubicacion .player-map-ubicacion-select {
+    text-align: center;
+}
 .player-map-ubicacion-select:focus {
     outline: none;
     border-color: #c9a227;
@@ -2249,6 +2358,7 @@ body {
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
     width: 100%;
     box-sizing: border-box;
+    text-align: center;
 }
 .player-map-rutas-title {
     font-family: 'Cinzel', serif;
@@ -2256,45 +2366,60 @@ body {
     font-size: 1.2em;
     margin: 0 0 10px 0;
     letter-spacing: 0.05em;
+    text-transform: uppercase;
 }
 .player-map-rutas-desc {
     color: #8b7355;
     font-size: 0.9em;
-    margin: 0 0 20px 0;
-    line-height: 1.4;
+    margin: 0 0 24px 0;
+    line-height: 1.5;
+    max-width: 420px;
+    margin-left: auto;
+    margin-right: auto;
 }
 .player-map-rutas-form {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 14px 20px;
-    margin-bottom: 20px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 18px 24px;
+    margin-bottom: 24px;
 }
 .player-map-rutas-form label {
     color: #a89878;
     font-size: 0.9em;
     display: block;
-    margin-bottom: 4px;
+    margin-bottom: 6px;
+    text-align: center;
+}
+.player-map-rutas-form .player-ruta-field {
+    min-width: 160px;
+    max-width: 220px;
+    flex: 1 1 160px;
 }
 .player-ruta-select {
-    padding: 10px 14px;
+    padding: 12px 14px;
     background: rgba(0, 0, 0, 0.4);
     border: 1px solid #4a3c31;
     border-radius: 8px;
     color: #e5ddd4;
     font-size: 1em;
     width: 100%;
+    text-align: center;
+    box-sizing: border-box;
 }
 .player-ruta-select:focus {
     outline: none;
     border-color: #8b5a2b;
 }
 .player-map-rutas-result {
-    padding: 16px 18px;
+    padding: 18px 20px;
     background: rgba(0, 0, 0, 0.35);
     border-radius: 10px;
     color: #8b7355;
     font-style: italic;
     border: 1px solid rgba(74, 60, 49, 0.6);
+    text-align: center;
+    line-height: 1.5;
 }
 .player-map-rutas-result-ok {
     color: #c9a227;

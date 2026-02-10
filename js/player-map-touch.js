@@ -101,6 +101,7 @@
         viewport.addEventListener('touchend', function (e) {
             if (e.changedTouches.length !== 1) return;
             if (typeof playerMapPlaceMode !== 'undefined' && playerMapPlaceMode) return;
+            if (typeof playerMapMoveMode !== 'undefined' && playerMapMoveMode) return;
             var tc = e.changedTouches[0];
             var dt = Date.now() - touchStart.t;
             var dx = Math.abs(tc.clientX - touchStart.x);
