@@ -366,10 +366,22 @@ async function handleLogin() {
     if (success) {
         updateFooterTagline();
         closeModal('login-modal');
-        if (userType === 'dm') {
-            showDashboard();
+        var transitionEl = document.getElementById('fire-transition-screen');
+        if (transitionEl) {
+            transitionEl.classList.add('active');
+            transitionEl.setAttribute('aria-hidden', 'false');
+            setTimeout(function () {
+                transitionEl.classList.remove('active');
+                transitionEl.setAttribute('aria-hidden', 'true');
+                if (userType === 'dm') {
+                    showDashboard();
+                } else {
+                    showPlayerView();
+                }
+            }, 2200);
         } else {
-            showPlayerView();
+            if (userType === 'dm') showDashboard();
+            else showPlayerView();
         }
     }
 }
@@ -2922,6 +2934,84 @@ async function confirmRegistrarEncontrado() {
     } catch (e) {
         showToast('Error al registrar: ' + (e.message || e), true);
     }
+}
+
+/** Dispara la animación de fuego en el icono de la app al entrar (DM o jugador). container = elemento con id main-container o player-view-container. */
+function playAppIconFireEntrance(container) {
+    if (!container || !container.querySelector) {
+        container = document.getElementById('main-container');
+        if (!container || container.style.display === 'none') container = document.getElementById('player-view-container');
+    }
+    if (!container) return;
+    var icon = container.querySelector('.app-brand-icon');
+    if (!icon) return;
+    function run() {
+        icon.classList.remove('app-brand-icon--fire-entrance');
+        icon.offsetHeight;
+        icon.classList.add('app-brand-icon--fire-entrance');
+        var onEnd = function () {
+            icon.classList.remove('app-brand-icon--fire-entrance');
+            icon.removeEventListener('animationend', onEnd);
+        };
+        icon.addEventListener('animationend', onEnd);
+    }
+    setTimeout(function () { requestAnimationFrame(function () { requestAnimationFrame(run); }); }, 120);
+}
+
+var _d20RestoreTimeoutId = null;
+var _d20RollIntervalId = null;
+var D20_ROLLING_MS = 2000;
+var D20_RESULT_SHOW_MS = 1500;
+/** Probabilidad de que salga 11-20 (por defecto 0.7 = 70 %). Con 0.5 sería dado justo. */
+var D20_BIAS_HIGH = 0.7;
+
+/** Devuelve un número del 1 al 20 con más probabilidad para 11-20. */
+function rollBiasedD20() {
+    if (Math.random() < D20_BIAS_HIGH) return 11 + Math.floor(Math.random() * 10);
+    return 1 + Math.floor(Math.random() * 10);
+}
+
+/** Tirada d20: ~2 s de animación (números girando) y luego resultado fijo ~1.5 s. */
+function rollHeaderD20(iconEl) {
+    if (!iconEl || !iconEl.closest) return;
+    var brand = iconEl.closest('.app-brand');
+    if (!brand) return;
+    var d20El = brand.querySelector('.app-brand-d20');
+    var valueEl = brand.querySelector('.app-brand-d20-value');
+    if (!d20El || !valueEl) return;
+    if (_d20RestoreTimeoutId != null) {
+        clearTimeout(_d20RestoreTimeoutId);
+        _d20RestoreTimeoutId = null;
+    }
+    if (_d20RollIntervalId != null) {
+        clearInterval(_d20RollIntervalId);
+        _d20RollIntervalId = null;
+    }
+    document.querySelectorAll('.app-brand.is-d20').forEach(function (b) {
+        b.classList.remove('is-d20');
+        var d = b.querySelector('.app-brand-d20');
+        if (d) { d.classList.remove('is-visible', 'is-rolling'); }
+    });
+    var roll = rollBiasedD20();
+    valueEl.textContent = Math.floor(Math.random() * 20) + 1;
+    d20El.classList.add('is-visible', 'is-rolling');
+    brand.classList.add('is-d20');
+    _d20RollIntervalId = setInterval(function () {
+        valueEl.textContent = Math.floor(Math.random() * 20) + 1;
+    }, 80);
+    setTimeout(function () {
+        if (_d20RollIntervalId != null) {
+            clearInterval(_d20RollIntervalId);
+            _d20RollIntervalId = null;
+        }
+        valueEl.textContent = roll;
+        d20El.classList.remove('is-rolling');
+        _d20RestoreTimeoutId = setTimeout(function () {
+            _d20RestoreTimeoutId = null;
+            d20El.classList.remove('is-visible');
+            brand.classList.remove('is-d20');
+        }, D20_RESULT_SHOW_MS);
+    }, D20_ROLLING_MS);
 }
 
 function showPlayerView() {
@@ -6299,7 +6389,13 @@ function refreshDMData() {
 // ==================== INITIALIZE ====================
 document.addEventListener('DOMContentLoaded', function() {
     updateFooterTagline();
-    document.addEventListener('click', function() {
+    document.addEventListener('click', function(e) {
+        var icon = e.target && e.target.closest && e.target.closest('.app-brand-icon');
+        if (icon) {
+            e.preventDefault();
+            if (typeof rollHeaderD20 === 'function') rollHeaderD20(icon);
+            return;
+        }
         if (typeof closeAllInvActionsMenus === 'function') closeAllInvActionsMenus();
     });
     document.addEventListener('keydown', function (e) {

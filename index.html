@@ -31,7 +31,8 @@
                 </div>
                 <div class="header-actions">
                     <div class="app-brand">
-                        <img src="./icons/icon-192.png" alt="DragonKeep" class="app-brand-icon">
+                        <img src="./icons/icon-192.png" alt="DragonKeep" class="app-brand-icon" title="Clic para tirar d20">
+                        <span class="app-brand-d20" aria-hidden="true"><span class="app-brand-d20-value"></span></span>
                         <span class="app-brand-name">DragonKeep</span>
                     </div>
                     <div class="header-actions-right">
@@ -364,7 +365,8 @@
                 </div>
                 <div class="header-actions">
                     <div class="app-brand">
-                        <img src="./icons/icon-192.png" alt="DragonKeep" class="app-brand-icon">
+                        <img src="./icons/icon-192.png" alt="DragonKeep" class="app-brand-icon" title="Clic para tirar d20">
+                        <span class="app-brand-d20" aria-hidden="true"><span class="app-brand-d20-value"></span></span>
                         <span class="app-brand-name">DragonKeep</span>
                     </div>
                     <div class="header-actions-right">
@@ -2976,6 +2978,13 @@
                 <button class="btn btn-secondary" onclick="closeModal('item-modal')">Cancelar</button>
                 <button class="btn" onclick="saveItem()">💾 Guardar</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Pantalla de transición (fuego) entre login y app -->
+    <div class="fire-transition-screen" id="fire-transition-screen" aria-hidden="true">
+        <div class="fire-transition-inner">
+            <img src="./icons/icon-192.png" alt="" class="fire-transition-icon" id="fire-transition-icon">
         </div>
     </div>
 
