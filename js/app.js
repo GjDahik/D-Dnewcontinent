@@ -368,11 +368,13 @@ async function handleLogin() {
         closeModal('login-modal');
         var transitionEl = document.getElementById('fire-transition-screen');
         if (transitionEl) {
+            transitionEl.style.display = '';
             transitionEl.classList.add('active');
             transitionEl.setAttribute('aria-hidden', 'false');
             setTimeout(function () {
                 transitionEl.classList.remove('active');
                 transitionEl.setAttribute('aria-hidden', 'true');
+                transitionEl.style.display = 'none';
                 if (userType === 'dm') {
                     showDashboard();
                 } else {
@@ -424,14 +426,18 @@ function showCreateDMModal() {
 }
 
 function showLoginModal() {
-    document.getElementById('login-nombre').value = '';
-    document.getElementById('login-pin').value = '';
-    const typeEl = document.getElementById('login-user-type');
+    var loginNombre = document.getElementById('login-nombre');
+    var loginPin = document.getElementById('login-pin');
+    if (loginNombre) loginNombre.value = '';
+    if (loginPin) loginPin.value = '';
+    var typeEl = document.getElementById('login-user-type');
     if (typeEl) typeEl.value = 'dm';
-    document.getElementById('main-container').style.display = 'none';
-    const pv = document.getElementById('player-view-container');
+    var main = document.getElementById('main-container');
+    if (main) main.style.display = 'none';
+    var pv = document.getElementById('player-view-container');
     if (pv) pv.style.display = 'none';
-    document.getElementById('login-modal').classList.add('active');
+    var loginModal = document.getElementById('login-modal');
+    if (loginModal) loginModal.classList.add('active');
     if (typeof toggleLoginFields === 'function') toggleLoginFields();
 }
 
@@ -2438,6 +2444,17 @@ function openUseItemConfirmStack(indicesStr) {
 function doConfirmedUseItem() {
     if (!_pendingUseAction) { closeModal('player-use-item-confirm-modal'); return; }
     var a = _pendingUseAction;
+    var inv = lastPlayerViewData && lastPlayerViewData.inventario ? lastPlayerViewData.inventario : [];
+    var item = null;
+    if (a.type === 'single' && inv[a.index]) item = inv[a.index];
+    if (a.type === 'stack' && a.indicesStr) {
+        var idx = parseInt(String(a.indicesStr).split(',')[0], 10);
+        if (!isNaN(idx) && inv[idx]) item = inv[idx];
+    }
+    var user = getCurrentUser();
+    if (item && user && typeof runAutomationRulesForPlayerUse === 'function') {
+        runAutomationRulesForPlayerUse(user.id, item, user.nombre || 'Jugador');
+    }
     var qtyInput = document.getElementById('player-use-qty');
     var qty = (qtyInput && qtyInput.value !== '') ? Math.max(1, parseInt(qtyInput.value, 10) || 1) : 1;
     var maxVal = qtyInput ? (parseInt(qtyInput.getAttribute('max'), 10) || qty) : qty;

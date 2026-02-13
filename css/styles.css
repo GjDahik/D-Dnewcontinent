@@ -1230,6 +1230,49 @@ body {
     border: 1px solid #5a4a4a;
     margin-bottom: 8px;
 }
+
+/* Badge "Disparada" en reglas de Análisis de objetos (ya ejecutadas una vez) */
+.rule-triggered-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.7em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #8b7355;
+    background: rgba(184, 134, 11, 0.2);
+    border: 1px solid #8b6914;
+}
+
+/* Tabs en modal Ver reglas (Todas / Pendientes / Disparadas) */
+.ver-reglas-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 10px;
+}
+.ver-reglas-tab {
+    flex: 1;
+    padding: 8px 12px;
+    font-size: 0.9em;
+    border: 1px solid #4a3c31;
+    border-radius: 6px;
+    background: rgba(30, 27, 24, 0.8);
+    color: #8b7355;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+.ver-reglas-tab:hover {
+    background: rgba(74, 60, 49, 0.4);
+    color: #d4c4a8;
+    border-color: #6a5a4a;
+}
+.ver-reglas-tab.active {
+    background: rgba(184, 134, 11, 0.25);
+    border-color: #8b6914;
+    color: #d4af37;
+}
+
 .player-visibility-visible {
     background: linear-gradient(180deg, rgba(90, 120, 90, 0.35) 0%, rgba(60, 90, 60, 0.25) 100%);
     border: 1px solid #5a7a5a;
@@ -2940,6 +2983,8 @@ body {
 .player-mistfall-shop-desc { color: #7a6a5a; font-size: 0.9em; font-style: italic; word-wrap: break-word; overflow-wrap: break-word; }
 .player-mistfall-shop-enter { font-family: 'Cinzel', serif; color: #c9a868; font-size: 0.85em; letter-spacing: 2px; margin-top: 10px; opacity: 0.8; }
 .player-mistfall-shop-card:hover .player-mistfall-shop-enter { opacity: 1; }
+.player-traveling-shop-blocked { opacity: 0.85; cursor: not-allowed; }
+.player-traveling-shop-blocked:hover { transform: none; border-color: #3a2a1a; }
 /* Colores por tipo de tienda */
 .player-mistfall-shop-pociones { --shop-accent: #9b7bb8; --shop-glow: rgba(155,123,184,0.3); }
 .player-mistfall-shop-herreria { --shop-accent: #c87941; --shop-glow: rgba(200,121,65,0.3); }
@@ -3199,6 +3244,13 @@ body {
 .player-shop-search-wrap.expanded .player-shop-search-row {
     display: block;
 }
+/* Modal Análisis de objetos: fila de búsqueda en flex (nombre + rareza lado a lado) solo cuando está expandido */
+#player-analisis-objetos-search-wrap.expanded .player-analisis-search-row {
+    display: flex !important;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: flex-end;
+}
 /* Filtros (TODAS, COMÚN, pestañas, etc.) dentro del wrap: ocultos por defecto, visibles al expandir */
 .player-shop-search-wrap .player-shop-filters {
     display: none;
@@ -3409,6 +3461,16 @@ body {
         padding: 10px; 
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
+    }
+    /* Ocultar barra de scroll en móvil para que parezca app nativa */
+    html, body {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+    html::-webkit-scrollbar, body::-webkit-scrollbar {
+        display: none;
+        width: 0;
+        height: 0;
     }
 
     /* En móvil: header = barra fija arriba siempre; placa debajo en el contenido */
@@ -3688,7 +3750,7 @@ body {
         margin: 10px; 
         max-height: 95vh; 
     }
-    /* Modales de tienda: overlay sin padding para pantalla completa */
+    /* Modales de tienda: estilo tipo Santuario — caja centrada, bordes redondeados (sí pueden tapar el header) */
     #player-artesanias-modal.modal-overlay.active,
     #player-emporio-modal.modal-overlay.active,
     #player-forge-modal.modal-overlay.active,
@@ -3698,10 +3760,12 @@ body {
     #player-posada-modal.modal-overlay.active,
     #player-batalla-modal.modal-overlay.active,
     #player-shop-catalog-modal.modal-overlay.active {
-        padding: 0;
-        align-items: stretch;
+        padding: 12px;
+        align-items: flex-start;
+        justify-content: center;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
     }
-    /* Modales de tienda: pantalla completa en móvil */
     #player-artesanias-modal .modal,
     #player-emporio-modal .modal,
     #player-forge-modal .modal,
@@ -3712,16 +3776,15 @@ body {
     #player-batalla-modal .modal,
     #player-shop-catalog-modal .modal {
         width: 100%;
-        max-width: 100%;
-        height: 100%;
-        max-height: 100%;
-        margin: 0;
-        border-radius: 0;
-        border-left: none;
-        border-right: none;
+        max-width: 500px;
+        max-height: calc(100vh - 24px);
+        margin: 0 auto;
+        border-radius: 8px;
+        border: 1px solid #8b5a2b;
         display: flex;
         flex-direction: column;
         overflow: hidden;
+        flex-shrink: 0;
     }
     #player-artesanias-modal .modal-body,
     #player-emporio-modal .modal-body,
@@ -4298,4 +4361,25 @@ body {
         height: auto !important;
         display: block;
     }
+}
+
+/* Barra de progreso en Análisis de objetos (jugador) */
+.analisis-progress-wrap {
+    width: 100%;
+    height: 8px;
+    background: rgba(0,0,0,0.4);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 10px;
+}
+.analisis-progress-bar {
+    height: 100%;
+    width: 40%;
+    background: linear-gradient(90deg, #8b5a2b, #c9a227);
+    border-radius: 4px;
+    animation: analisis-progress-slide 1.2s ease-in-out infinite;
+}
+@keyframes analisis-progress-slide {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(350%); }
 }

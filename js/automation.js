@@ -11,13 +11,136 @@ function automationItemSignature(it) {
     return n + '|' + e + '|' + String(p);
 }
 
+const SOURCE_TRAVELING_ANALISIS = 'traveling_analisis';
+
 /** Obtiene reglas para una tienda (o todas). */
 async function automationGetRules(shopId) {
     const snap = await db.collection('automation_rules')
         .where('shopId', '==', shopId)
         .limit(50)
         .get();
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        .filter(r => !r.sourceType || r.sourceType === 'shop');
+}
+
+/** Reglas de tienda ambulante tipo Análisis de objetos (por jugador + ítem al usar). */
+async function getTravelingAnalisisRules(travelingShopId) {
+    if (!travelingShopId) return [];
+    const snap = await db.collection('automation_rules')
+        .where('sourceType', '==', SOURCE_TRAVELING_ANALISIS)
+        .where('travelingShopId', '==', travelingShopId)
+        .limit(50)
+        .get();
     return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+/** playerId opcional: si es null o '__all__', la regla aplica a cualquier jugador. */
+const TRAVELING_ANALISIS_ANY_PLAYER = '__all__';
+
+/** Crea regla de Análisis de objetos (jugador usa ítem → mensaje y/o misión). */
+async function createTravelingAnalisisRule(travelingShopId, playerId, item, message, missionId) {
+    const payload = {
+        sourceType: SOURCE_TRAVELING_ANALISIS,
+        travelingShopId: String(travelingShopId),
+        playerId: playerId && String(playerId).trim() && String(playerId) !== TRAVELING_ANALISIS_ANY_PLAYER ? String(playerId) : TRAVELING_ANALISIS_ANY_PLAYER,
+        itemName: (item.name || item.title || '').trim(),
+        itemEffect: (item.effect || item.desc || '').trim(),
+        itemPrice: item.price != null ? Number(item.price) : null,
+        message: (message || '').trim(),
+        missionId: (missionId && String(missionId).trim()) || null,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    await db.collection('automation_rules').add(payload);
+}
+
+/** Actualiza una regla de Análisis de objetos (solo campos editables; no toca triggeredOnce). */
+async function updateTravelingAnalisisRule(ruleId, travelingShopId, playerId, item, message, missionId) {
+    const payload = {
+        travelingShopId: String(travelingShopId),
+        playerId: playerId && String(playerId).trim() && String(playerId) !== TRAVELING_ANALISIS_ANY_PLAYER ? String(playerId) : TRAVELING_ANALISIS_ANY_PLAYER,
+        itemName: (item.name || item.title || '').trim(),
+        itemEffect: (item.effect || item.desc || '').trim(),
+        itemPrice: item.price != null ? Number(item.price) : null,
+        message: (message || '').trim(),
+        missionId: (missionId && String(missionId).trim()) || null,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    await db.collection('automation_rules').doc(ruleId).update(payload);
+}
+
+/** Reglas por uso de ítem (jugador): traveling_analisis para ese jugador o para cualquier jugador. */
+async function automationGetRulesForPlayerUse(playerId) {
+    const [snapPlayer, snapAll] = await Promise.all([
+        db.collection('automation_rules')
+            .where('sourceType', '==', SOURCE_TRAVELING_ANALISIS)
+            .where('playerId', '==', String(playerId))
+            .limit(50)
+            .get(),
+        db.collection('automation_rules')
+            .where('sourceType', '==', SOURCE_TRAVELING_ANALISIS)
+            .where('playerId', '==', TRAVELING_ANALISIS_ANY_PLAYER)
+            .limit(50)
+            .get()
+    ]);
+    const list = snapPlayer.docs.concat(snapAll.docs).map(d => ({ id: d.id, ...d.data() }));
+    return list;
+}
+
+/** Ejecuta reglas cuando el jugador usa un ítem (reglas de Análisis de objetos). Cada regla solo se dispara una vez por ítem (en total).
+ * @param {string} [travelingShopId] - Si se pasa, solo se aplican reglas de esta tienda ambulante.
+ * @returns {Promise<boolean|string>} true si se aplicó, 'already_triggered' si ya se había disparado antes, false si no hay regla.
+ */
+async function runAutomationRulesForPlayerUse(playerId, item, playerName, travelingShopId) {
+    if (!playerId || !item) return false;
+    let rules = await automationGetRulesForPlayerUse(playerId);
+    if (travelingShopId) rules = rules.filter(r => String(r.travelingShopId || '') === String(travelingShopId));
+    if (!rules.length) return false;
+    const sig = automationItemSignature(item);
+    const rule = rules.find(r => automationItemSignature({
+        name: r.itemName,
+        effect: r.itemEffect,
+        price: r.itemPrice
+    }) === sig);
+    if (!rule) return false;
+    if (!rule.message && !rule.missionId) return false;
+    if (rule.triggeredOnce === true) return 'already_triggered';
+    if (rule.message) {
+        try {
+            await db.collection('notifications').add({
+                mensaje: rule.message,
+                enviadoPor: 'automation',
+                fecha: firebase.firestore.FieldValue.serverTimestamp(),
+                leida: false,
+                playerId,
+                playerName: playerName || 'Jugador'
+            });
+        } catch (e) { console.error('Automation: error enviando notificación', e); }
+    }
+    if (rule.missionId) {
+        try {
+            const missionRef = db.collection('missions').doc(rule.missionId);
+            const missionSnap = await missionRef.get();
+            if (missionSnap.exists) {
+                const d = missionSnap.data();
+                const assigned = Array.isArray(d.assignedPlayerIds) ? [...d.assignedPlayerIds] : [];
+                const pid = String(playerId);
+                if (assigned.indexOf(pid) === -1) assigned.push(pid);
+                const updates = {
+                    assignedPlayerIds: assigned,
+                    visibleTo: 'player',
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                if ((d.status || '').toString().toLowerCase() === 'draft') updates.status = 'visible';
+                await missionRef.update(updates);
+            }
+        } catch (e) { console.error('Automation: error haciendo visible la misión', e); }
+    }
+    try {
+        await db.collection('automation_rules').doc(rule.id).update({
+            triggeredOnce: true
+        });
+    } catch (e) { console.error('Automation: error guardando triggeredOnce', e); }
+    return true;
 }
 
 /**
@@ -178,9 +301,21 @@ function getPosadaRooms(shop) {
     return def;
 }
 
+/** Carga todas las tiendas desde Firestore si shopsData está vacío (para que los dropdowns tengan datos). */
+function ensureShopsLoadedForAutomation() {
+    const sh = (typeof window.shopsData !== 'undefined' ? window.shopsData : (typeof shopsData !== 'undefined' ? shopsData : [])) || [];
+    if (sh.length > 0) return Promise.resolve();
+    if (typeof db === 'undefined') return Promise.resolve();
+    return db.collection('shops').limit(400).get().then(snap => {
+        const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        window.shopsData = list;
+        if (typeof shopsData !== 'undefined') { try { shopsData = list; } catch (e) {} }
+    }).catch(() => {});
+}
+
 /** Tiendas que pueden tener reglas: con inventario (pociones, forja, etc.) o posadas (cuartos). */
 function automationShopsForRules() {
-    const sh = (typeof shopsData !== 'undefined' ? shopsData : []) || [];
+    const sh = (typeof window.shopsData !== 'undefined' ? window.shopsData : (typeof shopsData !== 'undefined' ? shopsData : [])) || [];
     return sh.filter(s => {
         const t = (s.tipo || '').toLowerCase();
         if (AUTOMATION_NO_INV.includes(t)) return false;
@@ -195,7 +330,7 @@ function loadAutomationRulesList() {
     if (!el) return;
     el.innerHTML = '<p style="color:#8b7355; text-align:center; padding:20px;">Cargando reglas...</p>';
     loadAllAutomationRules().then(async rules => {
-        const sh = (typeof shopsData !== 'undefined' ? shopsData : []) || [];
+        const sh = (typeof window.shopsData !== 'undefined' ? window.shopsData : (typeof shopsData !== 'undefined' ? shopsData : [])) || [];
         const shopName = id => (sh.find(s => s.id === id) || {}).nombre || '?';
         const shopTipo = id => (sh.find(s => s.id === id) || {}).tipo || '';
         if (!rules.length) {
@@ -272,6 +407,12 @@ function openAutomationRuleModal(ruleForEdit) {
     const titleEl = document.getElementById('automation-rule-modal-title');
     if (!shopSel || !itemSel || !msgEl || !removeEl) return;
 
+    ensureShopsLoadedForAutomation().then(() => {
+        _openAutomationRuleModalInner(ruleForEdit, shopSel, itemSel, msgEl, removeEl, removeWrap, missionSel, titleEl);
+    });
+}
+
+function _openAutomationRuleModalInner(ruleForEdit, shopSel, itemSel, msgEl, removeEl, removeWrap, missionSel, titleEl) {
     const shops = automationShopsForRules();
     const isEdit = !!ruleForEdit;
     _editingRuleId = isEdit ? ruleForEdit.id : null;
@@ -402,3 +543,9 @@ window.loadAutomationRulesList = loadAutomationRulesList;
 window.deleteAutomationRule = deleteAutomationRule;
 window.deleteAutomationRuleThenReload = deleteAutomationRuleThenReload;
 window.runAutomationRules = runAutomationRules;
+window.getTravelingAnalisisRules = getTravelingAnalisisRules;
+window.createTravelingAnalisisRule = createTravelingAnalisisRule;
+window.updateTravelingAnalisisRule = updateTravelingAnalisisRule;
+window.runAutomationRulesForPlayerUse = runAutomationRulesForPlayerUse;
+window.automationItemSignature = automationItemSignature;
+window.getPosadaRooms = getPosadaRooms;

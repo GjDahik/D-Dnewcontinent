@@ -50,6 +50,7 @@
                 <button class="nav-tab nav-tab-type-map active" data-tab="map">🗺️ Mapa</button>
                 <button class="nav-tab nav-tab-type-players" data-tab="players">👥 Jugadores</button>
                 <button class="nav-tab nav-tab-type-cities" data-tab="cities">🏘️ Ciudades/Pueblos</button>
+                <button class="nav-tab nav-tab-type-traveling-shops" data-tab="traveling-shops">🛒 Tiendas ambulantes</button>
                 <button class="nav-tab nav-tab-type-notifications" data-tab="notifications">📮 Notificaciones</button>
                 <button class="nav-tab nav-tab-type-missions" data-tab="missions">📋 Misiones</button>
             </div>
@@ -213,6 +214,16 @@
                 <button class="btn" onclick="openCityModal()">+ Nueva Ciudad</button>
             </div>
             <div id="cities-container"></div>
+        </section>
+
+        <!-- TIENDAS AMBULANTES (DM) -->
+        <section id="traveling-shops" class="tab-content">
+            <div class="section-header">
+                <h2>🛒 Tiendas ambulantes</h2>
+                <button type="button" class="btn" onclick="openTravelingShopModal()">+ Nueva tienda ambulante</button>
+            </div>
+            <p style="color:#8b7355; margin-bottom:16px;">Tiendas que los jugadores ven en su app. En Editar puedes marcar la tienda como visible o invisible para los jugadores (si está invisible, no pueden entrar).</p>
+            <div id="traveling-shops-container" class="cards-grid"></div>
         </section>
 
         <!-- NOTIFICACIONES (misma estructura que Cartas del jugador) -->
@@ -383,6 +394,7 @@
             <div class="nav-tabs-row1">
                 <button class="nav-tab nav-tab-type-map active" data-tab="player-map">🗺️ Mapa</button>
                 <button class="nav-tab nav-tab-type-cities" data-tab="player-ciudades">🏛️ Ciudades</button>
+                <button class="nav-tab nav-tab-type-traveling-shops" data-tab="player-traveling-shops">🛒 Tiendas ambulantes</button>
                 <button class="nav-tab nav-tab-type-inventario" data-tab="player-inventario">🎒 Inventario</button>
                 <button class="nav-tab nav-tab-type-cdd" data-tab="player-notifications">🃏 CDD & Correo<span class="nav-badge nav-badge-mail nav-badge--hidden" id="mail-unread-badge" aria-label="Correos sin leer"></span></button>
                 <button class="nav-tab nav-tab-type-home" data-tab="player-home" title="Ver mi hogar">🏠 Hogar</button>
@@ -546,6 +558,14 @@
                     <div id="player-directorio-habitantes-npcs-grid" class="player-mistfall-npcs-grid"></div>
                 </div>
             </div>
+        </section>
+        <section id="player-traveling-shops" class="tab-content">
+            <div class="section-header">
+                <h2>🛒 Tiendas ambulantes</h2>
+                <button type="button" class="btn btn-small btn-secondary" onclick="if(typeof fetchTravelingShopsPlayer==='function')fetchTravelingShopsPlayer();if(typeof showToast==='function')showToast('Lista actualizada');">🔄 Actualizar</button>
+            </div>
+            <p style="color:#8b7355; margin-bottom:16px;">Tiendas que recorren el mundo. Solo puedes entrar cuando estén &quot;Cerca de ti&quot;.</p>
+            <div id="player-traveling-shops-container" class="cards-grid"></div>
         </section>
         <section id="player-inventario" class="tab-content">
             <div class="section-header">
@@ -2981,8 +3001,8 @@
         </div>
     </div>
 
-    <!-- Pantalla de transición (fuego) entre login y app -->
-    <div class="fire-transition-screen" id="fire-transition-screen" aria-hidden="true">
+    <!-- Pantalla de transición (fuego) entre login y app; oculta por defecto para no verse al refrescar -->
+    <div class="fire-transition-screen" id="fire-transition-screen" aria-hidden="true" style="display: none;">
         <div class="fire-transition-inner">
             <img src="./icons/icon-192.png" alt="" class="fire-transition-icon" id="fire-transition-icon">
         </div>
@@ -3020,6 +3040,205 @@
             </div>
             <div class="modal-footer">
                 <button class="btn" onclick="handleLogin()">🔐 Iniciar Sesión</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Tienda ambulante (DM: crear/editar) -->
+    <div class="modal-overlay" id="traveling-shop-modal">
+        <div class="modal" style="max-width: 520px;">
+            <div class="modal-header">
+                <h3 id="traveling-shop-modal-title">🛒 Nueva tienda ambulante</h3>
+                <button class="modal-close" onclick="closeModal('traveling-shop-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="traveling-shop-modal-id" value="">
+                <div class="form-group">
+                    <label>Nombre</label>
+                    <input type="text" id="traveling-shop-modal-nombre" class="searchbar" placeholder="Ej: El carromato del buhonero">
+                </div>
+                <div class="form-group">
+                    <label>Tipo de tienda</label>
+                    <select id="traveling-shop-modal-tipo" class="searchbar" onchange="if(typeof travelingShopModalToggleTipo==='function')travelingShopModalToggleTipo()">
+                        <option value="catalogo">Catálogo (vende ítems)</option>
+                        <option value="analisis_objetos">Análisis de objetos (analiza el inventario del personaje, no vende)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Imagen (URL de Imgur)</label>
+                    <input type="url" id="traveling-shop-modal-imagen" class="searchbar" placeholder="https://i.imgur.com/...">
+                </div>
+                <div class="form-group">
+                    <label><input type="checkbox" id="traveling-shop-modal-visible" checked> Visible para jugadores (si no está marcada, la tienda desaparece de la lista del jugador)</label>
+                </div>
+                <div class="form-group">
+                    <label>Ubicación (solo cambia si pueden entrar o no; la tienda sigue en la lista si está visible)</label>
+                    <select id="traveling-shop-modal-locacion" class="searchbar">
+                        <option value="Locación desconocida">Locación desconocida (no pueden entrar)</option>
+                        <option value="Cerca de ti">Cerca de ti (pueden entrar)</option>
+                    </select>
+                </div>
+                <div class="form-group" id="traveling-shop-modal-catalogo-wrap">
+                    <label>Catálogo (ítems que vende)</label>
+                    <div id="traveling-shop-modal-inventario-list"></div>
+                    <button type="button" class="btn btn-small btn-secondary" onclick="travelingShopModalAddItem()" style="margin-top:8px;">+ Añadir ítem</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('traveling-shop-modal')">Cancelar</button>
+                <button class="btn" onclick="saveTravelingShopModal()">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Ver reglas (tienda Análisis de objetos: lista + Añadir regla) -->
+    <div class="modal-overlay" id="traveling-shop-ver-reglas-modal">
+        <div class="modal" style="max-width: 520px;">
+            <div class="modal-header">
+                <h3 id="traveling-shop-ver-reglas-title">🤖 Reglas</h3>
+                <button class="modal-close" onclick="closeModal('traveling-shop-ver-reglas-modal'); if(typeof window._travelingShopVerReglasShopId!=='undefined'){window._travelingShopVerReglasShopId=null;}">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="traveling-shop-ver-reglas-shop-id" value="">
+                <p style="color:#8b7355; font-size:0.9em; margin-bottom:12px;">Al usar un objeto del inventario del jugador que coincida con la regla, se enviará un mensaje y/o se activará una misión.</p>
+                <div class="ver-reglas-tabs" role="tablist">
+                    <button type="button" class="ver-reglas-tab active" role="tab" aria-selected="true" data-filter="all" onclick="typeof setVerReglasFilter==='function'&&setVerReglasFilter('all')">Todas</button>
+                    <button type="button" class="ver-reglas-tab" role="tab" aria-selected="false" data-filter="pending" onclick="typeof setVerReglasFilter==='function'&&setVerReglasFilter('pending')">Pendientes</button>
+                    <button type="button" class="ver-reglas-tab" role="tab" aria-selected="false" data-filter="triggered" onclick="typeof setVerReglasFilter==='function'&&setVerReglasFilter('triggered')">Disparadas</button>
+                </div>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <input type="text" id="traveling-shop-ver-reglas-search" class="searchbar" placeholder="🔍 Buscar por objeto o mensaje..." aria-label="Filtrar reglas" oninput="typeof applyVerReglasFilter==='function'&&applyVerReglasFilter()">
+                </div>
+                <div id="traveling-shop-ver-reglas-list" class="mini-cards" style="max-height:260px; overflow-y:auto; margin-bottom:12px;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="if(typeof openAddRuleFromVerReglas==='function')openAddRuleFromVerReglas()">+ Añadir regla</button>
+                <button class="btn" onclick="closeModal('traveling-shop-ver-reglas-modal'); if(typeof window._travelingShopVerReglasShopId!=='undefined'){window._travelingShopVerReglasShopId=null;}">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Añadir regla (tienda Análisis de objetos) -->
+    <div class="modal-overlay" id="traveling-analisis-rule-modal">
+        <div class="modal" style="max-width: 520px;">
+            <div class="modal-header">
+                <h3 id="traveling-analisis-rule-modal-title">🤖 Añadir regla</h3>
+                <button class="modal-close" onclick="closeModal('traveling-analisis-rule-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="traveling-analisis-rule-shop-id" value="">
+                <input type="hidden" id="traveling-analisis-rule-edit-id" value="">
+                <div class="form-group">
+                    <label>Origen del objeto</label>
+                    <select id="traveling-analisis-rule-source" class="searchbar">
+                        <option value="player">Inventario de un jugador</option>
+                        <option value="city_shop">Inventario de una tienda (ciudad)</option>
+                        <option value="traveling_shop">Inventario de una tienda ambulante</option>
+                    </select>
+                </div>
+                <div id="traveling-analisis-rule-block-player" class="traveling-analisis-rule-block">
+                    <div class="form-group">
+                        <label>Jugador</label>
+                        <select id="traveling-analisis-rule-player" class="searchbar">
+                            <option value="">— Elige un jugador —</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Objeto del inventario (al usarlo se dispara la regla)</label>
+                        <select id="traveling-analisis-rule-item" class="searchbar">
+                            <option value="">— Elige primero un jugador —</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="traveling-analisis-rule-block-city_shop" class="traveling-analisis-rule-block" style="display: none;">
+                    <div class="form-group">
+                        <label>Ciudad</label>
+                        <select id="traveling-analisis-rule-city" class="searchbar">
+                            <option value="">— Elige una ciudad —</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tienda</label>
+                        <select id="traveling-analisis-rule-city-shop" class="searchbar">
+                            <option value="">— Elige primero una ciudad —</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Objeto de la tienda (al usarlo el jugador dispara la regla)</label>
+                        <select id="traveling-analisis-rule-city-shop-item" class="searchbar">
+                            <option value="">— Elige primero una tienda —</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="traveling-analisis-rule-block-traveling_shop" class="traveling-analisis-rule-block" style="display: none;">
+                    <div class="form-group">
+                        <label>Tienda ambulante</label>
+                        <select id="traveling-analisis-rule-traveling-shop" class="searchbar">
+                            <option value="">— Elige una tienda ambulante —</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Objeto de la tienda (al usarlo el jugador dispara la regla)</label>
+                        <select id="traveling-analisis-rule-traveling-shop-item" class="searchbar">
+                            <option value="">— Elige primero una tienda —</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Mensaje a enviar (opcional)</label>
+                    <textarea id="traveling-analisis-rule-message" class="searchbar" rows="3" placeholder="Mensaje que recibirá el jugador al usar el objeto..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Activar misión (opcional)</label>
+                    <select id="traveling-analisis-rule-mission" class="searchbar">
+                        <option value="">— Ninguna —</option>
+                    </select>
+                </div>
+                <p style="color:#8b7355; font-size:0.85em;">Indica al menos mensaje o misión. Si eliges objeto de una tienda, la regla aplica a cualquier jugador que use un ítem con ese nombre/efecto/precio.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('traveling-analisis-rule-modal')">Cancelar</button>
+                <button class="btn" onclick="travelingShopModalSaveRule()">✅ Guardar regla</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Análisis de objetos (jugador: dentro de la tienda ambulante Análisis de objetos) -->
+    <div class="modal-overlay" id="player-analisis-objetos-modal">
+        <div class="modal" style="max-width: 560px; text-align: center;">
+            <div class="modal-header">
+                <h3 id="player-analisis-objetos-title">🔍 Análisis de objetos</h3>
+                <button class="modal-close" onclick="closeModal('player-analisis-objetos-modal')">&times;</button>
+            </div>
+            <div class="modal-body" style="text-align: center;">
+                <p style="color:#8b7355; margin-bottom:12px;">El experto revisa los objetos de tu inventario. Toca un objeto para seleccionarlo y luego pulsa "Analizar objeto" abajo.</p>
+                <div id="player-analisis-objetos-result" style="display:none; margin-bottom:16px; padding:12px; background:rgba(0,0,0,0.3); border-radius:8px; border:1px solid #4a3c31; text-align: center;"></div>
+                <div id="player-analisis-objetos-inventario-wrap">
+                    <p style="color:#8b7355; font-size:0.9em; margin-bottom:8px;">Tu inventario</p>
+                    <div id="player-analisis-objetos-search-wrap" class="player-shop-search-wrap" style="margin-bottom:12px; text-align: center;">
+                        <button type="button" class="player-shop-search-toggle" aria-expanded="false" onclick="var w=this.closest('.player-shop-search-wrap'); w.classList.toggle('expanded'); this.setAttribute('aria-expanded', w.classList.contains('expanded'));">🔍 Búsqueda y filtros</button>
+                        <div class="player-shop-search-row player-analisis-search-row">
+                            <div class="form-group" style="margin-bottom:0; flex:1; min-width:140px;">
+                                <input type="text" id="player-analisis-objetos-search" class="searchbar player-shop-search-input" placeholder="🔍 Buscar por nombre..." aria-label="Buscar objeto por nombre" oninput="typeof renderAnalisisObjetosFiltered==='function'&&renderAnalisisObjetosFiltered()" onchange="typeof renderAnalisisObjetosFiltered==='function'&&renderAnalisisObjetosFiltered()">
+                            </div>
+                            <div class="form-group" style="margin-bottom:0; flex:0 0 auto;">
+                                <label for="player-analisis-objetos-rarity" style="color:#8b7355; font-size:0.9em;">Rareza</label>
+                                <select id="player-analisis-objetos-rarity" class="searchbar" style="min-width:140px;" aria-label="Filtrar por rareza" onchange="typeof renderAnalisisObjetosFiltered==='function'&&renderAnalisisObjetosFiltered()">
+                                    <option value="">Todas</option>
+                                    <option value="común">Común</option>
+                                    <option value="inusual">Inusual</option>
+                                    <option value="rara">Rara</option>
+                                    <option value="legendaria">Legendaria</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="player-analisis-objetos-list" style="max-height: 280px; overflow-y: auto; text-align: left;"></div>
+                </div>
+            </div>
+            <div class="modal-footer" style="display:flex; gap:8px; flex-wrap:wrap; justify-content: center;">
+                <button type="button" class="btn" id="player-analisis-objetos-btn" disabled onclick="typeof playerAnalisisObjetoAnalizar==='function'&&playerAnalisisObjetoAnalizar()">🔍 Analizar objeto</button>
+                <button class="btn" onclick="closeModal('player-analisis-objetos-modal')">Cerrar</button>
             </div>
         </div>
     </div>
@@ -3158,6 +3377,7 @@
     <script src="js/player-map-touch.js"></script>
     <script src="js/players.js"></script>
     <script src="js/cities.js"></script>
+    <script src="js/traveling-shops.js"></script>
     <script src="js/inventory.js"></script>
     <script src="js/transactions.js"></script>
     <script src="js/notifications.js"></script>

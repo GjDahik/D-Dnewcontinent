@@ -32,6 +32,11 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // Tiendas ambulantes (DM crea/edita; jugador solo lee las activas)
+    match /travelingShops/{shopId} {
+      allow read, write: if true;
+    }
+
     // Transacciones (compras, hospedaje, retiros)
     match /transactions/{txId} {
       allow read, write: if true;
