@@ -2988,10 +2988,12 @@ function rollBiasedD20() {
     return 1 + Math.floor(Math.random() * 10);
 }
 
-/** Tirada d20: ~2 s de animación (números girando) y luego resultado fijo ~1.5 s. */
-function rollHeaderD20(iconEl) {
-    if (!iconEl || !iconEl.closest) return;
-    var brand = iconEl.closest('.app-brand');
+/** Tirada d20: animación de números girando ~2 s y luego resultado fijo ~1.5 s. */
+function rollHeaderD20(iconOrBrandEl) {
+    if (!iconOrBrandEl) return;
+    var brand = (iconOrBrandEl.classList && iconOrBrandEl.classList.contains('app-brand'))
+        ? iconOrBrandEl
+        : (iconOrBrandEl.closest && iconOrBrandEl.closest('.app-brand'));
     if (!brand) return;
     var d20El = brand.querySelector('.app-brand-d20');
     var valueEl = brand.querySelector('.app-brand-d20-value');
@@ -3010,18 +3012,18 @@ function rollHeaderD20(iconEl) {
         if (d) { d.classList.remove('is-visible', 'is-rolling'); }
     });
     var roll = rollBiasedD20();
-    valueEl.textContent = Math.floor(Math.random() * 20) + 1;
+    valueEl.textContent = String(1 + Math.floor(Math.random() * 20));
     d20El.classList.add('is-visible', 'is-rolling');
     brand.classList.add('is-d20');
     _d20RollIntervalId = setInterval(function () {
-        valueEl.textContent = Math.floor(Math.random() * 20) + 1;
+        valueEl.textContent = String(1 + Math.floor(Math.random() * 20));
     }, 80);
     setTimeout(function () {
         if (_d20RollIntervalId != null) {
             clearInterval(_d20RollIntervalId);
             _d20RollIntervalId = null;
         }
-        valueEl.textContent = roll;
+        valueEl.textContent = String(roll);
         d20El.classList.remove('is-rolling');
         _d20RestoreTimeoutId = setTimeout(function () {
             _d20RestoreTimeoutId = null;
@@ -6407,10 +6409,10 @@ function refreshDMData() {
 document.addEventListener('DOMContentLoaded', function() {
     updateFooterTagline();
     document.addEventListener('click', function(e) {
-        var icon = e.target && e.target.closest && e.target.closest('.app-brand-icon');
-        if (icon) {
+        var brand = e.target && e.target.closest && e.target.closest('.app-brand');
+        if (brand) {
             e.preventDefault();
-            if (typeof rollHeaderD20 === 'function') rollHeaderD20(icon);
+            if (typeof rollHeaderD20 === 'function') rollHeaderD20(brand);
             return;
         }
         if (typeof closeAllInvActionsMenus === 'function') closeAllInvActionsMenus();
