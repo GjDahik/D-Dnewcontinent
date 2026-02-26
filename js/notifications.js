@@ -1,6 +1,8 @@
 // ==================== NOTIFICACIONES ====================
 
 let _unreadBadgeUnsubscribe = null;
+let _dmNotificationsViewMode = 'table'; // vista única: tabla
+let _dmNotificationsLastDocs = [];
 
 function _updateMailBadges(n) {
     const ids = ['mail-unread-badge', 'mail-unread-badge-subtab'];
@@ -80,41 +82,73 @@ function _renderDMNotificationsList(docs) {
         container.innerHTML = '<p style="color:#8b7355; text-align:center; padding:30px; font-style:italic;">No hay notificaciones enviadas</p>';
         return;
     }
+    _dmNotificationsLastDocs = docs.slice();
     const grouped = {};
     docs.forEach(doc => {
         const notif = doc.data();
+        // Ocultar notificaciones archivadas para el DM (pero siguen existiendo para el jugador)
+        if (notif.hiddenForDM) return;
         const fecha = notif.fecha?.toDate?.() || new Date();
         const fechaKey = fecha.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
         const horaStr = fecha.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
         const mensaje = notif.mensaje || 'Sin mensaje';
         const key = `${mensaje.substring(0, 50)}_${fechaKey}`;
         if (!grouped[key]) {
-            grouped[key] = { mensaje: mensaje, fecha: fechaKey, hora: horaStr, destinatarios: [], ids: [] };
+            grouped[key] = { mensaje: mensaje, fecha: fechaKey, hora: horaStr, destinatarios: [], ids: [], automatic: false, itemName: null };
+        }
+        const enviadoPor = (notif.enviadoPor || '').toString().toLowerCase();
+        const isAutomatic = enviadoPor === 'automation' || enviadoPor === 'auto';
+        if (isAutomatic) {
+            grouped[key].automatic = true;
+            if (!grouped[key].itemName && notif.automationItemName) {
+                grouped[key].itemName = notif.automationItemName;
+            }
         }
         grouped[key].destinatarios.push(notif.playerName || 'Jugador desconocido');
         grouped[key].ids.push(doc.id);
     });
+    const groupsArr = Object.values(grouped);
+    if (!groupsArr.length) {
+        container.innerHTML = '<p style="color:#8b7355; text-align:center; padding:30px; font-style:italic;">No hay notificaciones enviadas</p>';
+        return;
+    }
     let html = '';
-    Object.values(grouped).forEach(group => {
+    // Vista única: tabla
+    html += '<div class="inventory-desktop inventory-table-wrap"><table class="inventory-table"><thead><tr><th style="width:32px; text-align:center;"><input type="checkbox" id="dm-notifs-select-all" aria-label="Seleccionar todas"></th><th>Fecha</th><th>Hora</th><th>Tipo</th><th>Destinatarios</th><th>Mensaje</th><th style="width:90px;">Acción</th></tr></thead><tbody>';
+    groupsArr.forEach(group => {
         const mensajeText = group.mensaje.replace(/</g, '&lt;').replace(/>/g, '&gt;');
         const preview = mensajeText.substring(0, 150) + (mensajeText.length > 150 ? '...' : '');
-        const destinatariosText = group.destinatarios.length === 1 ? group.destinatarios[0] : `${group.destinatarios.length} jugadores`;
-        html += `
-            <div class="mini-card" style="margin-bottom: 16px; border: 1px solid #4a3c31;">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
-                    <div style="flex: 1; min-width: 0;">
-                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
-                            <div class="mini-card-title" style="font-size: 1.1em; font-weight: 600;">📮 Notificación</div>
-                            <div style="color: #8b7355; font-size: 0.85em;">${group.fecha} a las ${group.hora}</div>
-                        </div>
-                        <div style="color: #d4c4a8; line-height: 1.6; margin-bottom: 10px; white-space: pre-wrap;">${preview}</div>
-                        <div style="color: #8b7355; font-size: 0.9em;"><strong>Para:</strong> ${destinatariosText}</div>
-                    </div>
-                    <button onclick="deleteDMNotification(['${group.ids.join("','")}'])" style="background: rgba(139, 90, 43, 0.3); border: 1px solid #8b5a2b; color: #d4af37; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 0.9em; flex-shrink: 0; white-space: nowrap;" title="Eliminar notificación">🗑️ Eliminar</button>
-                </div>
-            </div>`;
+        // Mostrar la lista completa de destinatarios (no solo "X jugadores")
+        const destinatariosText = group.destinatarios.join(', ');
+        const autoLabel = group.automatic
+            ? '<span class="dm-notif-tag dm-notif-tag-auto">Automático</span>'
+            : '<span class="dm-notif-tag dm-notif-tag-manual">Manual</span>';
+        const idsJoined = group.ids.join(',');
+        html += `<tr>
+            <td style="text-align:center;"><input type="checkbox" class="dm-notif-select" data-ids="${idsJoined}" aria-label="Seleccionar notificación"></td>
+            <td>${group.fecha}</td>
+            <td>${group.hora}</td>
+            <td>${autoLabel}</td>
+            <td>${destinatariosText}</td>
+            <td style="max-width:420px;"><span style="color:#d4c4a8;">${preview}</span></td>
+            <td>
+                <button type="button" class="btn btn-small btn-secondary" onclick="openNotificationModal(${group.ids.length ? `'${group.ids[0]}'` : "''"})" title="Ver mensaje completo">Ver</button>
+            </td>
+        </tr>`;
     });
+    html += '</tbody></table></div>';
     container.innerHTML = html;
+    // Wirear checkbox de seleccionar todo en modo tabla
+    if (_dmNotificationsViewMode === 'table') {
+        const selectAll = document.getElementById('dm-notifs-select-all');
+        if (selectAll) {
+            selectAll.onchange = function () {
+                const checked = !!this.checked;
+                const boxes = container.querySelectorAll('.dm-notif-select');
+                boxes.forEach(cb => { cb.checked = checked; });
+            };
+        }
+    }
 }
 
 // Cargar historial de notificaciones enviadas (DM) — get() una vez, sin listener
@@ -149,7 +183,86 @@ function loadDMNotifications() {
         });
 }
 
-// Eliminar notificación desde el DM
+function setDMNotificationsViewMode(mode) {
+    // Mantener siempre vista de tabla; la función se conserva por compatibilidad
+    _dmNotificationsViewMode = 'table';
+    _renderDMNotificationsList(_dmNotificationsLastDocs || []);
+}
+
+// Archivar (ocultar solo para el DM) notificación/es
+async function archiveDMNotification(notificationIds) {
+    if (!Array.isArray(notificationIds) || notificationIds.length === 0) {
+        showToast('IDs de notificación inválidos', true);
+        return;
+    }
+    const count = notificationIds.length;
+    const message = count === 1
+        ? '¿Ocultar esta carta de tu historial? El jugador seguirá viéndola.'
+        : `¿Ocultar ${count} cartas de tu historial? Los jugadores seguirán viéndolas.`;
+
+    async function doArchive() {
+        try {
+            const batch = db.batch();
+            notificationIds.forEach(id => {
+                const ref = db.collection('notifications').doc(id);
+                batch.update(ref, { hiddenForDM: true });
+            });
+            await batch.commit();
+            const label = count === 1 ? 'carta' : 'cartas';
+            showToast(`👁️ ${count} ${label} archivada${count !== 1 ? 's' : ''} en tu historial`);
+            loadDMNotifications();
+        } catch (error) {
+            showToast('Error al archivar notificaciones: ' + error.message, true);
+            console.error(error);
+        }
+    }
+
+    if (typeof showAppConfirm === 'function') {
+        showAppConfirm({
+            title: 'Archivar cartas',
+            message,
+            cancelText: 'Cancelar',
+            confirmText: 'Ocultar',
+            danger: false,
+            onConfirm: doArchive
+        });
+    } else {
+        if (!confirm(message)) return;
+        doArchive();
+    }
+}
+
+function _getSelectedDMNotificationIds() {
+    const container = document.getElementById('dm-notifications-list');
+    if (!container) return [];
+    const boxes = container.querySelectorAll('.dm-notif-select:checked');
+    const ids = [];
+    boxes.forEach(cb => {
+        const data = (cb.getAttribute('data-ids') || '').split(',').map(s => s.trim()).filter(Boolean);
+        data.forEach(id => { if (ids.indexOf(id) === -1) ids.push(id); });
+    });
+    return ids;
+}
+
+function archiveSelectedDMNotifications() {
+    const ids = _getSelectedDMNotificationIds();
+    if (!ids.length) {
+        showToast('Selecciona al menos una notificación', true);
+        return;
+    }
+    archiveDMNotification(ids);
+}
+
+function deleteSelectedDMNotifications() {
+    const ids = _getSelectedDMNotificationIds();
+    if (!ids.length) {
+        showToast('Selecciona al menos una notificación', true);
+        return;
+    }
+    deleteDMNotification(ids);
+}
+
+// Eliminar notificación desde el DM (también desaparece para el jugador)
 async function deleteDMNotification(notificationIds) {
     if (!Array.isArray(notificationIds) || notificationIds.length === 0) {
         showToast('IDs de notificación inválidos', true);
@@ -159,30 +272,39 @@ async function deleteDMNotification(notificationIds) {
     // Confirmar eliminación
     const count = notificationIds.length;
     const message = count === 1 
-        ? '¿Estás seguro de que quieres eliminar esta notificación? Esta acción no se puede deshacer.'
-        : `¿Estás seguro de que quieres eliminar ${count} notificaciones? Esta acción no se puede deshacer.`;
-    
-    if (!confirm(message)) {
-        return;
+        ? 'Vas a borrar esta carta para siempre (también para el jugador). ¿Continuar?'
+        : `Vas a borrar ${count} cartas para siempre (también para los jugadores). ¿Continuar?`;
+
+    async function doDelete() {
+        try {
+            const batch = db.batch();
+            notificationIds.forEach(id => {
+                const ref = db.collection('notifications').doc(id);
+                batch.delete(ref);
+            });
+            
+            await batch.commit();
+            const label = count === 1 ? 'carta' : 'cartas';
+            showToast(`🗑️ ${count} ${label} borrada${count !== 1 ? 's' : ''}`);
+            loadDMNotifications();
+        } catch (error) {
+            showToast('Error al eliminar notificaciones: ' + error.message, true);
+            console.error(error);
+        }
     }
-    
-    try {
-        const batch = db.batch();
-        notificationIds.forEach(id => {
-            const ref = db.collection('notifications').doc(id);
-            batch.delete(ref);
+
+    if (typeof showAppConfirm === 'function') {
+        showAppConfirm({
+            title: 'Borrar cartas',
+            message,
+            cancelText: 'Cancelar',
+            confirmText: 'Borrar',
+            danger: true,
+            onConfirm: doDelete
         });
-        
-        await batch.commit();
-        
-        showToast(`${count} notificación${count !== 1 ? 'es' : ''} eliminada${count !== 1 ? 's' : ''}`);
-        
-        // Recargar notificaciones
-        loadDMNotifications();
-        
-    } catch (error) {
-        showToast('Error al eliminar notificaciones: ' + error.message, true);
-        console.error(error);
+    } else {
+        if (!confirm(message)) return;
+        doDelete();
     }
 }
 
@@ -501,8 +623,12 @@ window.sendNotification = sendNotification;
 window.loadNotificationRecipients = loadNotificationRecipients;
 window.loadPlayerNotifications = loadPlayerNotifications;
 window.loadDMNotifications = loadDMNotifications;
+window.setDMNotificationsViewMode = setDMNotificationsViewMode;
 window.openNotificationModal = openNotificationModal;
 window.markNotificationAsRead = markNotificationAsRead;
 window.deleteNotification = deleteNotification;
 window.deleteDMNotification = deleteDMNotification;
+window.archiveDMNotification = archiveDMNotification;
+window.archiveSelectedDMNotifications = archiveSelectedDMNotifications;
+window.deleteSelectedDMNotifications = deleteSelectedDMNotifications;
 window.startUnreadMailBadge = startUnreadMailBadge;

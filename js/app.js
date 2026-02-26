@@ -1,14 +1,19 @@
 // ==================== FIREBASE CONFIGURATION ====================
-const firebaseConfig = {
-    apiKey: "AIzaSyAfOdbG9zqU4ccC_B-ZCUGPnfBDM2KvB-I",
+// Config centralizada en js/firebase-config.js. La seguridad depende de Firestore Rules.
+// Reemplaza __REPLACE_API_KEY__ en firebase-config.js por tu API key al desplegar.
+var firebaseConfig = (typeof window !== 'undefined' && window.firebaseConfig) ? window.firebaseConfig : {
+    apiKey: "__REPLACE_API_KEY__",
     authDomain: "nueva-valdoria.firebaseapp.com",
     projectId: "nueva-valdoria",
     storageBucket: "nueva-valdoria.firebasestorage.app",
     messagingSenderId: "29742426810",
     appId: "1:29742426810:web:0cf259ba71b0e5f0d8f083"
 };
-firebase.initializeApp(firebaseConfig);
+if (!firebase.apps || firebase.apps.length === 0) firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+// Auth anónimo desactivado aquí para evitar errores en consola (auth/configuration-not-found, 400).
+// Si más adelante usas reglas que exigen request.auth, activa Authentication en Firebase Console
+// y descomenta: firebase.auth().signInAnonymously().catch(function (err) { console.warn('[Auth]', err.message); });
 
 // ==================== CONTADOR DE READS (solo desarrollo / diagnóstico) ====================
 // Ver también: Firebase Console → Firestore → Usage (gráfica de lecturas por día).
@@ -87,6 +92,7 @@ var PWA_BASE = (function () {
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
   navigator.serviceWorker.register(PWA_BASE + 'sw.js').then(function (reg) {
     console.log('[PWA] Service Worker registrado:', reg.scope);
+    reg.update(); /* Comprobar actualización del SW en cada carga para recibir nueva versión sin limpiar caché */
   }).catch(function (err) {
     console.warn('[PWA] Error registrando Service Worker:', err);
   });
@@ -318,8 +324,12 @@ function toggleLoginFields() {
 
 async function loadLoginPlayers() {
     const sel = document.getElementById('login-player-select');
+    if (!sel) return;
     sel.innerHTML = '<option value="">— Cargando… —</option>';
     try {
+        if (typeof ensureAuthUid === 'function') {
+            try { await ensureAuthUid(); } catch (_) { /* con reglas permisivas cargamos igual */ }
+        }
         const snap = await db.collection('players').limit(200).get();
         const list = snap.docs
             .map(doc => ({ id: doc.id, ...doc.data() }))
@@ -1320,6 +1330,9 @@ function renderDMMapMarkersDropdown() {
     var fs = document.getElementById('dm-map-free-existing');
     if (fs) {
         var cv = fs.value || '';
+        // Mostrar siempre todos los marcadores libres creados por el DM,
+        // independientemente del nivel del mapa, para que los recién creados
+        // aparezcan inmediatamente en la lista.
         fs.innerHTML = '<option value="">— Marcadores creados —</option>' + dmMapCustomMarkers.map(function (m) {
             var lb = (m.icon || '🔥') + ' ' + (m.label || 'Marcador');
             var val = m.id || m.customId || '';
@@ -1448,8 +1461,11 @@ function placeDMMapMarkerFromEvent(e) {
         var save = nm.id ? saveDMMapMarkerToFirestore(nm) : saveDMMapMarkerToFirestore(nm);
         save.then(function (ref) {
             if (!nm.id && ref && ref.id) nm.id = ref.id;
+            // Mantener solo una entrada por customId (el marcador lógico),
+            // eliminando versiones anteriores (por ejemplo, la creada sin levelKey)
+            // para evitar duplicados en el dropdown.
             dmMapCustomMarkers = dmMapCustomMarkers.filter(function (m) {
-                return !(m.customId === nm.customId && (m.levelKey || 'default') === (nm.levelKey || 'default'));
+                return m.customId !== nm.customId;
             });
             dmMapCustomMarkers.push(nm);
             var li = document.getElementById('dm-map-free-label');
@@ -2239,12 +2255,7 @@ function renderPlayerView(data) {
             const idxStrEsc = (idxStr || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
             const actionsCell = `
                 <div class="inv-actions-wrap">
-                    <button type="button" class="btn btn-small btn-secondary inv-actions-menu-btn" onclick="toggleInvActionsMenu(event, this)" data-first-index="${idxUse}" data-count="${g.count}" data-indices-str="${idxStrEsc}" title="Acciones">⋮</button>
-                    <div class="inv-actions-dropdown">
-                        <button type="button" onclick="invActionUse(this)">✨ Utilizar</button>
-                        <button type="button" onclick="invActionSell(this)">💰 Vender</button>
-                        <button type="button" onclick="invActionTransfer(this)">📤 Transferir</button>
-                    </div>
+                    <button type="button" class="btn btn-small btn-secondary inv-actions-menu-btn" onclick="openPlayerInventoryActionsModal(event, this)" data-first-index="${idxUse}" data-count="${g.count}" data-indices-str="${idxStrEsc}" title="Acciones">⋮</button>
                 </div>`;
             return `<tr class="player-inventory-row">
                 <td><span class="player-inventory-item-name" style="color:#d4c4a8; font-weight:600; cursor:pointer; text-decoration:underline; text-underline-offset:3px;" onclick="openPlayerInventoryItemDetail(${idxUse}, ${g.count})" role="button" tabindex="0" title="Ver detalle del ítem">${esc(it.name || 'Item')}</span></td>
@@ -2266,12 +2277,7 @@ function renderPlayerView(data) {
             const idxStrEscCard = (idxStr || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
             const actionsCard = `
                 <div class="inv-actions-wrap">
-                    <button type="button" class="btn btn-small btn-secondary inv-actions-menu-btn" onclick="toggleInvActionsMenu(event, this)" data-first-index="${idxUse}" data-count="${g.count}" data-indices-str="${idxStrEscCard}" title="Acciones">⋮</button>
-                    <div class="inv-actions-dropdown">
-                        <button type="button" onclick="invActionUse(this)">✨ Utilizar</button>
-                        <button type="button" onclick="invActionSell(this)">💰 Vender</button>
-                        <button type="button" onclick="invActionTransfer(this)">📤 Transferir</button>
-                    </div>
+                    <button type="button" class="btn btn-small btn-secondary inv-actions-menu-btn" onclick="openPlayerInventoryActionsModal(event, this)" data-first-index="${idxUse}" data-count="${g.count}" data-indices-str="${idxStrEscCard}" title="Acciones">⋮</button>
                 </div>`;
             return `<div class="inventory-card">
                 <div class="inventory-card-header">
@@ -2295,6 +2301,8 @@ function renderPlayerView(data) {
 
 var _pendingUseAction = null;
 
+var _pendingInvActions = null;
+
 function closeAllInvActionsMenus() {
     document.querySelectorAll('.inv-actions-dropdown.is-open').forEach(function (el) { el.classList.remove('is-open'); });
 }
@@ -2308,6 +2316,52 @@ function toggleInvActionsMenu(event, btn) {
     if (!isOpen) dropdown.classList.add('is-open');
 }
 
+function openSpecialItemActionsModalFromBtn(btn) {
+    var playerId = btn.getAttribute('data-special-player-id');
+    var itemId = btn.getAttribute('data-special-item-id');
+    var itemName = (btn.getAttribute('data-special-item-name') || 'Item especial').replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+    var containerId = btn.getAttribute('data-special-container-id') || 'player-special-items-list';
+    var isDM = btn.getAttribute('data-special-is-dm') === '1';
+    openSpecialItemActionsModal(playerId, itemId, itemName, { containerId: containerId, isDM: isDM });
+}
+
+function openSpecialItemActionsModal(playerId, itemId, itemName, options) {
+    options = options || {};
+    closeAllInvActionsMenus();
+    _pendingInvActions = {
+        isSpecialItem: true,
+        playerId: playerId,
+        itemId: itemId,
+        itemName: itemName || 'Item especial',
+        containerId: options.containerId || 'player-special-items-list',
+        isDM: options.isDM === true
+    };
+    var titleEl = document.getElementById('player-inventory-actions-title');
+    var nameEl = document.getElementById('player-inventory-actions-item-name');
+    if (titleEl) titleEl.textContent = 'Acciones del ítem';
+    if (nameEl) nameEl.innerHTML = '<strong>' + String(itemName).replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') + '</strong>';
+    openModal('player-inventory-actions-modal');
+}
+
+function openPlayerInventoryActionsModal(event, btn) {
+    if (event) event.stopPropagation();
+    closeAllInvActionsMenus();
+    var firstIndex = parseInt(btn.getAttribute('data-first-index'), 10);
+    var count = parseInt(btn.getAttribute('data-count'), 10) || 1;
+    var indicesStr = (btn.getAttribute('data-indices-str') || '').replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+    var itemName = '—';
+    if (lastPlayerViewData && lastPlayerViewData.inventario) {
+        var item = lastPlayerViewData.inventario[firstIndex];
+        if (item) itemName = item.name || 'Item';
+    }
+    _pendingInvActions = { firstIndex: firstIndex, count: count, indicesStr: indicesStr };
+    var titleEl = document.getElementById('player-inventory-actions-title');
+    var nameEl = document.getElementById('player-inventory-actions-item-name');
+    if (titleEl) titleEl.textContent = 'Acciones del ítem';
+    if (nameEl) nameEl.innerHTML = '<strong>' + String(itemName).replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</strong>';
+    openModal('player-inventory-actions-modal');
+}
+
 function invActionGetMenuBtn(actionBtn) {
     var wrap = actionBtn.closest('.inv-actions-wrap');
     return wrap ? wrap.querySelector('.inv-actions-menu-btn') : null;
@@ -2318,9 +2372,8 @@ function invActionUse(actionBtn) {
     if (!menuBtn) return;
     closeAllInvActionsMenus();
     var firstIndex = parseInt(menuBtn.getAttribute('data-first-index'), 10);
-    var count = parseInt(menuBtn.getAttribute('data-count'), 10) || 1;
     var indicesStr = (menuBtn.getAttribute('data-indices-str') || '').replace(/&#39;/g, "'").replace(/&quot;/g, '"');
-    if (count > 1 && indicesStr) {
+    if (indicesStr) {
         openUseItemConfirmStack(indicesStr);
     } else {
         openUseItemConfirm(firstIndex);
@@ -2349,6 +2402,53 @@ function invActionTransfer(actionBtn) {
     var count = parseInt(menuBtn.getAttribute('data-count'), 10) || 1;
     var indicesStr = (menuBtn.getAttribute('data-indices-str') || '').replace(/&#39;/g, "'").replace(/&quot;/g, '"');
     openTransferItemModal(firstIndex, count, indicesStr);
+}
+
+function invActionUseFromModal() {
+    if (!_pendingInvActions) return;
+    closeModal('player-inventory-actions-modal');
+    var a = _pendingInvActions;
+    if (a.isSpecialItem && typeof useSpecialItem === 'function') {
+        useSpecialItem(a.playerId, a.itemId, { containerId: a.containerId, isDM: a.isDM });
+        _pendingInvActions = null;
+        return;
+    }
+    if (a.indicesStr) {
+        openUseItemConfirmStack(a.indicesStr);
+    } else {
+        openUseItemConfirm(a.firstIndex);
+    }
+    _pendingInvActions = null;
+}
+
+function invActionSellFromModal() {
+    if (!_pendingInvActions) return;
+    closeModal('player-inventory-actions-modal');
+    var a = _pendingInvActions;
+    if (a.isSpecialItem) {
+        openSellSpecialItemConfirm(a);
+        _pendingInvActions = null;
+        return;
+    }
+    if (a.count > 1 && a.indicesStr) {
+        openSellConfirmStack(a.indicesStr);
+    } else {
+        openSellConfirm(a.firstIndex);
+    }
+    _pendingInvActions = null;
+}
+
+function invActionTransferFromModal() {
+    if (!_pendingInvActions) return;
+    closeModal('player-inventory-actions-modal');
+    var a = _pendingInvActions;
+    if (a.isSpecialItem) {
+        openTransferSpecialItemModal(a);
+        _pendingInvActions = null;
+        return;
+    }
+    openTransferItemModal(a.firstIndex, a.count, a.indicesStr);
+    _pendingInvActions = null;
 }
 
 function openPlayerInventoryItemDetail(inventoryIndex, count) {
@@ -2433,10 +2533,10 @@ function openUseItemConfirmStack(indicesStr) {
         qtyInput.min = 1;
         qtyInput.max = totalAvailable;
         qtyInput.value = 1;
-        qtyInput.style.display = 'block';
+        qtyInput.style.display = totalAvailable <= 1 ? 'none' : '';
     }
     var qtyRow = document.getElementById('player-use-qty-row');
-    if (qtyRow) qtyRow.style.display = 'block';
+    if (qtyRow) qtyRow.style.display = totalAvailable <= 1 ? 'none' : 'block';
     _pendingUseAction = { type: 'stack', indicesStr: indicesStr };
     openModal('player-use-item-confirm-modal');
 }
@@ -2456,9 +2556,13 @@ function doConfirmedUseItem() {
         runAutomationRulesForPlayerUse(user.id, item, user.nombre || 'Jugador');
     }
     var qtyInput = document.getElementById('player-use-qty');
-    var qty = (qtyInput && qtyInput.value !== '') ? Math.max(1, parseInt(qtyInput.value, 10) || 1) : 1;
-    var maxVal = qtyInput ? (parseInt(qtyInput.getAttribute('max'), 10) || qty) : qty;
-    qty = Math.min(qty, maxVal);
+    var requestedQty = (qtyInput && qtyInput.value !== '') ? Math.max(1, parseInt(qtyInput.value, 10) || 1) : 1;
+    var maxVal = qtyInput ? (parseInt(qtyInput.getAttribute('max'), 10) || requestedQty) : requestedQty;
+    if (requestedQty > maxVal) {
+        showToast('No tienes suficientes unidades. Máximo: ' + maxVal, true);
+        return;
+    }
+    var qty = requestedQty;
     _pendingUseAction = null;
     closeModal('player-use-item-confirm-modal');
     if (a.type === 'single') {
@@ -2472,14 +2576,19 @@ var _pendingSellAction = null;
 
 function openSellConfirm(index) {
     if (!lastPlayerViewData || !lastPlayerViewData.inventario) return;
+    var qtyRow = document.getElementById('player-sell-qty-row');
+    var specialRow = document.getElementById('player-sell-special-item-row');
+    if (qtyRow) qtyRow.style.display = '';
+    if (specialRow) specialRow.style.display = 'none';
     var item = lastPlayerViewData.inventario[index];
     if (!item) return;
     var maxQty = getItemQuantity(item);
-    var valorVenta = Math.floor((item.price || 0) * 0.75);
+    // 75% del precio, redondeando .5 hacia arriba
+    var valorVenta = Math.floor((item.price || 0) * 0.75 + 0.5);
     var name = (item.name || 'Item').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     var msgEl = document.getElementById('player-sell-confirm-message');
     var hintEl = document.getElementById('player-sell-confirm-hint');
-    if (msgEl) msgEl.innerHTML = '¿Vender <strong>' + name + '</strong> por <strong>' + valorVenta.toLocaleString() + ' GP</strong> (por unidad)?';
+    if (msgEl) msgEl.innerHTML = '¿Vender <strong>' + name + '</strong>?';
     if (hintEl) hintEl.textContent = '75% del valor de compra por unidad.';
     var qtyInput = document.getElementById('player-sell-qty');
     if (qtyInput) {
@@ -2487,6 +2596,8 @@ function openSellConfirm(index) {
         qtyInput.max = maxQty;
         qtyInput.value = Math.min(1, maxQty);
         qtyInput.style.display = maxQty <= 1 ? 'none' : '';
+        qtyInput.oninput = updateSellConfirmPreview;
+        qtyInput.onchange = updateSellConfirmPreview;
     }
     var qtyRow = document.getElementById('player-sell-qty-row');
     if (qtyRow) qtyRow.style.display = maxQty <= 1 ? 'none' : 'block';
@@ -2496,6 +2607,10 @@ function openSellConfirm(index) {
 
 function openSellConfirmStack(indicesStr) {
     if (!lastPlayerViewData || !lastPlayerViewData.inventario) return;
+    var qtyRow = document.getElementById('player-sell-qty-row');
+    var specialRow = document.getElementById('player-sell-special-item-row');
+    if (qtyRow) qtyRow.style.display = '';
+    if (specialRow) specialRow.style.display = 'none';
     var indices = indicesStr.split(',').map(function(s) { return parseInt(s, 10); }).filter(function(n) { return !isNaN(n); });
     if (indices.length === 0) return;
     var inv = lastPlayerViewData.inventario;
@@ -2512,6 +2627,8 @@ function openSellConfirmStack(indicesStr) {
         qtyInput.max = totalAvailable;
         qtyInput.value = 1;
         qtyInput.style.display = 'block';
+        qtyInput.oninput = updateSellConfirmPreview;
+        qtyInput.onchange = updateSellConfirmPreview;
     }
     var qtyRow = document.getElementById('player-sell-qty-row');
     if (qtyRow) qtyRow.style.display = 'block';
@@ -2519,9 +2636,36 @@ function openSellConfirmStack(indicesStr) {
     openModal('player-sell-item-confirm-modal');
 }
 
+function openSellSpecialItemConfirm(a) {
+    _pendingSellAction = { isSpecialItem: true, playerId: a.playerId, itemId: a.itemId, itemName: a.itemName, containerId: a.containerId, isDM: a.isDM };
+    var msgEl = document.getElementById('player-sell-confirm-message');
+    var hintEl = document.getElementById('player-sell-confirm-hint');
+    var qtyRow = document.getElementById('player-sell-qty-row');
+    var specialRow = document.getElementById('player-sell-special-item-row');
+    var valorInput = document.getElementById('player-sell-special-valor');
+    if (msgEl) msgEl.textContent = '¿Vender este item especial? Indica su valor en GP (recibirás 75%).';
+    if (hintEl) hintEl.textContent = '75% del valor indicado se añade a tu oro.';
+    if (qtyRow) qtyRow.style.display = 'none';
+    if (specialRow) specialRow.style.display = 'block';
+    if (valorInput) { valorInput.value = '0'; valorInput.min = 0; }
+    openModal('player-sell-item-confirm-modal');
+}
+
 function doConfirmedSellItem() {
     if (!_pendingSellAction) { closeModal('player-sell-item-confirm-modal'); return; }
     var a = _pendingSellAction;
+    if (a.isSpecialItem && typeof sellSpecialItem === 'function') {
+        var valorInput = document.getElementById('player-sell-special-valor');
+        var valor = parseInt(valorInput && valorInput.value, 10) || 0;
+        sellSpecialItem(a.playerId, a.itemId, valor, { containerId: a.containerId, isDM: a.isDM });
+        _pendingSellAction = null;
+        closeModal('player-sell-item-confirm-modal');
+        var qtyRow = document.getElementById('player-sell-qty-row');
+        var specialRow = document.getElementById('player-sell-special-item-row');
+        if (qtyRow) qtyRow.style.display = '';
+        if (specialRow) specialRow.style.display = 'none';
+        return;
+    }
     var qtyInput = document.getElementById('player-sell-qty');
     var qty = (qtyInput && qtyInput.value !== '') ? Math.max(1, parseInt(qtyInput.value, 10) || 1) : 1;
     var maxVal = qtyInput ? (parseInt(qtyInput.getAttribute('max'), 10) || qty) : qty;
@@ -2532,6 +2676,58 @@ function doConfirmedSellItem() {
         playerSellItemStack(String(a.index), qty);
     } else {
         playerSellItemStack(a.indicesStr, qty);
+    }
+}
+
+function updateSellConfirmPreview() {
+    if (!_pendingSellAction || !lastPlayerViewData || !lastPlayerViewData.inventario) return;
+    var qtyInput = document.getElementById('player-sell-qty');
+    var msgEl = document.getElementById('player-sell-confirm-message');
+    if (!qtyInput || !msgEl) return;
+    var raw = parseInt(qtyInput.value, 10);
+    if (isNaN(raw) || raw <= 0) raw = 1;
+    var maxVal = parseInt(qtyInput.getAttribute('max'), 10);
+    if (!isNaN(maxVal) && maxVal > 0) raw = Math.min(raw, maxVal);
+    qtyInput.value = raw;
+    var inv = lastPlayerViewData.inventario;
+    var escName = function (s) { return String(s || '').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+    var a = _pendingSellAction;
+    var totalVenta = 0;
+    var soldCount = 0;
+    var firstName = 'Item';
+    if (a.type === 'single') {
+        var idx = a.index;
+        var item = inv[idx];
+        if (!item) return;
+        var perUnit = Math.floor((item.price || 0) * 0.75 + 0.5);
+        var available = getItemQuantity(item);
+        var qty = Math.min(raw, available);
+        totalVenta = perUnit * qty;
+        soldCount = qty;
+        firstName = item.name || 'Item';
+    } else if (a.type === 'stack') {
+        var indices = (a.indicesStr || '').split(',').map(function (s) { return parseInt(s, 10); }).filter(function (n) { return !isNaN(n); });
+        if (!indices.length) return;
+        firstName = (inv[indices[0]] || {}).name || 'Item';
+        var remaining = raw;
+        for (var i = 0; i < indices.length && remaining > 0; i++) {
+            var id = indices[i];
+            if (id < 0 || id >= inv.length) continue;
+            var it = inv[id];
+            var availableQty = getItemQuantity(it);
+            if (availableQty <= 0) continue;
+            var take = Math.min(remaining, availableQty);
+            remaining -= take;
+            var perUnitStack = Math.floor((it.price || 0) * 0.75 + 0.5);
+            totalVenta += perUnitStack * take;
+            soldCount += take;
+        }
+    }
+    var nameHtml = escName(firstName);
+    if (soldCount > 1) {
+        msgEl.innerHTML = '¿Vender <strong>' + soldCount + '× ' + nameHtml + '</strong> por <strong>' + totalVenta.toLocaleString() + ' GP</strong>?';
+    } else {
+        msgEl.innerHTML = '¿Vender <strong>' + nameHtml + '</strong> por <strong>' + totalVenta.toLocaleString() + ' GP</strong>?';
     }
 }
 
@@ -2589,8 +2785,7 @@ async function playerUseItemStack(indicesStr, qtyOrButton) {
         }
         indices = indices.slice(0, qty);
     } else if (typeof qtyOrButton === 'number' && qtyOrButton > 0) {
-        qty = Math.min(qtyOrButton, indices.length);
-        indices = indices.slice(0, qty);
+        qty = qtyOrButton;
     }
     if (indices.length === 0) return;
     try {
@@ -2652,7 +2847,8 @@ async function playerSellItem(index) {
         if (index < 0 || index >= inventario.length) { showToast('Ítem no válido', true); return; }
         const item = inventario[index];
         const qty = getItemQuantity(item);
-        const valorVenta = Math.floor((item.price || 0) * 0.75);
+        // 75% del precio, redondeando .5 hacia arriba
+        const valorVenta = Math.floor((item.price || 0) * 0.75 + 0.5);
         const nuevoOro = (data.oro != null ? data.oro : 0) + valorVenta;
         if (qty > 1 && item.quantity != null && item.quantity >= 1) {
             inventario[index] = { ...item, quantity: item.quantity - 1 };
@@ -2697,8 +2893,11 @@ async function playerSellItemStack(indicesStr, qtyOrButton) {
         }
         indices = indices.slice(0, qty);
     } else if (typeof qtyOrButton === 'number' && qtyOrButton > 0) {
-        qty = Math.min(qtyOrButton, indices.length);
-        indices = indices.slice(0, qty);
+        // En la vista del DM, qtyOrButton es la cantidad total de unidades a vender
+        // (pueden estar concentradas en un único slot con quantity alto), así que
+        // no recortamos indices aquí; el bucle posterior ya reparte correctamente
+        // la cantidad entre los índices según getItemQuantity.
+        qty = Math.max(1, qtyOrButton);
     }
     if (indices.length === 0) return;
     try {
@@ -2718,7 +2917,9 @@ async function playerSellItemStack(indicesStr, qtyOrButton) {
             const itemQty = getItemQuantity(it);
             const take = Math.min(remaining, itemQty);
             remaining -= take;
-            totalVenta += Math.floor((it.price || 0) * 0.75 * take);
+            // Aplicar 75% por unidad con redondeo .5 hacia arriba y multiplicar por las unidades vendidas de este slot
+            const perUnitSale = Math.floor((it.price || 0) * 0.75 + 0.5);
+            totalVenta += perUnitSale * take;
             if (take >= itemQty) {
                 inventario[i] = null;
             } else {
@@ -2752,6 +2953,29 @@ async function playerSellItemStack(indicesStr, qtyOrButton) {
 
 var _pendingTransfer = null;
 
+function openTransferSpecialItemModal(a) {
+    const user = getCurrentUser();
+    if (!user) return;
+    _pendingTransfer = { isSpecialItem: true, fromPlayerId: a.playerId, itemId: a.itemId, itemName: a.itemName, containerId: a.containerId, isDM: a.isDM };
+    const nameEl = document.getElementById('player-transfer-item-name');
+    const qtyRow = document.getElementById('player-transfer-qty-row');
+    const selectEl = document.getElementById('player-transfer-to-select');
+    if (nameEl) nameEl.textContent = 'Transferir item especial: ' + (a.itemName || 'Item');
+    if (qtyRow) qtyRow.style.display = 'none';
+    if (selectEl) {
+        selectEl.innerHTML = '<option value="">— Cargando —</option>';
+        db.collection('players').limit(200).get().then(snap => {
+            const others = (snap.docs || [])
+                .map(d => ({ id: d.id, nombre: (d.data().nombre || '').trim() || 'Sin nombre', visible: d.data().visible }))
+                .filter(p => p.id !== a.playerId && p.visible !== false)
+                .sort((x, y) => (x.nombre || '').localeCompare(y.nombre || '', 'es'));
+            selectEl.innerHTML = '<option value="">— Elige jugador —</option>' +
+                others.map(p => '<option value="' + p.id + '">' + (p.nombre || p.id).replace(/</g, '&lt;') + '</option>').join('');
+        }).catch(() => { selectEl.innerHTML = '<option value="">— Error al cargar —</option>'; });
+    }
+    if (typeof openModal === 'function') openModal('player-transfer-item-modal');
+}
+
 function openTransferItemModal(firstIndex, count, indicesStr) {
     const user = getCurrentUser();
     if (!user || !isPlayer()) return;
@@ -2760,8 +2984,10 @@ function openTransferItemModal(firstIndex, count, indicesStr) {
     if (!item) return;
     _pendingTransfer = { firstIndex, count, indicesStr };
     const nameEl = document.getElementById('player-transfer-item-name');
+    const qtyRow = document.getElementById('player-transfer-qty-row');
     const qtyEl = document.getElementById('player-transfer-qty');
     const selectEl = document.getElementById('player-transfer-to-select');
+    if (qtyRow) qtyRow.style.display = '';
     if (nameEl) nameEl.textContent = 'Transferir: ' + (item.name || 'Item') + (count > 1 ? ' (máx. ' + count + ')' : '');
     if (qtyEl) {
         qtyEl.min = 1;
@@ -2785,13 +3011,26 @@ function openTransferItemModal(firstIndex, count, indicesStr) {
 }
 
 async function confirmTransferItem() {
-    const user = getCurrentUser();
-    if (!user || !isPlayer() || !_pendingTransfer) return;
+    if (!_pendingTransfer) return;
     const toId = document.getElementById('player-transfer-to-select') && document.getElementById('player-transfer-to-select').value;
     if (!toId) {
         showToast('Elige un jugador para enviar el ítem', true);
         return;
     }
+    if (_pendingTransfer.isSpecialItem && typeof transferSpecialItem === 'function') {
+        if (toId === _pendingTransfer.fromPlayerId) {
+            showToast('Elige otro jugador (no puedes enviártelo a ti mismo)', true);
+            return;
+        }
+        transferSpecialItem(_pendingTransfer.fromPlayerId, _pendingTransfer.itemId, toId, { containerId: _pendingTransfer.containerId, isDM: _pendingTransfer.isDM });
+        if (typeof closeModal === 'function') closeModal('player-transfer-item-modal');
+        _pendingTransfer = null;
+        var qtyRow = document.getElementById('player-transfer-qty-row');
+        if (qtyRow) qtyRow.style.display = '';
+        return;
+    }
+    const user = getCurrentUser();
+    if (!user || !isPlayer()) return;
     if (toId === user.id) {
         showToast('No puedes enviarte a ti mismo', true);
         return;
@@ -3036,7 +3275,7 @@ function rollHeaderD20(iconOrBrandEl) {
 function showPlayerView() {
     const user = getCurrentUser();
     if (!user || !isPlayer()) {
-        showLoginModal();
+        if (typeof showLoginModal === 'function') showLoginModal();
         return;
     }
     // FIRESTORE LISTENER FIX: cerrar player y tab; DM solo si realmente se abandona la vista DM
@@ -3046,9 +3285,12 @@ function showPlayerView() {
         if (window.__currentMode === 'dm') closeAll('dm');
     }
     window.__currentMode = 'player';
-    document.getElementById('main-container').style.display = 'none';
-    document.getElementById('player-view-container').style.display = 'block';
-    document.getElementById('login-modal').classList.remove('active');
+    var main = document.getElementById('main-container');
+    if (main) main.style.display = 'none';
+    var pv = document.getElementById('player-view-container');
+    if (pv) pv.style.display = 'block';
+    var loginEl = document.getElementById('login-modal');
+    if (loginEl) loginEl.classList.remove('active');
     loadMapImage();
     if (typeof initPlayerMapMarkers === 'function') initPlayerMapMarkers();
     _playerDocCache = undefined;
@@ -3306,12 +3548,28 @@ function editRuta(id) {
 }
 
 async function deleteRuta(id) {
-    if (!id || !confirm('¿Eliminar esta ruta?')) return;
-    try {
-        await db.collection('rutas_conocidas').doc(id).delete();
-        showToast('Ruta eliminada');
-    } catch (e) {
-        showToast('Error al eliminar', true);
+    if (!id) return;
+    async function doDelete() {
+        try {
+            await db.collection('rutas_conocidas').doc(id).delete();
+            showToast('Ruta eliminada');
+        } catch (e) {
+            showToast('Error al eliminar', true);
+        }
+    }
+    const message = 'Vas a borrar esta ruta entre ciudades. Los aventureros dejarán de verla en el mapa. ¿Continuar?';
+    if (typeof showAppConfirm === 'function') {
+        showAppConfirm({
+            title: 'Eliminar ruta',
+            message,
+            cancelText: 'Cancelar',
+            confirmText: 'Eliminar',
+            danger: true,
+            onConfirm: doDelete
+        });
+    } else {
+        if (!confirm(message)) return;
+        doDelete();
     }
 }
 
@@ -6366,9 +6624,12 @@ async function showDashboard() {
             closeAll('player');
             closeAll('tab', 'transactions');
         }
-        document.getElementById('player-view-container').style.display = 'none';
-        document.getElementById('main-container').style.display = 'block';
-        document.getElementById('login-modal').classList.remove('active');
+        var pv = document.getElementById('player-view-container');
+        if (pv) pv.style.display = 'none';
+        var main = document.getElementById('main-container');
+        if (main) main.style.display = 'block';
+        var loginEl = document.getElementById('login-modal');
+        if (loginEl) loginEl.classList.remove('active');
         window.__currentMode = 'dm';
         _playerDocCache = null;
         const dmNameEl = document.getElementById('dm-header-name');
@@ -6388,7 +6649,7 @@ async function showDashboard() {
         if (typeof loadDMMapMarkers === 'function') loadDMMapMarkers();
         if (typeof loadRutasConocidas === 'function') loadRutasConocidas();
     } else {
-        showLoginModal();
+        if (typeof showLoginModal === 'function') showLoginModal();
     }
 }
 
@@ -6406,6 +6667,8 @@ function refreshDMData() {
 
 
 // ==================== INITIALIZE ====================
+// Soporta 3 páginas: index.html (login), dm-dashboard.html, player-app.html
+// Primero autenticar, después leer Firestore: onAuthStateChanged → si !user signInAnonymously y return; solo con user se ejecuta runAppInit (loadPlayers, showDashboard, etc.).
 document.addEventListener('DOMContentLoaded', function() {
     updateFooterTagline();
     document.addEventListener('click', function(e) {
@@ -6425,13 +6688,39 @@ document.addEventListener('DOMContentLoaded', function() {
             if (col && typeof setPlayerInventorySort === 'function') setPlayerInventorySort(col);
         }
     });
-    if (checkAuth()) {
-        if (isDM()) showDashboard();
-        else if (isPlayer()) showPlayerView();
-        else showLoginModal();
-    } else {
-        showLoginModal();
+    function runAppInit() {
+        var hasMain = !!document.getElementById('main-container');
+        var hasPlayerView = !!document.getElementById('player-view-container');
+        if (hasMain && !hasPlayerView) {
+            if (!checkAuth() || !isDM()) { window.location = 'index.html'; return; }
+            showDashboard();
+            return;
+        }
+        if (hasPlayerView && !hasMain) {
+            if (!checkAuth() || !isPlayer()) { window.location = 'index.html'; return; }
+            showPlayerView();
+            return;
+        }
+        if (checkAuth()) {
+            if (isDM()) showDashboard();
+            else if (isPlayer()) showPlayerView();
+            else if (typeof showLoginModal === 'function') showLoginModal();
+        } else {
+            if (typeof showLoginModal === 'function') showLoginModal();
+        }
     }
+    var auth = typeof firebase !== 'undefined' && firebase.auth ? firebase.auth() : null;
+    if (!auth) {
+        runAppInit();
+        return;
+    }
+    auth.onAuthStateChanged(async function (user) {
+        if (!user) {
+            try { await firebase.auth().signInAnonymously(); } catch (e) { console.warn('[Auth]', e.message); runAppInit(); }
+            return;
+        }
+        runAppInit();
+    });
 });
 
 // ==================== MENÚ HAMBURGUESA (MÓVIL) ====================
@@ -6482,22 +6771,19 @@ function switchPlayerNotificationsSubtab(subtabId) {
     if (subtabId === 'cartas' && typeof loadPlayerNotifications === 'function') loadPlayerNotifications();
 }
 
-// Sub-tabs de Notificaciones (DM): Enviar | Historial | Mensajes automáticos
+// Sub-tabs de Notificaciones (DM): Enviar | Historial (Reglas automáticas tiene su propia pestaña principal)
 function switchDMNotificationsSubtab(subtabId) {
     const section = document.getElementById('notifications');
     if (!section) return;
     const subtabs = section.querySelectorAll('.dm-notifications-subtab');
     const enviarPanel = document.getElementById('dm-notifications-enviar-panel');
     const historialPanel = document.getElementById('dm-notifications-historial-panel');
-    const automationPanel = document.getElementById('dm-notifications-automation-panel');
-    if (!subtabs.length || !enviarPanel || !historialPanel || !automationPanel) return;
+    if (!subtabs.length || !enviarPanel || !historialPanel) return;
     subtabs.forEach(t => {
         t.classList.toggle('active', t.getAttribute('data-dm-subtab') === subtabId);
     });
     enviarPanel.style.display = subtabId === 'enviar' ? 'block' : 'none';
     historialPanel.style.display = subtabId === 'historial' ? 'block' : 'none';
-    automationPanel.style.display = subtabId === 'automation' ? 'block' : 'none';
-    if (subtabId === 'automation' && typeof loadAutomationRulesList === 'function') loadAutomationRulesList();
 }
 
 // ==================== NAVIGATION ====================
@@ -6540,11 +6826,18 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
         if (tab.dataset.tab === 'player-home' && typeof loadMiCasaContent === 'function') {
             loadMiCasaContent();
         }
-        
+        // Si se hace clic en Inventario, cargar items especiales del jugador
+        if ((tab.dataset.tab === 'player-inventario' || tab.dataset.tab === 'player-items-especiales') && typeof loadPlayerSpecialItemsForCurrentUser === 'function') {
+            loadPlayerSpecialItemsForCurrentUser();
+        }
         // Si se hace clic en el tab de notificaciones del DM, cargar destinatarios y historial
         if (tab.dataset.tab === 'notifications') {
             if (typeof loadNotificationRecipients === 'function') loadNotificationRecipients();
             if (typeof loadDMNotifications === 'function') loadDMNotifications();
+        }
+        // Si se hace clic en Reglas automáticas, cargar lista de reglas
+        if (tab.dataset.tab === 'automation' && typeof loadAutomationRulesList === 'function') {
+            loadAutomationRulesList();
         }
         // Si se hace clic en el tab de misiones del DM, cargar misiones
         if (tab.dataset.tab === 'missions') {
@@ -6595,6 +6888,11 @@ function toggleShopCart(btn) {
     var cartId = btn.getAttribute('data-cart-id');
     if (cartId === 'player-posada-cart') {
         var body = document.getElementById('player-posada-body');
+        if (body) body.classList.toggle('view-cart');
+        return;
+    }
+    if (cartId === 'player-shop-catalog-cart') {
+        var body = document.getElementById('player-shop-catalog-body');
         if (body) body.classList.toggle('view-cart');
         return;
     }

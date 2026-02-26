@@ -18,12 +18,15 @@ Se abrirá en **http://localhost:3000**. Si no tienes Node, puedes usar Python: 
 
 ## 🚀 Entrada y login
 
-- **`index.html`** — Punto de entrada único. DM y personajes usan el mismo enlace.
-- En el login se elige **Dungeon Master** o **Personaje**, se ingresa nombre y PIN.
-- Si entras como **DM** → panel completo del Dungeon Master.
-- Si entras como **Personaje** → vista de aventurero (mapa, ciudades, inventario, correo, etc.).
+La app está dividida en **3 páginas**:
 
-El primer DM se crea desde el login con **"👑 Crear Cuenta DM"**. Los personajes los crea el DM en **Jugadores** y les asigna un PIN. Ver `CREAR_DM.md` y `AUTH_SETUP.md` para más detalle.
+- **`index.html`** — Solo login. Elige **Dungeon Master** o **Personaje**, nombre y PIN. Tras iniciar sesión redirige a `dm-dashboard.html` o `player-app.html`.
+- **`dm-dashboard.html`** — Panel completo del DM (mapa, jugadores, ciudades, notificaciones, misiones, historial, etc.). Si no hay sesión de DM, redirige a `index.html`.
+- **`player-app.html`** — Vista del aventurero (mapa, ciudades, inventario, CDD & Correo, Home, misiones). Si no hay sesión de personaje, redirige a `index.html`.
+
+Por seguridad, el **primer DM** se crea solo **directamente en la base de datos** (Firestore, colección `dms`). A partir de ahí, ese DM puede crear otros DMs desde el dashboard (Jugadores → **👑 + DM**). Los personajes los crea el DM en **Jugadores** y les asigna un PIN. Al hacer **Salir** en DM o Personaje se vuelve a `index.html`. Ver `CREAR_DM.md` y `AUTH_SETUP.md` para más detalle.
+
+*(También existe `index-full.html` con la versión antigua de una sola página, por si se necesita.)*
 
 ---
 
@@ -188,7 +191,7 @@ Requisito: tener Firebase CLI instalado y haber hecho `firebase login` y `fireba
 ## 🚀 Cómo usar
 
 1. Abre **`index.html`** en el navegador (o despliégalo en GitHub Pages / tu hosting).
-2. Crea un DM desde **"👑 Crear Cuenta DM"** si aún no existe.
+2. Crea el **primer DM** en Firestore (colección `dms`: documento con `nombre` y `pin`) si aún no existe; los demás DMs los crea un DM desde el dashboard (**👑 + DM** en Jugadores).
 3. Inicia sesión como **DM**, crea **Jugadores** y asígnales PIN.
 4. Como **Personaje**, inicia sesión con nombre y PIN del personaje.
 5. Configura **Firebase** (Firestore, reglas) y, si usas emulación, `.firebaserc` y `firebaseConfig` según tu proyecto.

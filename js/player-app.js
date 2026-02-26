@@ -1,13 +1,14 @@
 // ==================== FIREBASE CONFIGURATION ====================
-const firebaseConfig = {
-    apiKey: "AIzaSyAfOdbG9zqU4ccC_B-ZCUGPnfBDM2KvB-I",
+// Usa firebase-config.js si está cargado; si no, placeholder. Reemplaza __REPLACE_API_KEY__ al desplegar.
+var firebaseConfig = (typeof window !== 'undefined' && window.firebaseConfig) ? window.firebaseConfig : {
+    apiKey: "__REPLACE_API_KEY__",
     authDomain: "nueva-valdoria.firebaseapp.com",
     projectId: "nueva-valdoria",
     storageBucket: "nueva-valdoria.firebasestorage.app",
     messagingSenderId: "29742426810",
     appId: "1:29742426810:web:0cf259ba71b0e5f0d8f083"
 };
-firebase.initializeApp(firebaseConfig);
+if (!firebase.apps || firebase.apps.length === 0) firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
 // ==================== GLOBAL ====================
@@ -194,12 +195,18 @@ async function playerSellItem(index) {
         if (index < 0 || index >= inventario.length) { showToast('Ítem no válido', true); return; }
         const item = inventario[index];
         const precioCompra = item.price || 0;
-        const valorVenta = Math.floor(precioCompra * 0.75);
+        // 75% del precio, redondeando .5 hacia arriba
+        const valorVenta = Math.floor(precioCompra * 0.75 + 0.5);
         const msg = '¿Vender «' + (item.name || 'Item') + '» por ' + valorVenta + ' GP? (75% del valor de compra)';
         if (!confirm(msg)) return;
         const nuevoOro = (data.oro != null ? data.oro : 0) + valorVenta;
         inventario.splice(index, 1);
         await ref.update({ oro: nuevoOro, inventario });
+        // Forzar refresco inmediato del inventario por si el listener en tiempo real
+        // aún no está activo en esta sesión.
+        if (typeof loadPlayerData === 'function') {
+            loadPlayerData();
+        }
         await db.collection('transactions').add({
             tipo: 'venta',
             itemName: item.name || 'Item',
@@ -243,7 +250,11 @@ async function playerSellItemStack(indicesStr, qtyOrButton) {
         let totalVenta = 0;
         const firstName = (inventario[indices[0]] || {}).name || 'Item';
         indices.forEach(i => {
-            if (i >= 0 && i < inventario.length) totalVenta += Math.floor((inventario[i].price || 0) * 0.75);
+            if (i >= 0 && i < inventario.length) {
+                const precio = inventario[i].price || 0;
+                // 75% del precio, redondeando .5 hacia arriba
+                totalVenta += Math.floor(precio * 0.75 + 0.5);
+            }
         });
         const label = indices.length > 1 ? indices.length + '× ' + firstName : firstName;
         const msg = '¿Vender ' + label + ' por ' + totalVenta + ' GP en total? (75% del valor de compra por unidad)';
@@ -251,6 +262,11 @@ async function playerSellItemStack(indicesStr, qtyOrButton) {
         const nuevoInv = inventario.filter((_, i) => !set.has(i));
         const nuevoOro = (data.oro != null ? data.oro : 0) + totalVenta;
         await ref.update({ oro: nuevoOro, inventario: nuevoInv });
+        // Forzar refresco inmediato del inventario por si el listener en tiempo real
+        // aún no está activo en esta sesión.
+        if (typeof loadPlayerData === 'function') {
+            loadPlayerData();
+        }
         await db.collection('transactions').add({
             tipo: 'venta',
             itemName: indices.length > 1 ? indices.length + '× ' + firstName : firstName,
@@ -281,13 +297,30 @@ function subscribeToPlayer() {
 }
 
 // ==================== INIT ====================
+// Primero autenticar, después leer Firestore: onAuthStateChanged → si !user signInAnonymously y return; solo con user se ejecuta runPlayerAppInit (loadPlayerData, subscribeToPlayer).
 (function() {
-    const saved = sessionStorage.getItem('playerId');
-    if (saved) {
-        currentPlayerId = saved;
-        document.getElementById('player-app').style.display = 'block';
-        document.getElementById('player-login-modal').classList.remove('active');
-        loadPlayerData();
-        subscribeToPlayer();
+    function runPlayerAppInit() {
+        var saved = sessionStorage.getItem('playerId');
+        if (saved) {
+            currentPlayerId = saved;
+            var appEl = document.getElementById('player-app');
+            var loginEl = document.getElementById('player-login-modal');
+            if (appEl) appEl.style.display = 'block';
+            if (loginEl) loginEl.classList.remove('active');
+            loadPlayerData();
+            subscribeToPlayer();
+        }
     }
+    var auth = typeof firebase !== 'undefined' && firebase.auth ? firebase.auth() : null;
+    if (!auth) {
+        runPlayerAppInit();
+        return;
+    }
+    auth.onAuthStateChanged(async function (user) {
+        if (!user) {
+            try { await firebase.auth().signInAnonymously(); } catch (e) { console.warn('[Auth]', e.message); runPlayerAppInit(); }
+            return;
+        }
+        runPlayerAppInit();
+    });
 })();

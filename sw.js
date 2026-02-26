@@ -1,5 +1,5 @@
-/* Service Worker para DragonKeep - GitHub Pages subpath */
-const CACHE_NAME = 'dragonkeep-v2';
+/* Service Worker - La versión (CACHE_NAME) se actualiza con: node update-version.js 1.0.9 */
+const CACHE_NAME = 'dragonkeep-v1.0.9';
 
 /** Base path del SW (ej. /dm-dashboard-modular/) para que funcione bajo subpath */
 function getBase() {
@@ -33,6 +33,12 @@ self.addEventListener('fetch', function (e) {
   var rel = path.indexOf(base) === 0 ? (path.slice(base.length) || 'index.html') : path.replace(/^\//, '');
   var isHtml = /\.html?$/i.test(rel) || path === base || path === base.replace(/\/$/, '');
   var isAsset = /\.(css|js|png|ico|woff2?|webp|svg)$/i.test(rel) || rel.indexOf('icons/') === 0;
+
+  /* No cachear el SW para que siempre se descargue la versión nueva al desplegar */
+  if (rel === 'sw.js' || path.endsWith('/sw.js')) {
+    e.respondWith(fetch(e.request));
+    return;
+  }
 
   if (isHtml) {
     e.respondWith(

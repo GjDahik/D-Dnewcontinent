@@ -6,6 +6,8 @@ const MISSION_STATUS = { draft: 'draft', visible: 'visible', completed: 'complet
 const PLAYER_PROGRESS_STATUS = { accepted: 'accepted', in_progress: 'in_progress', rejected: 'rejected' };
 
 let missionsData = [];
+let missionAutomationInfo = {}; // missionId -> [{ itemName, ruleId }]
+let _dmMissionsActiveView = 'all'; // 'all' | 'auto' | 'manual'
 
 // ---------- DM ----------
 
@@ -31,14 +33,47 @@ function switchDMMissionsSubtab(subtabId) {
     if (subtabId === 'leyenda') loadLegendTracks();
 }
 
+function setDMMissionsActiveView(mode) {
+    _dmMissionsActiveView = (mode === 'auto' || mode === 'manual') ? mode : 'all';
+    const allBtn = document.getElementById('dm-missions-view-all');
+    const autoBtn = document.getElementById('dm-missions-view-auto');
+    const manualBtn = document.getElementById('dm-missions-view-manual');
+    if (allBtn && autoBtn && manualBtn) {
+        allBtn.classList.toggle('btn-primary', _dmMissionsActiveView === 'all');
+        allBtn.classList.toggle('btn-secondary', _dmMissionsActiveView !== 'all');
+        autoBtn.classList.toggle('btn-primary', _dmMissionsActiveView === 'auto');
+        autoBtn.classList.toggle('btn-secondary', _dmMissionsActiveView !== 'auto');
+        manualBtn.classList.toggle('btn-primary', _dmMissionsActiveView === 'manual');
+        manualBtn.classList.toggle('btn-secondary', _dmMissionsActiveView !== 'manual');
+    }
+    renderDMMissionsList('activas');
+}
+
 // OPTIMIZACIÓN READS: get() al cargar/refrescar, sin listener permanente
 function loadDMMissions() {
     db.collection('missions')
         .orderBy('createdAt', 'desc')
         .limit(200)
         .get()
-        .then(snap => {
+        .then(async snap => {
             missionsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            // Cargar info de reglas de automatización que desbloquean misiones
+            try {
+                const autoSnap = await db.collection('automation_rules').limit(400).get();
+                const map = {};
+                autoSnap.docs.forEach(doc => {
+                    const data = doc.data();
+                    const mid = data.missionId;
+                    if (!mid) return;
+                    const itemName = (data.itemName || '').trim();
+                    if (!map[mid]) map[mid] = [];
+                    map[mid].push({ itemName: itemName || 'Ítem de regla', ruleId: doc.id });
+                });
+                missionAutomationInfo = map;
+            } catch (e) {
+                console.error('Error loading mission automation info', e);
+                missionAutomationInfo = {};
+            }
             const activasOn = document.getElementById('dm-missions-activas-panel')?.style.display !== 'none';
             const rechazadasOn = document.getElementById('dm-missions-rechazadas-panel')?.style.display !== 'none';
             const historialOn = document.getElementById('dm-missions-historial-panel')?.style.display !== 'none';
@@ -48,6 +83,7 @@ function loadDMMissions() {
         .catch(err => {
             console.error('Missions load:', err);
             missionsData = [];
+            missionAutomationInfo = {};
             renderDMMissionsList('activas');
         });
 }
@@ -63,7 +99,13 @@ function renderDMMissionsList(filter) {
         return Object.keys(m.playerProgress).some(pid => m.playerProgress[pid] && m.playerProgress[pid].status === PLAYER_PROGRESS_STATUS.rejected);
     };
 
-    const activas = missionsData.filter(m => m.status === MISSION_STATUS.draft || m.status === MISSION_STATUS.visible);
+    const activasBase = missionsData.filter(m => m.status === MISSION_STATUS.draft || m.status === MISSION_STATUS.visible);
+    const activas = activasBase.filter(m => {
+        const hasAuto = (missionAutomationInfo[m.id] || []).length > 0;
+        if (_dmMissionsActiveView === 'auto') return hasAuto;
+        if (_dmMissionsActiveView === 'manual') return !hasAuto;
+        return true;
+    });
     const rechazadas = missionsData.filter(m => m.status === MISSION_STATUS.visible && hasRejections(m));
     const historial = missionsData.filter(m => m.status === MISSION_STATUS.completed || m.status === MISSION_STATUS.archived);
 
@@ -79,6 +121,10 @@ function renderDMMissionsList(filter) {
         ? '<p style="color:#8b7355; text-align:center; padding:30px;">No hay misiones activas. Crea una con "+ Nueva misión".</p>'
         : activas.map(m => {
             const statusLabel = m.status === MISSION_STATUS.visible ? 'Visible' : 'Borrador';
+            const autoInfo = missionAutomationInfo[m.id] || [];
+            const tagHtml = autoInfo.length
+                ? `<span class="mission-tag-auto">Se activa por: ${autoInfo.map(x => esc(x.itemName || 'Ítem')).join(', ')}</span>`
+                : '<span class="mission-tag-manual">Activar manualmente</span>';
             const visibleToLabel = (m.visibleTo === 'player' && Array.isArray(m.assignedPlayerIds) && m.assignedPlayerIds.length)
                 ? `${m.assignedPlayerIds.length} jugador(es)` : (m.visibleTo === 'all' ? 'Todos' : '—');
             const nivelLabel = m.nivel != null && m.nivel !== '' ? `Nivel ${m.nivel}` : '';
@@ -91,7 +137,7 @@ function renderDMMissionsList(filter) {
             return `
                 <div class="mission-card" data-mission-id="${esc(m.id)}">
                     <div class="mission-card-header">
-                        <h3 class="mission-card-title">${esc(m.title || 'Sin título')}</h3>
+                        <h3 class="mission-card-title">${esc(m.title || 'Sin título')}${tagHtml}</h3>
                         <span class="mission-card-meta">${statusLabel}${nivelLabel ? ' · ' + esc(nivelLabel) : ''}</span>
                     </div>
                     ${desc ? `<p class="mission-card-desc">${esc(desc)}</p>` : ''}
@@ -924,6 +970,22 @@ function loadPlayerLegendTracks(forceRefresh) {
 /** Invalida la caché de Leyenda del jugador (p. ej. al entrar a vista jugador) para que la próxima apertura de Leyenda traiga datos frescos. */
 function invalidatePlayerLegendCache() {
     playerLegendTracksData = null;
+}
+
+// Exponer funciones para uso global (DM/Player)
+if (typeof window !== 'undefined') {
+    window.switchDMMissionsSubtab = switchDMMissionsSubtab;
+    window.loadDMMissions = loadDMMissions;
+    window.setDMMissionsActiveView = setDMMissionsActiveView;
+    window.openMissionModal = openMissionModal;
+    window.saveMission = saveMission;
+    window.setMissionStatus = setMissionStatus;
+    window.deleteMission = deleteMission;
+    window.switchPlayerMissionsSubtab = switchPlayerMissionsSubtab;
+    window.loadPlayerMissions = loadPlayerMissions;
+    window.updatePlayerMissionStatus = updatePlayerMissionStatus;
+    window.loadLegendTracks = loadLegendTracks;
+    window.invalidatePlayerLegendCache = invalidatePlayerLegendCache;
 }
 
 // FIXED: loadPlayerMissions single listener, no catch listener
